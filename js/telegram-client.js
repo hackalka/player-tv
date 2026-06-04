@@ -1,40 +1,21 @@
 /**
- * MOTOR DE TELEGRAM (VERSIÓN DIAGNÓSTICO MASTER)
+ * MOTOR DE TELEGRAM (INYECTOR MAESTRO)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let client = null;
-let retryCount = 0;
 
-async function startBoot() {
-    console.log("🚀 Verificando componentes...");
+async function startLogin() {
+    console.log("⚡ Iniciando conexión...");
 
-    // Intentamos rescatar Buffer si el navegador lo escondió
+    // Forzamos Buffer por si acaso
     if (typeof window.Buffer === 'undefined' && window.buffer) {
         window.Buffer = window.buffer.Buffer;
     }
 
     const lib = window.telegram || window.gramjs;
-    const hasBuffer = typeof window.Buffer !== 'undefined';
-    const hasLib = !!lib;
-
-    if (!hasLib || !hasBuffer) {
-        retryCount++;
-        let missing = !hasLib ? "MOTOR TELEGRAM" : "SEGURIDAD (BUFFER)";
-        document.getElementById('boot-status').innerText = `ESPERANDO ${missing}... (${retryCount})`;
-
-        if (retryCount > 20) {
-            document.getElementById('boot-status').innerHTML = "<span style='color:red;'>ERROR CRÍTICO: LIBRERÍAS BLOQUEADAS POR EL NAVEGADOR</span>";
-            return;
-        }
-
-        setTimeout(startBoot, 500);
-        return;
-    }
-
-    console.log("✅ Componentes listos. Iniciando sesión...");
     const { TelegramClient, sessions } = lib;
     const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
@@ -44,7 +25,7 @@ async function startBoot() {
     });
 
     try {
-        document.getElementById('boot-status').innerText = "ESTABLECIENDO CONEXIÓN...";
+        document.getElementById('boot-status').innerText = "CONECTANDO...";
         await client.connect();
 
         if (!await client.checkAuthorization()) {
@@ -56,8 +37,7 @@ async function startBoot() {
         }
     } catch (e) {
         console.error(e);
-        document.getElementById('boot-status').innerText = "REINTENTANDO CONEXIÓN...";
-        setTimeout(startBoot, 2000);
+        document.getElementById('boot-status').innerText = "ERROR DE CONEXIÓN. REFRESCA.";
     }
 }
 
@@ -66,11 +46,13 @@ async function runQR() {
         await client.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
             qrCode: async (code) => {
                 const url = `tg://login?token=${code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-                const qr = qrcode(0, 'M');
-                qr.addData(url);
-                qr.make();
-                document.getElementById('qr-loading').style.display = 'none';
-                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4 });
+                if (window.qrcode) {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(url);
+                    qr.make();
+                    document.getElementById('qr-loading').style.display = 'none';
+                    document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4 });
+                }
             }
         });
         finalize();
@@ -82,13 +64,10 @@ function finalize() {
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
     document.body.style.overflow = 'auto';
-    if (typeof syncContents === 'undefined') {
-        // Si main.js no ha cargado funciones, las definimos o esperamos
-        setTimeout(finalize, 500);
-    } else {
-        syncContents();
-    }
+    if (typeof syncContents === 'function') syncContents();
 }
 
-// Iniciar proceso
-window.addEventListener('load', startBoot);
+// El inyector de index.html llamará a esta función al terminar
+window.iniciarTodo = startLogin;
+// Iniciamos automáticamente tras un pequeño delay para asegurar estabilidad
+setTimeout(startLogin, 500);
