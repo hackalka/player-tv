@@ -8,8 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const apiId = 8952741;
-const apiHash = "693fb2da124662dad85b2b337c53a386";
+// Estos datos son fijos o vienen de variables de entorno de Render
+const apiId = parseInt(process.env.API_ID) || 8952741;
+const apiHash = process.env.API_HASH || "693fb2da124662dad85b2b337c53a386";
 const stringSession = new StringSession(process.env.SESSION || "");
 
 const client = new TelegramClient(stringSession, apiId, apiHash, {
@@ -27,43 +28,45 @@ app.get("/api/catalogo", async (req, res) => {
     try {
         const entity = await client.getEntity("gran_player");
         const fullChannel = await client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
-        const topics = fullChannel.fullChat.topics.topics || [];
+        const topics = fullChannel.fullChat.topics?.topics || [];
 
         const catalogo = [];
-        for (const topic of topics) {
-            const messages = await client.getMessages(entity, { replyTo: topic.id, limit: 50 });
-            messages.forEach(m => {
-                if (!m.message) return;
-                const texto = m.message.toLowerCase();
-                let cat = "otros";
-                if (texto.includes("#pelicula")) cat = "peliculas";
-                else if (texto.includes("#serie")) cat = "series";
+        // Leemos los mensajes más recientes del canal
+        const messages = await client.getMessages(entity, { limit: 100 });
 
-                catalogo.push({
-                    id: m.id,
-                    titulo: m.message.split('\n')[0].replace(/#\w+/g, '').trim(),
-                    sinopsis: m.message,
-                    categoria: cat,
-                    topic: topic.title
-                });
+        messages.forEach(m => {
+            if (!m.message) return;
+            const texto = m.message.toLowerCase();
+            let cat = "otros";
+            if (texto.includes("#pelicula")) cat = "peliculas";
+            else if (texto.includes("#serie")) cat = "series";
+
+            catalogo.push({
+                id: m.id,
+                titulo: m.message.split('\n')[0].replace(/#\w+/g, '').trim(),
+                sinopsis: m.message,
+                categoria: cat
             });
-        }
+        });
         res.json(catalogo);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-// Endpoint para streaming (Proxy de video)
+// Endpoint para streaming
 app.get("/api/stream/:id", async (req, res) => {
     try {
         const entity = await client.getEntity("gran_player");
         const messages = await client.getMessages(entity, { ids: [parseInt(req.params.id)] });
-        const media = messages[0].media;
+        if (!messages.length || !messages[0].media) return res.status(404).send("Video no encontrado");
 
+        const media = messages[0].media;
         res.setHeader('Content-Type', 'video/mp4');
+
+        // STREAMING REAL: Enviamos los datos conforme llegan de Telegram
         await client.downloadMedia(media, {
-            outputFile: res, // Enviamos el video directamente al navegador
+            outputFile: res,
             workers: 4
         });
     } catch (e) {
@@ -71,5 +74,5 @@ app.get("/api/stream/:id", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API Netflix lista en puerto ${PORT}`));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 Servidor listo en puerto ${PORT}`));
