@@ -2,19 +2,20 @@
 //  1. CONFIGURACIÓN Y VARIABLES
 // ══════════════════════════════════════════
 const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.ready();
-    tg.expand();
-    // Aplicar colores de Telegram
-    document.documentElement.style.setProperty('--bg', tg.themeParams.bg_color || '#06090e');
-    document.documentElement.style.setProperty('--surface', tg.themeParams.secondary_bg_color || '#10141d');
-    document.documentElement.style.setProperty('--gold', tg.themeParams.button_color || '#f5c518');
-    document.documentElement.style.setProperty('--text-color', tg.themeParams.text_color || '#ffffff');
-}
 
 const _db = "aHR0cHM6Ly9wbGF5ZXJ0di05NDQ5Yy1kZWZhdWx0LXJ0ZGIuZXVyb3BlLXdlc3QxLmZpcmViYXNlZGF0YWJhc2UuYXBwLw==";
-firebase.initializeApp({ databaseURL: atob(_db) });
-const db = firebase.database();
+let db;
+
+function initFirebase() {
+    if (typeof firebase === 'undefined') {
+        console.error("Firebase no cargado todavía...");
+        setTimeout(initFirebase, 500);
+        return;
+    }
+    firebase.initializeApp({ databaseURL: atob(_db) });
+    db = firebase.database();
+    cargar();
+}
 
 let base = { peliculas: [], series: [], directos: [], agenda: [], destacados: null };
 let filtroActual = 'inicio';
@@ -27,7 +28,7 @@ const IMG_CAMPO = "https://blog.marti.mx/wp-content/uploads/2023/06/campo_futbol
 function cargar() {
     // Si queremos usar Telegram, podemos pausar Firebase o combinar ambos
     // Comentamos el window.onload original para que no choque con telegram-client.js
-    // // window.onload = cargar;
+    // // window.onload = initFirebase;
 
     db.ref('destacado_manual').on('value', snap => {
         base.destacados = snap.val(); 
@@ -366,4 +367,4 @@ function obtenerValorCronologico(str) {
     return nums ? parseInt(nums[0])*100 + parseInt(nums[1]) : 999999;
 }
 
-// window.onload = cargar;
+// window.onload = initFirebase;

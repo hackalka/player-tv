@@ -2,63 +2,42 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV</title>
+    <title>PLAYER TV - Premium</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- 1. CIMIENTOS (Fix para errores de require/exports) -->
-    <script>
-        window.global = window;
-        window.process = { env: { DEBUG: undefined } };
-        window.exports = {};
-        window.module = { exports: {} };
-        window.require = function(m) {
-            if (m === "buffer") return { Buffer: window.Buffer };
-            return {};
-        };
-    </script>
-
-    <!-- 2. LIBRERÍAS (Carga en orden estricto) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-    <script>
-        // Forzar Buffer global inmediato
-        window.Buffer = window.buffer.Buffer;
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
 <body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
     <!-- PANTALLA DE CARGA -->
     <div id="loader-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
         <h1 style="color:#f5c518; font-size:32px; letter-spacing:5px; margin:0;">PLAYER TV</h1>
-        <div id="boot-status" style="color:#666; margin-top:20px; font-size:12px; text-transform:uppercase;">Iniciando protocolos...</div>
+        <div id="boot-status" style="color:#666; margin-top:20px; font-size:12px; text-transform:uppercase;">Iniciando sistema...</div>
     </div>
 
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
+    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222; background: #000;">
         <h1 style="color: #f5c518; margin: 0; font-size: 22px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px;">
+    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000;">
         <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
         <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
         <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
     </nav>
 
-    <div id="content" style="padding: 10px;"></div>
+    <div id="content" style="padding: 15px;"></div>
 
-    <!-- MODAL DE LOGIN -->
+    <!-- MODAL LOGIN -->
     <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
         <div style="background:#111; border:2px solid #f5c518; padding:35px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518; margin:0 0 15px;">LOGIN</h2>
+            <h2 style="color:#f5c518; margin:0 0 20px;">CONECTAR TELEGRAM</h2>
             <div id="qr-container" style="background:#fff; width:220px; height:220px; margin:0 auto 20px; padding:10px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
                 <div id="qr-code"></div>
-                <div id="qr-loading" style="color:#000; font-weight:bold;">GENERANDO...</div>
+                <div id="qr-loading" style="color:#000; font-weight:bold; font-size:14px;">GENERANDO QR...</div>
             </div>
-            <p style="font-size:12px; color:#888;">Escanea con Telegram > Ajustes > Dispositivos</p>
-            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:14px; margin:10px 0; background:#222; border:1px solid #333; color:white; border-radius:10px;">
-            <button onclick="iniciarLogin()" style="width:100%; padding:14px; background:#f5c518; border:none; font-weight:bold; border-radius:10px; cursor:pointer;">ENTRAR</button>
+            <p style="font-size:12px; color:#888;">Escanea desde Telegram > Ajustes > Dispositivos</p>
+            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:14px; margin-top:10px; background:#222; border:1px solid #333; color:white; border-radius:10px;">
+            <button onclick="iniciarLogin()" style="width:100%; padding:14px; margin-top:10px; background:#f5c518; border:none; font-weight:bold; border-radius:10px; cursor:pointer; color:#000;">ENTRAR</button>
         </div>
     </div>
 
@@ -68,10 +47,29 @@
         <video id="main-video" controls style="width:100%; max-height:80vh; background:#000;"></video>
     </div>
 
-    <!-- 3. LÓGICA FINAL -->
+    <!-- 1. CIMIENTOS Y SHIMS -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script>
+        // Fix de Buffer Seguro
+        window.Buffer = window.Buffer || (typeof buffer !== 'undefined' ? buffer.Buffer : undefined);
+        window.process = { env: { DEBUG: undefined } };
+        window.exports = {};
+        window.module = { exports: {} };
+        window.require = function(t) {
+            if (t === "buffer") return { Buffer: window.Buffer };
+            return {};
+        };
+    </script>
+
+    <!-- 2. LIBRERÍAS EXTERNAS -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- 3. LÓGICA DE APP -->
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
+
 </body>
 </html>
