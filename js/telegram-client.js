@@ -5,18 +5,24 @@ const apiId = 8952741;
 const apiHash = "693fb2da124662dad85b2b337c53a386";
 const stringSession = new StringSession(localStorage.getItem('tg_session') || "");
 
+// Usar servidores de prueba o producción correctamente con un logger
 const client = new TelegramClient(stringSession, apiId, apiHash, {
     connectionRetries: 5,
-    useWSS: true
+    useWSS: true, // Forzar WebSocket Seguro para navegadores
 });
 
 let loginResolver;
 let step = 'phone';
 
 async function conectarTelegram() {
-    if (!localStorage.getItem('tg_session')) {
-        document.getElementById('login-modal').style.display = 'flex';
-        try {
+    console.log("Iniciando conexión con Telegram...");
+    try {
+        await client.connect();
+
+        if (!await client.checkAuthorization()) {
+            console.log("No autorizado. Mostrando modal de login...");
+            document.getElementById('login-modal').style.display = 'flex';
+
             await client.start({
                 phoneNumber: async () => {
                     step = 'phone';
@@ -32,17 +38,24 @@ async function conectarTelegram() {
                     actualizarUI();
                     return new Promise(resolve => { loginResolver = resolve; });
                 },
-                onError: (err) => alert("Error: " + err.message),
+                onError: (err) => {
+                    console.error("Error en start:", err);
+                    alert("Error: " + err.message);
+                },
             });
             localStorage.setItem('tg_session', client.session.save());
             document.getElementById('login-modal').style.display = 'none';
-            await inicializarContenidoTelegram();
-        } catch (e) {
-            console.error(e);
         }
-    } else {
-        await client.connect();
+
+        console.log("Conexión establecida correctamente.");
         await inicializarContenidoTelegram();
+    } catch (e) {
+        console.error("Error crítico de conexión:", e);
+        // Si hay error de sesión, la limpiamos para reintentar
+        if (e.message.includes("AUTH_KEY_UNREGISTERED")) {
+            localStorage.removeItem('tg_session');
+            location.reload();
+        }
     }
 }
 
