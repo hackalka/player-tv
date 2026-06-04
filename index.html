@@ -13,18 +13,15 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <!-- FIX CRÍTICO: Definición de entorno para GramJS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <!-- Cargamos Buffer PRIMERO de forma absoluta -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        // Definir Buffer y require antes de cargar Telegram
-        window.Buffer = window.Buffer || buffer.Buffer;
-        window.require = window.require || function(mod) {
-            console.warn("Módulo requerido dinámicamente:", mod);
-            return window[mod] || {};
-        };
+        // Definición global robusta
+        window.Buffer = window.buffer.Buffer;
+        window.process = { env: {} };
     </script>
 
-    <!-- Carga de GramJS (Versión estable de navegador) -->
+    <!-- Cargamos GramJS después de Buffer -->
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
 </head>
 <body>
@@ -44,52 +41,45 @@
 
 <div id="hero-container"></div>
 
-<nav class="nav" data-zona="nav">
+<nav class="nav">
     <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
     <button class="f-btn" onclick="cambiarFiltro('agenda', this)">DEPORTES</button>
     <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
     <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
     <button class="f-btn" onclick="cambiarFiltro('directos', this)">TV EN VIVO</button>
-    <button class="f-btn" onclick="cambiarFiltro('favoritos', this)"><i class="fa fa-star"></i></button>
 </nav>
 
-<div id="sub-nav" data-zona="subnav"></div>
-
+<div id="sub-nav"></div>
 <div id="content"></div>
 
-<!-- Modal de Login Telegram -->
-<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index: 5000; align-items:center; justify-content:center;">
-    <div style="background:#111; border:1px solid var(--gold); max-width: 400px; width:90%; padding: 30px; text-align: center; border-radius:15px;">
-        <h2 style="color:var(--gold); margin-bottom:10px;">CONECTAR TELEGRAM</h2>
-        <p id="login-msg" style="color:#ccc; margin-bottom:20px;">Introduce tu número para recibir el código</p>
-        <input type="text" id="phone-input" placeholder="+34123456789" style="width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
-        <input type="text" id="code-input" placeholder="Código de Telegram" style="display:none; width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
-        <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
-        <button id="btn-send-phone" onclick="iniciarLogin()" style="width:100%; background:var(--gold); color:#000; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:15px; font-size:16px;">ENVIAR</button>
+<!-- Modal de Login -->
+<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 10000; align-items:center; justify-content:center;">
+    <div style="background:#111; border:2px solid #f5c518; width:90%; max-width:400px; padding:30px; border-radius:15px; text-align:center;">
+        <h2 style="color:#f5c518;">TELEGRAM LOGIN</h2>
+        <p id="login-msg" style="color:#ccc;">Introduce tu número (+34...)</p>
+        <input type="text" id="phone-input" style="width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;">
+        <input type="text" id="code-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Código">
+        <input type="password" id="2fa-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Contraseña 2FA">
+        <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CONTINUAR</button>
     </div>
 </div>
 
-<div class="zona-activa-label" id="zonaLabel"></div>
-
-<div id="modal" class="modal" role="dialog" aria-modal="true">
+<div id="modal" class="modal">
     <div class="modal-content">
         <button class="close-btn" onclick="cerrarModal()">✕</button>
         <div id="modalHeader"></div>
         <div class="modal-details" style="padding: 20px;">
-            <h2 id="det-titulo" style="color:var(--gold); margin-top:0; text-transform: uppercase;"></h2>
-            <p id="det-sinopsis" style="font-size: 14px; color: #ccc; margin-bottom: 15px;"></p>
-            <div id="modalActions"></div>
-            <div id="tabsTemporadas" class="tabs-temporadas"></div>
+            <h2 id="det-titulo" style="color:#f5c518;"></h2>
+            <p id="det-sinopsis" style="color:#ccc;"></p>
+            <div id="tabsTemporadas"></div>
             <div id="linksBox"></div>
         </div>
     </div>
 </div>
 
-<div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index:4000; flex-direction:column; align-items:center; justify-content:center;">
-    <button class="btn-volver" onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:12px 24px; cursor:pointer; font-weight:bold; border-radius:8px;">
-        <i class="fa fa-arrow-left"></i> VOLVER
-    </button>
-    <h2 id="video-info" style="color:white; margin-bottom:15px; text-align:center;"></h2>
+<div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index:15000; flex-direction:column; align-items:center; justify-content:center;">
+    <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">VOLVER</button>
+    <h2 id="video-info" style="color:white; margin-bottom:15px;"></h2>
     <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
 </div>
 
