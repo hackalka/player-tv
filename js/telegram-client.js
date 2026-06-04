@@ -1,4 +1,4 @@
-// Configuración del Cliente - Optimizada por Master Dev
+// Configuración del Cliente - Fix de Inicialización
 const apiId = 8952741;
 const apiHash = "693fb2da124662dad85b2b337c53a386";
 
@@ -8,6 +8,13 @@ let step = 'phone';
 let isLoadingTelegram = false;
 
 async function initGramJS() {
+    // Verificamos que la librería esté cargada en window.telegram
+    if (!window.telegram) {
+        console.error("❌ Librería GramJS no detectada. Reintentando...");
+        setTimeout(initGramJS, 1000);
+        return;
+    }
+
     const { TelegramClient, Api } = window.telegram;
     const { StringSession } = window.telegram.sessions;
 
@@ -18,7 +25,7 @@ async function initGramJS() {
         useWSS: true
     });
 
-    console.log("🚀 Cliente GramJS Iniciado");
+    console.log("🚀 Cliente GramJS Inicializado");
     conectarTelegram();
 }
 
@@ -82,7 +89,6 @@ function iniciarLogin() {
     if (loginResolver) loginResolver(val);
 }
 
-// Lógica de carga optimizada con Caché Temporal
 async function inicializarContenidoTelegram() {
     if (isLoadingTelegram) return;
     isLoadingTelegram = true;
@@ -90,12 +96,12 @@ async function inicializarContenidoTelegram() {
     const channelId = "gran_player";
     try {
         const entity = await client.getEntity(channelId);
+        // Usar window.telegram.Api para asegurar acceso global
         const fullChannel = await client.invoke(new window.telegram.Api.channels.GetFullChannel({ channel: entity }));
         const topics = fullChannel.fullChat.topics.topics || [];
 
         console.log("📂 Cargando " + topics.length + " Topics...");
 
-        // Carga paralela controlada
         const promises = topics.map(topic => cargarMensajesDeTopic(entity, topic));
         await Promise.all(promises);
 
@@ -109,7 +115,6 @@ async function inicializarContenidoTelegram() {
 }
 
 async function cargarMensajesDeTopic(entity, topic) {
-    // Usamos caché local para evitar re-peticiones en la misma sesión
     const messages = await client.getMessages(entity, {
         replyTo: topic.id,
         limit: 40
@@ -156,9 +161,6 @@ function extraerExtraAgenda(msg) {
 }
 
 function extraerPortada(m) {
-    // Si el mensaje tiene una imagen adjunta real en Telegram
-    if (m.media && m.media.photo) return "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW";
-
     const urlImg = m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i);
     return urlImg ? urlImg[0] : "https://via.placeholder.com/160x230/111/f5c518?text=VIDEO";
 }
@@ -172,7 +174,6 @@ function itemExiste(cat, titulo) {
     return base[cat].some(i => i.titulo.toUpperCase() === titulo.toUpperCase());
 }
 
-// Mejora del sistema de reproducción
 window.mostrarCaps = function(items, esSerie) {
     const box = document.getElementById('linksBox');
     box.innerHTML = '';
@@ -199,7 +200,7 @@ async function reproducirVideoInterno(titulo, url) {
 
     playerLayer.style.display = 'flex';
     info.innerText = titulo;
-    video.innerHTML = ''; // Limpiar fuentes anteriores
+    video.innerHTML = '';
 
     try {
         if (url.includes('t.me/')) {
@@ -223,15 +224,14 @@ async function reproducirVideoInterno(titulo, url) {
             video.play();
         }
     } catch (e) {
-        console.warn("⚠️ Fallo reproductor interno, usando fallback:", e);
+        console.warn("⚠️ Fallo reproductor interno:", e);
         if (window.Telegram?.WebApp) window.Telegram.WebApp.openLink(url);
         else window.open(url, '_blank');
         playerLayer.style.display = 'none';
     }
 }
 
-// Inicialización Premium
+// Inicialización Robusta
 window.addEventListener('load', () => {
-    // Pequeño delay para efectos de entrada
-    setTimeout(initGramJS, 500);
+    setTimeout(initGramJS, 1000);
 });
