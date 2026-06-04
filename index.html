@@ -7,10 +7,10 @@
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Script oficial de Telegram WebApp -->
+    <!-- Script de Telegram WebApp (Oficial) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- Firebase v10 (Modular ES Modules) -->
+    <!-- FIREBASE V10 MODULAR (La forma correcta) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -20,41 +20,42 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        window.db = getDatabase(app);
-        window.dbRef = ref;
-        window.dbOnValue = onValue;
+        const db = getDatabase(app);
 
-        console.log("✅ Firebase v10 Conectado");
-        // Iniciamos la carga una vez Firebase está listo
-        if (window.initApp) window.initApp();
+        // Exponer herramientas necesarias a la ventana global
+        window.firebaseDB = db;
+        window.firebaseRef = ref;
+        window.firebaseOnValue = onValue;
+
+        console.log("✅ Firebase Engine Ready");
+        if (window.startApp) window.startApp();
     </script>
 </head>
-<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif;">
+<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
+    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222; background: #000;">
         <h1 style="color: #f5c518; margin: 0; font-size: 24px; letter-spacing: 2px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 15px; padding: 15px;">
+    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000; position: sticky; top: 0; z-index: 1000;">
         <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
         <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
         <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
-        <button class="f-btn" onclick="cambiarFiltro('agenda', this)">DEPORTES</button>
+        <button class="f-btn" onclick="cambiarFiltro('directos', this)">TV EN VIVO</button>
     </nav>
 
-    <div id="content" style="padding: 10px;">
-        <div id="loading" style="text-align:center; padding:50px; color:#666;">Cargando contenidos...</div>
+    <div id="content" style="padding: 15px; min-height: 80vh;">
+        <div style="text-align: center; color: #444; padding-top: 50px;">Conectando con la base de datos...</div>
     </div>
 
-    <!-- REPRODUCTOR -->
-    <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 20000; flex-direction:column; align-items:center; justify-content:center;">
-        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">VOLVER</button>
-        <h2 id="video-info" style="color:#fff; margin-bottom:10px;"></h2>
-        <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
+    <!-- REPRODUCTOR MAESTRO -->
+    <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 150000; flex-direction:column; align-items:center; justify-content:center;">
+        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:12px 25px; border-radius:10px; font-weight:bold; cursor:pointer; z-index: 10;">VOLVER</button>
+        <h2 id="video-info" style="color:white; margin-bottom:15px; font-size: 18px; text-align:center;"></h2>
+        <video id="main-video" controls style="width:100%; max-height:80vh; background:#000;"></video>
     </div>
 
-    <!-- Lógica de la Aplicación -->
+    <!-- Lógica Principal -->
     <script src="js/main.js"></script>
-    <!-- Ya no cargamos telegram-client.js porque eliminamos GramJS -->
 </body>
 </html>
