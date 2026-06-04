@@ -25,7 +25,11 @@ const IMG_CAMPO = "https://blog.marti.mx/wp-content/uploads/2023/06/campo_futbol
 //  2. CARGA DE DATOS
 // ══════════════════════════════════════════
 function cargar() {
-    db.ref('destacado_manual').on('value', snap => { 
+    // Si queremos usar Telegram, podemos pausar Firebase o combinar ambos
+    // Comentamos el window.onload original para que no choque con telegram-client.js
+    // window.onload = cargar;
+
+    db.ref('destacado_manual').on('value', snap => {
         base.destacados = snap.val(); 
         render(filtroActual); 
     });
