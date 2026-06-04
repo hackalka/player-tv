@@ -1,5 +1,5 @@
 /**
- * MOTOR DE TELEGRAM (VERSIÓN AUTO-REPARABLE)
+ * TELEGRAM STREAMING ENGINE (MASTER EDITION)
  */
 
 const API_ID = 8952741;
@@ -8,23 +8,64 @@ const API_HASH = "693fb2da124662dad85b2b337c53a386";
 let tgClient = null;
 let loginRes = null;
 let step = 'phone';
+let swRegistration = null;
 
-function updateStatus(msg) {
-    const el = document.getElementById('status-text');
-    if (el) el.innerText = msg;
+// Registro del Service Worker para Streaming
+async function registerSW() {
+    if ('serviceWorker' in navigator) {
+        try {
+            swRegistration = await navigator.serviceWorker.register('sw.js');
+            console.log("✅ Service Worker de Streaming registrado");
+
+            // Establecer canal de comunicación
+            navigator.serviceWorker.ready.then((registration) => {
+                const messageChannel = new MessageChannel();
+                messageChannel.port1.onmessage = handleSWMessage;
+                registration.active.postMessage({ type: 'INIT' }, [messageChannel.port2]);
+            });
+        } catch (e) {
+            console.error("Fallo al registrar SW:", e);
+        }
+    }
+}
+
+async function handleSWMessage(e) {
+    const { type, requestId, streamId, start, size } = e.data;
+    if (type === 'FETCH_RANGE') {
+        try {
+            // Esta es la magia: descargamos el trozo de Telegram directamente
+            const chunk = await downloadTelegramChunk(streamId, start, size);
+            e.target.postMessage({ requestId, chunk });
+        } catch (err) {
+            e.target.postMessage({ requestId, error: err.message });
+        }
+    }
+}
+
+async function downloadTelegramChunk(streamId, start, size) {
+    // Obtenemos el mensaje que contiene el archivo
+    // streamId tendrá el formato "chatId-msgId"
+    const [chatId, msgId] = streamId.split('-');
+    const messages = await tgClient.getMessages(chatId, { ids: [parseInt(msgId)] });
+    if (!messages.length || !messages[0].media) throw new Error("Archivo no encontrado");
+
+    const media = messages[0].media;
+    // Descargar el trozo específico
+    const buffer = await tgClient.downloadMedia(media, {
+        start: BigInt(start),
+        end: BigInt(start + size - 1),
+        workers: 1
+    });
+    return buffer; // ArrayBuffer
 }
 
 async function startEngine() {
-    // Verificamos si Buffer está disponible, si no, lo inyectamos de nuevo
-    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
-        window.Buffer = window.buffer.Buffer;
-    }
-
     if (!window.telegram || !window.Buffer) {
-        console.log("⏳ Reintentando cargar librerías...");
-        setTimeout(startEngine, 1000);
+        setTimeout(startEngine, 500);
         return;
     }
+
+    await registerSW();
 
     const { TelegramClient, sessions } = window.telegram;
     const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
@@ -35,11 +76,8 @@ async function startEngine() {
     });
 
     try {
-        updateStatus("Estableciendo conexión segura...");
         await tgClient.connect();
-
-        const isAuth = await tgClient.checkAuthorization();
-        if (!isAuth) {
+        if (!await tgClient.checkAuthorization()) {
             document.getElementById('login-modal').style.display = 'flex';
             await tgClient.start({
                 phoneNumber: async () => { step='phone'; updateLoginUI(); return new Promise(r => loginRes=r); },
@@ -50,16 +88,51 @@ async function startEngine() {
             localStorage.setItem('tg_session', tgClient.session.save());
             document.getElementById('login-modal').style.display = 'none';
         }
-
-        updateStatus("Sincronizando contenido...");
         loadTelegramContent();
-
     } catch (e) {
         console.error(e);
-        updateStatus("Fallo al conectar con Telegram. Reintenta.");
     }
 }
 
+// Interceptar clics en portadas para usar el Streaming
+window.playVideo = async function(titulo, item) {
+    const player = document.getElementById('player-layer');
+    const video = document.getElementById('main-video');
+    const info = document.getElementById('video-info');
+
+    player.style.display = 'flex';
+    info.innerText = titulo;
+
+    if (item.msgId && item.chatId) {
+        // Obtenemos info del archivo para registrarlo en el Service Worker
+        const messages = await tgClient.getMessages(item.chatId, { ids: [parseInt(item.msgId)] });
+        const media = messages[0]?.media;
+        const fileSize = media?.document?.size || media?.video?.size;
+        const mimeType = media?.document?.mimeType || media?.video?.mimeType || 'video/mp4';
+
+        if (fileSize) {
+            const streamId = `${item.chatId}-${item.msgId}`;
+            // Registramos el stream en el worker
+            navigator.serviceWorker.controller.postMessage({
+                type: 'REGISTER',
+                streamId,
+                fileSize: Number(fileSize),
+                mimeType
+            });
+
+            // La URL ahora es local, servida por nuestro Service Worker
+            video.src = `/tg-stream/${streamId}`;
+            video.play().catch(e => console.error("Error al reproducir streaming:", e));
+            return;
+        }
+    }
+
+    // Fallback si no es un archivo directo de Telegram
+    video.src = item.link;
+    video.play();
+};
+
+// ... resto de funciones de login y carga ...
 function updateLoginUI() {
     document.getElementById('phone-input').style.display = step==='phone'?'block':'none';
     document.getElementById('code-input').style.display = step==='code'?'block':'none';
@@ -77,12 +150,13 @@ function iniciarLogin() {
 async function loadTelegramContent() {
     try {
         const { Api } = window.telegram;
-        const entity = await tgClient.getEntity("gran_player");
+        const chatId = "gran_player";
+        const entity = await tgClient.getEntity(chatId);
         const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: entity }));
         const topics = full.fullChat.topics.topics || [];
 
         for (const t of topics) {
-            const msgs = await tgClient.getMessages(entity, { replyTo: t.id, limit: 30 });
+            const msgs = await tgClient.getMessages(entity, { replyTo: t.id, limit: 40 });
             msgs.forEach(m => {
                 if (!m.message) return;
                 const txt = m.message.toLowerCase();
@@ -95,9 +169,11 @@ async function loadTelegramContent() {
                 const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
                 const link = m.message.match(/https?:\/\/[^\s]+/)?.[0];
 
-                if (link && !base[cat].some(i => i.titulo === titulo)) {
+                if (!base[cat].some(i => i.titulo === titulo)) {
                     base[cat].push({
                         titulo, link,
+                        chatId: chatId,
+                        msgId: m.id,
                         portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW",
                         sinopsis: m.message,
                         catAsignada: cat
@@ -106,11 +182,7 @@ async function loadTelegramContent() {
             });
         }
         if (typeof render === 'function') render(filtroActual);
-        else console.error("No se encontró la función render");
-    } catch (e) {
-        console.error(e);
-    }
+    } catch (e) { console.error(e); }
 }
 
-// Iniciar cuando todo esté listo
 window.addEventListener('load', startEngine);
