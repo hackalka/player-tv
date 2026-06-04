@@ -1,5 +1,5 @@
 /**
- * TELEGRAM TRUE STREAMING ENGINE (FIXED)
+ * TELEGRAM ENGINE MASTER (ESTILO CINEFLIX)
  */
 
 const API_ID = 8952741;
@@ -7,77 +7,53 @@ const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let tgClient = null;
 let loginResolver = null;
-let loginStep = 'qr';
+let currentStep = 'qr';
 
-async function registerStreamingSW() {
-    if ('serviceWorker' in navigator) {
-        try {
-            await navigator.serviceWorker.register('sw.js');
-            console.log("Streaming SW OK");
+async function initTelegram() {
+    console.log("🛠 Iniciando motor...");
 
-            navigator.serviceWorker.ready.then((reg) => {
-                const chan = new MessageChannel();
-                chan.port1.onmessage = (e) => {
-                    const { type, requestId, streamId, start, size } = e.data;
-                    if (type === 'FETCH_RANGE') handleRangeRequest(requestId, streamId, start, size, e.target);
-                };
-                reg.active.postMessage({ type: 'INIT' }, [chan.port2]);
-            });
-        } catch (e) { console.error("SW fail:", e); }
+    // Verificación y corrección de Buffer en tiempo real
+    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
+        window.Buffer = window.buffer.Buffer;
     }
-}
 
-async function handleRangeRequest(rid, sid, start, size, port) {
-    try {
-        const [chatId, msgId] = sid.split('-');
-        const msgs = await tgClient.getMessages(chatId, { ids: [parseInt(msgId)] });
-        const buf = await tgClient.downloadMedia(msgs[0].media, {
-            start: BigInt(start),
-            end: BigInt(start + size - 1),
-            workers: 1
-        });
-        port.postMessage({ requestId: rid, chunk: buf });
-    } catch (err) { port.postMessage({ requestId: rid, error: err.message }); }
-}
-
-async function startBoot() {
-    // Espera crítica de librerías
     if (!window.telegram || !window.Buffer) {
-        setTimeout(startBoot, 500);
+        document.getElementById('boot-status').innerText = "Esperando motor...";
+        setTimeout(initTelegram, 500);
         return;
     }
 
-    await registerStreamingSW();
+    const { TelegramClient, sessions } = window.telegram;
+    const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
-    const { TelegramClient, Api } = window.telegram;
-    const { StringSession } = window.telegram.sessions;
-
-    const session = new StringSession(localStorage.getItem('tg_session') || "");
-    tgClient = new TelegramClient(session, API_ID, API_HASH, { connectionRetries: 5, useWSS: true });
+    tgClient = new TelegramClient(session, API_ID, API_HASH, {
+        connectionRetries: 5,
+        useWSS: true
+    });
 
     try {
-        document.getElementById('boot-status').innerText = "Estableciendo conexión...";
+        document.getElementById('boot-status').innerText = "Conectando...";
         await tgClient.connect();
 
         if (!await tgClient.checkAuthorization()) {
             document.getElementById('loader-screen').style.display = 'none';
             document.getElementById('login-modal').style.display = 'flex';
-            startQR();
+            startLoginFlow();
         } else {
-            finalizeBoot();
+            onAuthorized();
         }
     } catch (e) {
         console.error(e);
-        document.getElementById('boot-status').innerText = "Error de red. Reintentando...";
+        document.getElementById('boot-status').innerText = "Fallo de conexión. Reintentando...";
     }
 }
 
-async function startQR() {
+async function startLoginFlow() {
     try {
         await tgClient.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
             onError: (err) => {
                 if (err.message.includes("SESSION_PASSWORD_NEEDED")) {
-                    loginStep = '2fa'; updateLoginUI();
+                    currentStep = '2fa'; updateLoginUI();
                 } else alert("Error: " + err.message);
             },
             qrCode: async (code) => {
@@ -89,27 +65,26 @@ async function startQR() {
                 document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
             }
         });
-        finalizeBoot();
+        onAuthorized();
     } catch (e) {}
 }
 
-function finalizeBoot() {
+function onAuthorized() {
     localStorage.setItem('tg_session', tgClient.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
-    syncData();
+    syncContents();
 }
 
-async function syncData() {
+async function syncContents() {
     try {
         const { Api } = window.telegram;
-        const chatId = "gran_player";
-        const ent = await tgClient.getEntity(chatId);
-        const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: ent }));
+        const channel = await tgClient.getEntity("gran_player");
+        const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel }));
         const topics = full.fullChat.topics.topics || [];
 
         for (const t of topics) {
-            const msgs = await tgClient.getMessages(ent, { replyTo: t.id, limit: 30 });
+            const msgs = await tgClient.getMessages(channel, { replyTo: t.id, limit: 30 });
             msgs.forEach(m => {
                 if (!m.message) return;
                 const txt = m.message.toLowerCase();
@@ -123,8 +98,8 @@ async function syncData() {
                 if (lnk && !base[cat].some(i => i.titulo === tit)) {
                     base[cat].push({
                         titulo: tit, link: lnk,
-                        chatId: chatId, msgId: m.id,
-                        portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW",
+                        chatId: "gran_player", msgId: m.id,
+                        portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=TV",
                         sinopsis: m.message, catAsignada: cat
                     });
                 }
@@ -134,30 +109,4 @@ async function syncData() {
     } catch (e) { console.error(e); }
 }
 
-window.playVideo = async function(titulo, item) {
-    const player = document.getElementById('player-layer');
-    const video = document.getElementById('main-video');
-    player.style.display = 'flex';
-
-    if (item.msgId && item.chatId) {
-        const msgs = await tgClient.getMessages(item.chatId, { ids: [parseInt(item.msgId)] });
-        const media = msgs[0]?.media;
-        const size = media?.document?.size || media?.video?.size;
-        const mime = media?.document?.mimeType || media?.video?.mimeType || 'video/mp4';
-
-        if (size) {
-            const sid = `${item.chatId}-${item.msgId}`;
-            navigator.serviceWorker.controller.postMessage({
-                type: 'REGISTER', streamId: sid,
-                fileSize: Number(size), mimeType: mime
-            });
-            video.src = `tg-stream/${sid}`;
-            video.play();
-            return;
-        }
-    }
-    video.src = item.link;
-    video.play();
-};
-
-window.addEventListener('load', startBoot);
+window.addEventListener('load', initTelegram);

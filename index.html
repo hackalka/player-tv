@@ -6,13 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 1. POLYFILLS (Vital para que Telegram no falle) -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script>
+        // Si la carga falla por red, forzamos el objeto global
+        window.Buffer = window.Buffer || (typeof buffer !== 'undefined' ? buffer.Buffer : undefined);
+        window.process = { env: { DEBUG: undefined } };
+        window.require = function(t) { return {}; };
+    </script>
+
+    <!-- 2. MOTOR DE TELEGRAM (Browser Bundle) -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js"></script>
+    <script src="js/qrcode.min.js"></script>
 </head>
 <body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
     <!-- PANTALLA DE CARGA -->
     <div id="loader-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
         <h1 style="color:#f5c518; font-size:30px; letter-spacing:5px;">PLAYER TV</h1>
-        <div id="boot-status" style="color:#666; margin-top:20px; font-size:14px;">Iniciando motor...</div>
+        <div id="boot-status" style="color:#666; margin-top:20px; font-size:14px;">Conectando...</div>
     </div>
 
     <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
@@ -28,18 +41,20 @@
     <div id="content" style="padding: 10px;"></div>
 
     <!-- MODAL DE LOGIN -->
-    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 100000; align-items:center; justify-content:center;">
+    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
         <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518; margin:0;">CONECTAR</h2>
+            <h2 style="color:#f5c518; margin:0;">LOGIN</h2>
             <div id="qr-container" style="background:#fff; width:200px; height:200px; margin:20px auto; padding:10px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
                 <div id="qr-code"></div>
                 <div id="qr-loading" style="color:#000;">Generando QR...</div>
             </div>
-            <p style="font-size:12px; color:#aaa;">Escanea con Telegram > Ajustes > Dispositivos</p>
+            <p style="font-size:12px; color:#aaa; margin-bottom: 20px;">Abre Telegram > Ajustes > Dispositivos</p>
+
             <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin:10px 0; background:#222; border:1px solid #333; color:white; border-radius:8px;">
             <input type="text" id="code-input" placeholder="Código" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
             <input type="password" id="2fa-input" placeholder="2FA" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
-            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer;">CONTINUAR</button>
+
+            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer; color:#000;">CONTINUAR</button>
         </div>
     </div>
 
@@ -49,24 +64,8 @@
         <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
     </div>
 
-    <!-- 1. Cimientos -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-    <script>
-        // Forzar Buffer antes de Telegram
-        if (typeof buffer !== 'undefined') window.Buffer = buffer.Buffer;
-        window.process = { env: {} };
-        window.require = function() { return {}; };
-    </script>
-
-    <!-- 2. Motor Telegram -->
-    <script src="js/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
-
-    <!-- 3. Lógica de Negocio -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- Scripts de Aplicación -->
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
-
 </body>
 </html>
