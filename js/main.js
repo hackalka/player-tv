@@ -27,7 +27,7 @@ const IMG_CAMPO = "https://blog.marti.mx/wp-content/uploads/2023/06/campo_futbol
 function cargar() {
     // Si queremos usar Telegram, podemos pausar Firebase o combinar ambos
     // Comentamos el window.onload original para que no choque con telegram-client.js
-    // window.onload = cargar;
+    // // window.onload = cargar;
 
     db.ref('destacado_manual').on('value', snap => {
         base.destacados = snap.val(); 
@@ -358,4 +358,4 @@ function obtenerValorCronologico(str) {
     return nums ? parseInt(nums[0])*100 + parseInt(nums[1]) : 999999;
 }
 
-window.onload = cargar;
+// window.onload = cargar;

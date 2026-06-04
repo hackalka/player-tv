@@ -170,7 +170,7 @@ window.mostrarCaps = function(items, esSerie) {
     });
 };
 
-function reproducirVideoInterno(titulo, url) {
+async function reproducirVideoInterno(titulo, url) {
     const playerLayer = document.getElementById('player-layer');
     const video = document.getElementById('main-video');
     const info = document.getElementById('video-info');
@@ -178,16 +178,32 @@ function reproducirVideoInterno(titulo, url) {
     playerLayer.style.display = 'flex';
     info.innerText = titulo;
 
-    // Aquí usamos el resolver que hicimos para obtener el mp4 directo de Telegram
-    TelegramLinkResolver.resolve(url).then(resolvedUrl => {
+    try {
+        // Resolver URL de Telegram en JS
+        const sUrl = url.replace("t.me/", "t.me/s/");
+        const response = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(sUrl));
+        const data = await response.json();
+        const html = data.contents;
+
+        // Buscar video en el HTML
+        const videoMatch = html.match(/<video[^>]*src="([^"]*)"/);
+        const metaMatch = html.match(/<meta[^>]*property="og:video"[^>]*content="([^"]*)"/);
+
+        const resolvedUrl = videoMatch ? videoMatch[1] : (metaMatch ? metaMatch[1] : null);
+
         if (resolvedUrl) {
             video.src = resolvedUrl;
             video.play();
         } else {
-            alert("No se pudo obtener el video directo.");
+            console.log("No se pudo obtener el video directo, abriendo externamente...");
+            if (window.Telegram?.WebApp) window.Telegram.WebApp.openLink(url);
+            else window.open(url, '_blank');
             playerLayer.style.display = 'none';
         }
-    });
+    } catch (e) {
+        console.error("Error al resolver video:", e);
+        playerLayer.style.display = 'none';
+    }
 }
 
 window.onload = () => {
