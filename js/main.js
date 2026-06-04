@@ -1,370 +1,130 @@
-// ══════════════════════════════════════════
-//  1. CONFIGURACIÓN Y VARIABLES
-// ══════════════════════════════════════════
-const tg = window.Telegram?.WebApp;
-
-const _db = "aHR0cHM6Ly9wbGF5ZXJ0di05NDQ5Yy1kZWZhdWx0LXJ0ZGIuZXVyb3BlLXdlc3QxLmZpcmViYXNlZGF0YWJhc2UuYXBwLw==";
-let db;
-
-function initFirebase() {
-    if (typeof firebase === 'undefined') {
-        console.error("Firebase no cargado todavía...");
-        setTimeout(initFirebase, 500);
-        return;
-    }
-    firebase.initializeApp({ databaseURL: atob(_db) });
-    db = firebase.database();
-    cargar();
-}
-
+/**
+ * MAIN ENGINE - FRONTEND PURE EDITION (FIREBASE V10)
+ */
 let base = { peliculas: [], series: [], directos: [], agenda: [], destacados: null };
 let filtroActual = 'inicio';
-let subFiltroActual = 'TODOS';
-const IMG_CAMPO = "https://blog.marti.mx/wp-content/uploads/2023/06/campo_futbol_Header-770x449.webp";
 
-// ══════════════════════════════════════════
-//  2. CARGA DE DATOS
-// ══════════════════════════════════════════
+window.initApp = function() {
+    console.log("🚀 Iniciando aplicación...");
+    cargarContenido();
+};
+
 function cargar() {
-    // Si queremos usar Telegram, podemos pausar Firebase o combinar ambos
-    // Comentamos el window.onload original para que no choque con telegram-client.js
-    // // window.onload = initFirebase;
+    if (!window.db) return;
 
-    db.ref('destacado_manual').on('value', snap => {
-        base.destacados = snap.val(); 
-        render(filtroActual); 
-    });
-
+    // Cargar datos de Firebase (v10 Style)
     ['peliculas', 'series', 'directos', 'agenda'].forEach(cat => {
-        db.ref(cat).on('value', snap => {
+        const reference = window.dbRef(window.db, cat);
+        window.dbOnValue(reference, snap => {
             const data = snap.val() || {};
-            let list = Object.keys(data).map(k => ({ ...data[k], firebaseKey: k, catAsignada: cat }));
-            
-            if (cat === 'peliculas') list.reverse(); 
-            if (cat === 'agenda') list.sort((a, b) => obtenerValorCronologico(a.extra) - obtenerValorCronologico(b.extra));
-            
-            base[cat] = list;
+            base[cat] = Object.keys(data).map(k => ({ ...data[k], firebaseKey: k, catAsignada: cat }));
             render(filtroActual);
         });
     });
 }
 
-// ══════════════════════════════════════════
-//  3. LÓGICA DE FAVORITOS
-// ══════════════════════════════════════════
-function gestionarFavorito(item) {
-    let favs = JSON.parse(localStorage.getItem('favoritos')) || [];
-    const r = getRoot(item.titulo);
-    const index = favs.findIndex(i => getRoot(i.titulo) === r);
-
-    if (index > -1) {
-        favs.splice(index, 1);
-    } else {
-        favs.push(item);
-    }
-    localStorage.setItem('favoritos', JSON.stringify(favs));
-    
-    // Actualizar visualmente el botón del modal si está abierto
-    const btnModal = document.getElementById('btn-fav-modal');
-    if (btnModal) {
-        const esFav = favs.some(i => getRoot(i.titulo) === r);
-        btnModal.style.color = esFav ? 'gold' : '#ccc';
-        btnModal.innerHTML = `<i class="fa ${esFav ? 'fa-star' : 'fa-star-o'}"></i>`;
-    }
-    render(filtroActual);
+async function cargarContenido() {
+    // Aquí es donde sucede la magia: Sincronizamos con el canal público
+    // sin necesidad de GramJS ni login.
+    console.log("📥 Sincronizando vídeos de Telegram...");
+    await fetchTelegramPublic("gran_player");
+    cargar(); // Luego cargamos Firebase
 }
 
-function guardarSeguirViendo(item) {
-    let lista = JSON.parse(localStorage.getItem('seguirViendo')) || [];
-    lista = lista.filter(i => getRoot(i.titulo) !== getRoot(item.titulo));
-    lista.unshift(item);
-    if (lista.length > 20) lista.pop();
-    localStorage.setItem('seguirViendo', JSON.stringify(lista));
+async function fetchTelegramPublic(channelId) {
+    try {
+        const proxy = 'https://api.allorigins.win/get?url=';
+        const url = `https://t.me/s/${channelId}`;
+        const res = await fetch(proxy + encodeURIComponent(url));
+        const data = await res.json();
+        const html = data.contents;
+
+        // Buscamos mensajes con vídeos o enlaces
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const messages = doc.querySelectorAll('.tgme_widget_message_wrap');
+
+        messages.forEach(msg => {
+            const text = msg.querySelector('.tgme_widget_message_text')?.innerText || "";
+            const txtLower = text.toLowerCase();
+
+            let cat = "inicio";
+            if (txtLower.includes("#pelicula")) cat = "peliculas";
+            else if (txtLower.includes("#serie")) cat = "series";
+
+            const titulo = text.split('\n')[0].replace(/#\w+/g, '').trim();
+            const linkMatch = text.match(/https?:\/\/t\.me\/[^\s]+/);
+
+            if (titulo && linkMatch && !base[cat].some(i => i.titulo === titulo)) {
+                base[cat].push({
+                    titulo: titulo,
+                    link: linkMatch[0],
+                    portada: "https://via.placeholder.com/160x230/111/f5c518?text=TV",
+                    catAsignada: cat
+                });
+            }
+        });
+    } catch (e) { console.warn("Fallo al scrapear Telegram:", e); }
 }
 
-function eliminarElemento(e, tituloRaiz, claveStorage) {
-    e.stopPropagation();
-    let lista = JSON.parse(localStorage.getItem(claveStorage)) || [];
-    lista = lista.filter(i => getRoot(i.titulo) !== tituloRaiz);
-    localStorage.setItem(claveStorage, JSON.stringify(lista));
-    render(filtroActual);
-}
-
-// ══════════════════════════════════════════
-//  4. RENDERIZADO PRINCIPAL
-// ══════════════════════════════════════════
 function render(modo) {
     filtroActual = modo;
     const container = document.getElementById('content');
     if (!container) return;
-
     container.innerHTML = '';
+
+    const data = modo === 'inicio' ? base.peliculas.slice(0, 10) : base[modo];
     
-    // Banner Principal
-    renderHero();
-
-    if (modo === 'inicio') {
-        const favs = JSON.parse(localStorage.getItem('favoritos')) || [];
-        if (favs.length > 0) container.appendChild(crearSeccion("MIS FAVORITOS", favs, 'favoritos'));
-
-        ['peliculas', 'series', 'directos', 'agenda'].forEach(cat => {
-            if (base[cat]?.length > 0) {
-                let t = cat === 'agenda' ? 'DEPORTES EN VIVO' : cat.toUpperCase();
-                container.appendChild(crearSeccion(t, base[cat].slice(0, 20), null));
-            }
-        });
-    } else {
-        const grid = document.createElement('div');
-        grid.className = "grid";
-        
-        let data = base[modo] || [];
-        const visto = new Set();
-        data.forEach(item => {
-            if (!visto.has(item.titulo)) { visto.add(item.titulo); grid.appendChild(crearCard(item)); }
-        });
-        container.appendChild(grid);
+    if (data.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:#444; margin-top:50px;">No hay contenido disponible</div>';
+        return;
     }
-}
 
-function crearSeccion(titulo, items, tipoStorage) {
-    const sec = document.createElement('div');
-    sec.style.marginBottom = "30px";
-    sec.innerHTML = `<div class="section-title">${titulo}</div>`;
-
-    const row = document.createElement('div');
-    row.className = "row-container";
+    const grid = document.createElement('div');
+    grid.style = "display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; padding: 10px;";
     
-    const visto = new Set();
-    items.forEach(item => {
-        const r = getRoot(item.titulo);
-        if (!visto.has(r)) { visto.add(r); row.appendChild(crearCard(item, tipoStorage)); }
+    data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = "card";
+        card.style = "background:#111; border-radius:10px; overflow:hidden; border:1px solid #222; cursor:pointer;";
+        card.innerHTML = `
+            <img src="${item.portada || 'https://via.placeholder.com/160x230/111/f5c518?text=VIDEO'}" style="width:100%; height:200px; object-fit:cover;">
+            <div style="padding:10px; text-align:center; font-size:12px; font-weight:bold;">${item.titulo}</div>
+        `;
+        card.onclick = () => reproducir(item.titulo, item.link);
+        grid.appendChild(card);
     });
-    sec.appendChild(row);
-    return sec;
+    container.appendChild(grid);
 }
 
-function crearCard(item, tipoStorage = null) {
-    const card = document.createElement('div');
-    card.className = "card";
-    card.onclick = () => {
-        if (typeof window.playVideo === 'function') {
-            window.playVideo(item.titulo, item);
+async function reproducir(titulo, url) {
+    const player = document.getElementById('player-layer');
+    const video = document.getElementById('main-video');
+    player.style.display = 'flex';
+    document.getElementById('video-info').innerText = titulo;
+
+    if (url.includes('t.me/')) {
+        const sUrl = url.replace("t.me/", "t.me/s/");
+        const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(sUrl));
+        const data = await res.json();
+        const videoUrl = data.contents.match(/<video[^>]*src="([^"]*)"/)?.[1];
+
+        if (videoUrl) {
+            video.src = videoUrl;
+            video.play();
         } else {
-            guardarSeguirViendo(item);
-            abrirModal(item.titulo, item.catAsignada, item);
+            alert("No se puede extraer el video directo de este mensaje.");
+            player.style.display = 'none';
+            window.open(url, '_blank');
         }
-    };
-
-    const btnBorrar = tipoStorage ? `<div onclick="eliminarElemento(event, '${r}', '${tipoStorage}')" style="position:absolute; top:8px; right:8px; background:rgba(255,0,0,0.9); color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:15; font-size:16px;">&times;</div>` : '';
-
-    let contentHTML = '';
-    if (item.logo1 && item.logo2) {
-        contentHTML = `
-            <div class="img-container">
-                <div class="fondo-agenda">
-                    <img class="escudo-mini" src="${item.logo1}">
-                    <span class="vs-text">VS</span>
-                    <img class="escudo-mini" src="${item.logo2}">
-                </div>
-            </div>`;
     } else {
-        contentHTML = `
-            <div class="img-container">
-                <img class="portada ${item.catAsignada === 'directos' ? 'img-directo' : ''}" src="${item.portada || item.logo1}" onerror="this.src='https://via.placeholder.com/160x230/111/f5c518?text=${r}'">
-            </div>`;
-    }
-
-    const infoExtra = item.extra ? `<div class="info-agenda">${item.extra}</div>` : '';
-
-    card.innerHTML = `
-        ${btnBorrar}
-        ${contentHTML}
-        <div class="info">
-            <div class="info-titulo">${r}</div>
-            ${infoExtra}
-        </div>`;
-    return card;
-}
-
-// ══════════════════════════════════════════
-//  6. MODAL (CON ESTRELLA DE FAVORITOS)
-// ══════════════════════════════════════════
-function abrirModal(nombreRaiz, catKey, itemFallback) {
-    if (tg) {
-        tg.BackButton.show();
-        tg.BackButton.onClick(() => cerrarModal());
-    }
-    const modal = document.getElementById('modal');
-    modal.classList.add('active');
-    
-    let lista = [];
-    ['agenda', 'peliculas', 'series', 'directos'].forEach(c => {
-        const matches = base[c].filter(i => getRoot(i.titulo) === nombreRaiz);
-        if (matches.length > 0) lista = [...lista, ...matches];
-    });
-    if (lista.length === 0) lista = [itemFallback];
-
-    const principal = lista[0];
-    const favs = JSON.parse(localStorage.getItem('favoritos')) || [];
-    const esFav = favs.some(i => getRoot(i.titulo) === nombreRaiz);
-
-    // Actualizamos el título y añadimos la estrella al lado
-    document.getElementById('det-titulo').innerHTML = `${nombreRaiz} <span id="btn-fav-modal" style="margin-left:15px; cursor:pointer; color:${esFav?'gold':'#ccc'}; font-size:24px;"><i class="fa ${esFav?'fa-star':'fa-star-o'}"></i></span>`;
-    
-    document.getElementById('btn-fav-modal').onclick = () => gestionarFavorito(principal);
-    document.getElementById('det-sinopsis').textContent = principal.sinopsis || "Sin descripción.";
-
-    const header = document.getElementById('modalHeader');
-    if (principal.logo1 && principal.logo2) {
-        header.innerHTML = `<div style="background-image:url('${IMG_CAMPO}'); background-size:cover; height:200px; display:flex; align-items:center; justify-content:center; gap:20px;">
-            <img src="${principal.logo1}" style="height:90px; filter:drop-shadow(0 0 10px white);"><b style="font-size:25px; color:white;">VS</b><img src="${principal.logo2}" style="height:90px; filter:drop-shadow(0 0 10px white);">
-        </div>`;
-    } else {
-        header.innerHTML = `<div style="background-image: linear-gradient(transparent, #000), url('${principal.portada || principal.logo1}'); height:280px; background-size:cover; background-position:center;"></div>`;
-    }
-
-    const tabs = document.getElementById('tabsTemporadas');
-    tabs.innerHTML = '';
-    
-    if (catKey === 'series') {
-        const temps = {};
-        lista.forEach(i => {
-            const sMatch = i.titulo.match(/S(\d+)/i);
-            const sNum = sMatch ? sMatch[1] : "01";
-            if (!temps[sNum]) temps[sNum] = [];
-            temps[sNum].push(i);
-        });
-        Object.keys(temps).sort().forEach((s, idx) => {
-            const b = document.createElement('button');
-            b.className = `tab-temp ${idx === 0 ? 'active' : ''}`;
-            b.textContent = `TEMP ${s}`;
-            b.onclick = () => {
-                document.querySelectorAll('.tab-temp').forEach(btn => btn.classList.remove('active'));
-                b.classList.add('active');
-                mostrarCaps(temps[s], true);
-            };
-            tabs.appendChild(b);
-        });
-        mostrarCaps(temps[Object.keys(temps).sort()[0]], true);
-    } else {
-        mostrarCaps(lista, false);
+        video.src = url;
+        video.play();
     }
 }
 
-function mostrarCaps(items, esSerie) {
-    const box = document.getElementById('linksBox');
-    box.innerHTML = '';
-    
-    if (esSerie) {
-        items.sort((a, b) => {
-            const numA = parseInt(a.titulo.match(/E(\d+)/i)?.[1] || 0);
-            const numB = parseInt(b.titulo.match(/E(\d+)/i)?.[1] || 0);
-            return numA - numB;
-        });
-    }
-
-    items.forEach(item => {
-        let label = item.titulo;
-        if (esSerie) {
-            const eMatch = item.titulo.match(/E(\d+)/i);
-            label = eMatch ? `CAPÍTULO ${parseInt(eMatch[1])}` : item.titulo;
-        }
-
-        const links = [
-            { u: item.link, n: 'LINK 1' },
-            { u: item.link1, n: 'LINK 2' },
-            { u: item.acestream, n: 'ACESTREAM' },
-            { u: item.id, n: 'ID ACESTREAM' }
-        ];
-
-        links.forEach(l => {
-            if (l.u && l.u.length > 5) {
-                const row = document.createElement('div');
-                row.style = "background:rgba(255,255,255,0.05); margin-bottom:8px; padding:12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:12px; border:1px solid rgba(255,255,255,0.1);";
-                const esAce = l.u.includes('acestream://') || l.u.length === 40;
-                row.innerHTML = `<i class="fa ${esAce ? 'fa-bolt' : 'fa-play'}" style="color:gold;"></i>
-                    <div style="color:white; flex:1;"><b style="font-size:13px;">${label}</b></div>`;
-                row.onclick = () => {
-                    let url = l.u;
-                    if (l.u.length === 40 && !l.u.includes('://')) url = 'acestream://' + l.u;
-
-                    if (tg && url.startsWith('http')) {
-                        tg.openLink(url);
-                    } else {
-                        window.location.href = url;
-                    }
-                };
-                box.appendChild(row);
-            }
-        });
-    });
+function cerrarReproductor() {
+    const v = document.getElementById('main-video');
+    v.pause(); v.src = "";
+    document.getElementById('player-layer').style.display = 'none';
 }
-
-// ══════════════════════════════════════════
-//  7. HERO Y UTILIDADES
-// ══════════════════════════════════════════
-function renderHero() {
-    const hero = document.getElementById('hero-container');
-    if (!hero || filtroActual !== 'inicio' || !base.destacados) { if(hero) hero.style.display='none'; return; }
-    hero.style.display = 'block';
-    const item = base.destacados;
-    const r = getRoot(item.titulo);
-    
-    if (item.logo1 && item.logo2) {
-        hero.innerHTML = `
-        <div class="hero-content" style="background-image:linear-gradient(rgba(0,0,0,0.4), var(--bg)), url('${IMG_CAMPO}');">
-            <div class="hero-details">
-                <div class="hero-vs-box">
-                    <img src="${item.logo1}">
-                    <span>VS</span>
-                    <img src="${item.logo2}">
-                </div>
-                <h2>${r}</h2>
-                <button class="btn-play-hero" onclick="abrirModal('${r}','${item.catAsignada}',null)">
-                    <i class="fa fa-play"></i> VER AHORA
-                </button>
-            </div>
-        </div>`;
-    } else {
-        hero.innerHTML = `
-        <div class="hero-content" style="background-image:linear-gradient(transparent, var(--bg)), url('${item.portada || item.logo1}');">
-            <div class="hero-details">
-                <h2>${r}</h2>
-                <button class="btn-play-hero" onclick="abrirModal('${r}','${item.catAsignada}',null)">
-                    <i class="fa fa-play"></i> VER AHORA
-                </button>
-            </div>
-        </div>`;
-    }
-}
-
-function generarSubCategorias(modo) {
-    const subNav = document.getElementById('sub-nav');
-    const gens = ['TODOS', 'ACCION', 'DRAMA', 'TERROR', 'COMEDIA', 'ANIMACION', 'FANTASIA'];
-    gens.forEach(g => {
-        const b = document.createElement('button');
-        b.style = `margin:5px; padding:8px 18px; border-radius:20px; border:none; cursor:pointer; background:${subFiltroActual===g?'gold':'#222'}; color:${subFiltroActual===g?'#000':'#fff'}; font-weight:bold;`;
-        b.textContent = g;
-        b.onclick = () => { subFiltroActual = g; render(modo); };
-        subNav.appendChild(b);
-    });
-}
-
-function cambiarFiltro(m, btn) {
-    document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    subFiltroActual = 'TODOS';
-    render(m);
-}
-
-function cerrarModal() {
-    document.getElementById('modal').classList.remove('active');
-    if (tg) tg.BackButton.hide();
-}
-function getRoot(t) { return t ? t.toUpperCase().split(/ S\d+| T\d+| TEMPORADA| CAPITULO| C\d+| E\d+/i)[0].trim() : ""; }
-function obtenerValorCronologico(str) {
-    const nums = str?.match(/\d+/g);
-    return nums ? parseInt(nums[0])*100 + parseInt(nums[1]) : 999999;
-}
-
-// window.onload = initFirebase;
