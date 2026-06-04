@@ -9,33 +9,32 @@
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-    <!-- Cargamos Buffer PRIMERO de forma absoluta -->
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        // Definición global robusta
-        window.Buffer = window.buffer.Buffer;
-        window.process = { env: {} };
+        // FIX PARA LIBRERÍAS DE NODE EN NAVEGADOR
+        window.process = { env: { DEBUG: undefined } };
+        window.Buffer = window.Buffer || undefined;
+        window.require = function(t) { return {}; };
     </script>
 
-    <!-- Cargamos GramJS después de Buffer -->
+    <!-- Cargamos Buffer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+
+    <!-- Cargamos GramJS desde un bundle preparado para navegador -->
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
 
 <header>
-    <div class="logo-box">
-        <h1>PLAYER TV</h1>
-    </div>
+    <div class="logo-box"><h1>PLAYER TV</h1></div>
 </header>
 
 <div class="search-container">
     <div class="search-bar">
         <i class="fa fa-search"></i>
-        <input type="text" id="mainSearch" placeholder="Buscar películas, series, deportes..." onkeyup="ejecutarBuscador()">
+        <input type="text" id="mainSearch" placeholder="Buscar..." onkeyup="ejecutarBuscador()">
     </div>
 </div>
 
@@ -49,18 +48,17 @@
     <button class="f-btn" onclick="cambiarFiltro('directos', this)">TV EN VIVO</button>
 </nav>
 
-<div id="sub-nav"></div>
 <div id="content"></div>
 
-<!-- Modal de Login -->
-<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 10000; align-items:center; justify-content:center;">
+<!-- Modal Login Telegram -->
+<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:#111; border:2px solid #f5c518; width:90%; max-width:400px; padding:30px; border-radius:15px; text-align:center;">
-        <h2 style="color:#f5c518;">TELEGRAM LOGIN</h2>
-        <p id="login-msg" style="color:#ccc;">Introduce tu número (+34...)</p>
+        <h2 style="color:#f5c518;">CONECTAR TELEGRAM</h2>
+        <p id="login-msg" style="color:#ccc;">Introduce tu número con el prefijo (+34...)</p>
         <input type="text" id="phone-input" style="width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;">
         <input type="text" id="code-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Código">
         <input type="password" id="2fa-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Contraseña 2FA">
-        <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">CONTINUAR</button>
+        <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ENVIAR</button>
     </div>
 </div>
 
@@ -71,7 +69,6 @@
         <div class="modal-details" style="padding: 20px;">
             <h2 id="det-titulo" style="color:#f5c518;"></h2>
             <p id="det-sinopsis" style="color:#ccc;"></p>
-            <div id="tabsTemporadas"></div>
             <div id="linksBox"></div>
         </div>
     </div>

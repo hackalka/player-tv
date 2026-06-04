@@ -1,16 +1,20 @@
-// Configuración del Cliente
-const _0x1 = "ODk1Mjc0MQ==";
-const _0x2 = "NjkzZmIyZGExMjQ2NjJkYWQ4NWIyYjMzN2M1M2EzODY=";
-const apiId = parseInt(atob(_0x1));
-const apiHash = atob(_0x2);
+// Master Config
+const _aID = "ODk1Mjc0MQ==";
+const _aHS = "NjkzZmIyZGExMjQ2NjJkYWQ4NWIyYjMzN2M1M2EzODY=";
+const apiId = parseInt(atob(_aID));
+const apiHash = atob(_aHS);
 
 let client = null;
 let loginResolver = null;
 let step = 'phone';
 
 async function initGramJS() {
+    // Definir Buffer si la librería lo cargó pero no lo asignó a window
+    if (typeof buffer !== 'undefined' && !window.Buffer) window.Buffer = buffer.Buffer;
+
     const tgLib = window.telegram;
     if (!tgLib || !window.Buffer) {
+        console.log("⏳ Reintentando carga de librerías...");
         setTimeout(initGramJS, 500);
         return;
     }
@@ -27,34 +31,35 @@ async function initGramJS() {
             document.getElementById('login-modal').style.display = 'flex';
             await client.start({
                 phoneNumber: async () => { step='phone'; return new Promise(r => loginResolver=r); },
-                phoneCode: async () => { step='code'; updateLoginUI(); return new Promise(r => loginResolver=r); },
-                password: async () => { step='2fa'; updateLoginUI(); return new Promise(r => loginResolver=r); },
+                phoneCode: async () => { step='code'; updateUI(); return new Promise(r => loginResolver=r); },
+                password: async () => { step='2fa'; updateUI(); return new Promise(r => loginResolver=r); },
                 onError: (e) => alert(e.message)
             });
             localStorage.setItem('tg_session', client.session.save());
             document.getElementById('login-modal').style.display = 'none';
         }
-        cargarDesdeTelegram();
+        syncTelegram();
     } catch (e) {
-        console.error(e);
+        console.error("Connection Error:", e);
     }
 }
 
-function updateLoginUI() {
+function updateUI() {
+    const msg = document.getElementById('login-msg');
     document.getElementById('phone-input').style.display = step==='phone'?'block':'none';
     document.getElementById('code-input').style.display = step==='code'?'block':'none';
     document.getElementById('2fa-input').style.display = step==='2fa'?'block':'none';
-    document.getElementById('login-msg').innerText = step==='code'?'Introduce el código':'Introduce el 2FA';
+    msg.innerText = step==='code' ? 'Introduce el código recibido' : (step==='2fa'?'Introduce contraseña 2FA':'Escribe tu teléfono');
 }
 
 function iniciarLogin() {
-    const v = step==='phone'?document.getElementById('phone-input').value:
-              step==='code'?document.getElementById('code-input').value:
-              document.getElementById('2fa-input').value;
-    if (loginResolver) loginResolver(v);
+    const val = step==='phone'?document.getElementById('phone-input').value:
+                step==='code'?document.getElementById('code-input').value:
+                document.getElementById('2fa-input').value;
+    if (loginResolver) loginResolver(val);
 }
 
-async function cargarDesdeTelegram() {
+async function syncTelegram() {
     try {
         const { Api } = window.telegram;
         const channel = await client.getEntity("gran_player");
@@ -62,7 +67,7 @@ async function cargarDesdeTelegram() {
         const topics = full.fullChat.topics.topics || [];
 
         for (const t of topics) {
-            const msgs = await client.getMessages(channel, { replyTo: t.id, limit: 50 });
+            const msgs = await client.getMessages(channel, { replyTo: t.id, limit: 30 });
             msgs.forEach(m => {
                 if (!m.message) return;
                 const txt = m.message.toLowerCase();
@@ -73,12 +78,12 @@ async function cargarDesdeTelegram() {
                 else if (txt.includes("#agenda")) cat = "agenda";
 
                 const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
-                const link = extraerLink(m.message);
+                const link = m.message.match(/[a-f0-9]{40}/) ? "acestream://" + m.message.match(/[a-f0-9]{40}/)[0] : (m.message.match(/https?:\/\/[^\s]+/) ? m.message.match(/https?:\/\/[^\s]+/)[0] : null);
 
                 if (link && !base[cat].some(i => i.titulo === titulo)) {
                     base[cat].push({
                         titulo, link,
-                        portada: extraerImg(m.message),
+                        portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=TV",
                         sinopsis: m.message,
                         catAsignada: cat
                     });
@@ -86,19 +91,7 @@ async function cargarDesdeTelegram() {
             });
         }
         if (typeof render === 'function') render(filtroActual);
-    } catch (e) { console.error(e); }
-}
-
-function extraerLink(m) {
-    const ace = m.match(/[a-f0-9]{40}/);
-    if (ace) return "acestream://" + ace[0];
-    const url = m.match(/https?:\/\/[^\s]+/);
-    return url ? url[0] : null;
-}
-
-function extraerImg(m) {
-    const img = m.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i);
-    return img ? img[0] : "https://via.placeholder.com/160x230/111/f5c518?text=TV";
+    } catch (e) { console.error("Sync Error:", e); }
 }
 
 window.mostrarCaps = function(items) {
@@ -107,26 +100,27 @@ window.mostrarCaps = function(items) {
     items.forEach(i => {
         const d = document.createElement('div');
         d.className = "link-item";
-        d.innerHTML = `<i class="fa fa-play"></i> ${i.titulo}`;
-        d.onclick = () => playVideo(i.titulo, i.link);
+        d.style = "background:#222; padding:15px; border-radius:10px; margin-bottom:10px; cursor:pointer;";
+        d.innerHTML = `<i class="fa fa-play" style="color:#f5c518;"></i> ${i.titulo}`;
+        d.onclick = () => {
+            const p = document.getElementById('player-layer');
+            const v = document.getElementById('main-video');
+            p.style.display = 'flex';
+            document.getElementById('video-info').innerText = i.titulo;
+
+            if (i.link.includes('t.me/')) {
+                const sUrl = i.link.replace("t.me/", "t.me/s/");
+                fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(sUrl))
+                    .then(r => r.json())
+                    .then(data => {
+                        const vid = data.contents.match(/<video[^>]*src="([^"]*)"/)?.[1];
+                        if (vid) { v.src = vid; v.play(); } else { window.open(i.link, '_blank'); p.style.display='none'; }
+                    });
+            } else { v.src = i.link; v.play(); }
+        };
         box.appendChild(d);
     });
 };
-
-async function playVideo(t, u) {
-    const p = document.getElementById('player-layer');
-    const v = document.getElementById('main-video');
-    p.style.display = 'flex';
-    document.getElementById('video-info').innerText = t;
-
-    if (u.includes('t.me/')) {
-        const sUrl = u.replace("t.me/", "t.me/s/");
-        const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(sUrl));
-        const data = await res.json();
-        const videoUrl = data.contents.match(/<video[^>]*src="([^"]*)"/)?.[1];
-        if (videoUrl) { v.src = videoUrl; v.play(); } else { window.open(u, '_blank'); p.style.display='none'; }
-    } else { v.src = u; v.play(); }
-}
 
 function cerrarReproductor() {
     const v = document.getElementById('main-video');
