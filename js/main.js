@@ -95,29 +95,18 @@ function eliminarElemento(e, tituloRaiz, claveStorage) {
 function render(modo) {
     filtroActual = modo;
     const container = document.getElementById('content');
-    const subNav = document.getElementById('sub-nav');
     if (!container) return;
 
     container.innerHTML = '';
     
-    if (subNav) {
-        subNav.innerHTML = '';
-        if (modo === 'peliculas' || modo === 'series') {
-            subNav.style.display = 'flex';
-            generarSubCategorias(modo);
-        } else { subNav.style.display = 'none'; }
-    }
-
+    // Banner Principal
     renderHero();
 
     if (modo === 'inicio') {
         const favs = JSON.parse(localStorage.getItem('favoritos')) || [];
         if (favs.length > 0) container.appendChild(crearSeccion("MIS FAVORITOS", favs, 'favoritos'));
 
-        const seguir = JSON.parse(localStorage.getItem('seguirViendo')) || [];
-        if (seguir.length > 0) container.appendChild(crearSeccion("SEGUIR VIENDO", seguir, 'seguirViendo'));
-
-        ['agenda', 'peliculas', 'series', 'directos'].forEach(cat => {
+        ['peliculas', 'series', 'directos', 'agenda'].forEach(cat => {
             if (base[cat]?.length > 0) {
                 let t = cat === 'agenda' ? 'DEPORTES EN VIVO' : cat.toUpperCase();
                 container.appendChild(crearSeccion(t, base[cat].slice(0, 20), null));
@@ -128,12 +117,9 @@ function render(modo) {
         grid.className = "grid";
         
         let data = base[modo] || [];
-        if (subFiltroActual !== 'TODOS') data = data.filter(i => i.genero && i.genero.toUpperCase() === subFiltroActual);
-        
         const visto = new Set();
         data.forEach(item => {
-            const r = getRoot(item.titulo);
-            if (!visto.has(r)) { visto.add(r); grid.appendChild(crearCard(item)); }
+            if (!visto.has(item.titulo)) { visto.add(item.titulo); grid.appendChild(crearCard(item)); }
         });
         container.appendChild(grid);
     }
@@ -157,10 +143,16 @@ function crearSeccion(titulo, items, tipoStorage) {
 }
 
 function crearCard(item, tipoStorage = null) {
-    const r = getRoot(item.titulo);
     const card = document.createElement('div');
     card.className = "card";
-    card.onclick = () => { guardarSeguirViendo(item); abrirModal(r, item.catAsignada, item); };
+    card.onclick = () => {
+        if (typeof window.playVideo === 'function') {
+            window.playVideo(item.titulo, item);
+        } else {
+            guardarSeguirViendo(item);
+            abrirModal(item.titulo, item.catAsignada, item);
+        }
+    };
 
     const btnBorrar = tipoStorage ? `<div onclick="eliminarElemento(event, '${r}', '${tipoStorage}')" style="position:absolute; top:8px; right:8px; background:rgba(255,0,0,0.9); color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:15; font-size:16px;">&times;</div>` : '';
 

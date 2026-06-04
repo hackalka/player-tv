@@ -1,6 +1,6 @@
 // TelegramFlix Service Worker — True Range-Request Streaming
-const streams = new Map();  // streamId -> { fileSize, mimeType }
-const pending = new Map();  // requestId -> { resolve, reject }
+const streams = new Map();
+const pending = new Map();
 let port = null;
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -30,7 +30,7 @@ self.addEventListener('message', (e) => {
 
 function fetchChunk(streamId, start, size) {
     return new Promise((resolve, reject) => {
-        if (!port) { reject(new Error('Port not ready')); return; }
+        if (!port) return reject(new Error('Port not ready'));
         const requestId = `${streamId}-${start}-${Date.now()}`;
         pending.set(requestId, { resolve, reject });
         port.postMessage({ type: 'FETCH_RANGE', requestId, streamId, start, size });
@@ -68,7 +68,7 @@ self.addEventListener('fetch', (e) => {
         }
     }
 
-    const CHUNK_SIZE = 1024 * 1024; // 1MB
+    const CHUNK_SIZE = 1024 * 1024;
     const totalRequested = end - start + 1;
 
     let pos = start;
