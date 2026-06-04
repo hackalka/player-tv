@@ -125,7 +125,7 @@ function render(modo) {
         });
     } else {
         const grid = document.createElement('div');
-        grid.style = "display: grid; grid-template-columns: repeat(auto-fill, 145px); gap: 15px; justify-content: center; padding: 15px;";
+        grid.className = "grid";
         
         let data = base[modo] || [];
         if (subFiltroActual !== 'TODOS') data = data.filter(i => i.genero && i.genero.toUpperCase() === subFiltroActual);
@@ -139,15 +139,13 @@ function render(modo) {
     }
 }
 
-// ══════════════════════════════════════════
-//  5. CREACIÓN DE CARDS (TAMAÑO FIJO TV/DIRECTOS)
-// ══════════════════════════════════════════
 function crearSeccion(titulo, items, tipoStorage) {
     const sec = document.createElement('div');
-    sec.style.marginBottom = "25px";
-    sec.innerHTML = `<h2 style="color:gold; margin:15px; font-size:1.3rem;">${titulo}</h2>`;
+    sec.style.marginBottom = "30px";
+    sec.innerHTML = `<div class="section-title">${titulo}</div>`;
+
     const row = document.createElement('div');
-    row.style = "display:flex; overflow-x:auto; gap:15px; padding:0 15px 10px; scrollbar-width:none;";
+    row.className = "row-container";
     
     const visto = new Set();
     items.forEach(item => {
@@ -161,30 +159,35 @@ function crearSeccion(titulo, items, tipoStorage) {
 function crearCard(item, tipoStorage = null) {
     const r = getRoot(item.titulo);
     const card = document.createElement('div');
-    card.style = "flex:0 0 auto; width:145px; position:relative; cursor:pointer;";
+    card.className = "card";
     card.onclick = () => { guardarSeguirViendo(item); abrirModal(r, item.catAsignada, item); };
 
-    const btnBorrar = tipoStorage ? `<div onclick="eliminarElemento(event, '${r}', '${tipoStorage}')" style="position:absolute; top:5px; right:5px; background:rgba(255,0,0,0.8); color:white; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:10; font-size:14px;">&times;</div>` : '';
+    const btnBorrar = tipoStorage ? `<div onclick="eliminarElemento(event, '${r}', '${tipoStorage}')" style="position:absolute; top:8px; right:8px; background:rgba(255,0,0,0.9); color:white; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:15; font-size:16px;">&times;</div>` : '';
 
-    let imgHTML = '';
+    let contentHTML = '';
     if (item.logo1 && item.logo2) {
-        imgHTML = `<div style="background-image:url('${IMG_CAMPO}'); background-size:cover; display:flex; align-items:center; justify-content:center; gap:5px; height:190px; border-radius:12px;">
-            <img src="${item.logo1}" style="width:40%; height:55px; object-fit:contain; filter:drop-shadow(0 0 5px white);"><b style="color:white; font-size:10px;">VS</b><img src="${item.logo2}" style="width:40%; height:55px; object-fit:contain; filter:drop-shadow(0 0 5px white);">
-        </div>`;
+        contentHTML = `
+            <div class="img-container">
+                <div class="fondo-agenda">
+                    <img class="escudo-mini" src="${item.logo1}">
+                    <span class="vs-text">VS</span>
+                    <img class="escudo-mini" src="${item.logo2}">
+                </div>
+            </div>`;
     } else {
-        // Forzamos el tamaño del póster a 145x190 pase lo que pase
-        imgHTML = `<img src="${item.portada || item.logo1}" style="width:145px; height:190px; object-fit:cover; display:block; border-radius:12px; background:#1a1a1a;">`;
+        contentHTML = `
+            <div class="img-container">
+                <img class="portada ${item.catAsignada === 'directos' ? 'img-directo' : ''}" src="${item.portada || item.logo1}" onerror="this.src='https://via.placeholder.com/160x230/111/f5c518?text=${r}'">
+            </div>`;
     }
 
-    const infoExtra = item.extra ? `<div style="font-size:10px; color:gold; margin-top:2px;">${item.extra}</div>` : '';
+    const infoExtra = item.extra ? `<div class="info-agenda">${item.extra}</div>` : '';
 
     card.innerHTML = `
         ${btnBorrar}
-        <div style="height:190px; width:145px; background:#1a1a1a; border-radius:12px; overflow:hidden; border:1px solid #333;">
-            ${imgHTML}
-        </div>
-        <div style="text-align:center; padding:8px 2px;">
-            <div style="color:#eee; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r}</div>
+        ${contentHTML}
+        <div class="info">
+            <div class="info-titulo">${r}</div>
             ${infoExtra}
         </div>`;
     return card;
@@ -315,16 +318,29 @@ function renderHero() {
     const r = getRoot(item.titulo);
     
     if (item.logo1 && item.logo2) {
-        hero.innerHTML = `<div style="background-image:linear-gradient(rgba(0,0,0,0.4), #000), url('${IMG_CAMPO}'); background-size:cover; height:350px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:0 0 25px 25px; gap:15px;">
-            <div style="display:flex; align-items:center; gap:25px;">
-                <img src="${item.logo1}" style="height:100px; filter:drop-shadow(0 0 8px white);"><b style="color:white; font-size:25px;">VS</b><img src="${item.logo2}" style="height:100px; filter:drop-shadow(0 0 8px white);">
+        hero.innerHTML = `
+        <div class="hero-content" style="background-image:linear-gradient(rgba(0,0,0,0.4), var(--bg)), url('${IMG_CAMPO}');">
+            <div class="hero-details">
+                <div class="hero-vs-box">
+                    <img src="${item.logo1}">
+                    <span>VS</span>
+                    <img src="${item.logo2}">
+                </div>
+                <h2>${r}</h2>
+                <button class="btn-play-hero" onclick="abrirModal('${r}','${item.catAsignada}',null)">
+                    <i class="fa fa-play"></i> VER AHORA
+                </button>
             </div>
-            <h1 style="color:white; font-size:1.6rem; margin:0; text-align:center;">${r}</h1>
-            <button onclick="abrirModal('${r}','${item.catAsignada}',null)" style="background:gold; border:none; padding:12px 35px; font-weight:bold; border-radius:8px; cursor:pointer;">VER AHORA</button>
         </div>`;
     } else {
-        hero.innerHTML = `<div style="background-image:linear-gradient(transparent, #000), url('${item.portada || item.logo1}'); background-size:cover; background-position:center; height:350px; display:flex; align-items:flex-end; padding:25px; border-radius:0 0 25px 25px;">
-            <div style="width:100%;"><h1 style="color:white; font-size:2rem; margin:0; text-shadow:2px 2px 4px #000;">${r}</h1><button onclick="abrirModal('${r}','${item.catAsignada}',null)" style="background:gold; border:none; padding:12px 35px; font-weight:bold; border-radius:8px; margin-top:10px; cursor:pointer;">VER AHORA</button></div>
+        hero.innerHTML = `
+        <div class="hero-content" style="background-image:linear-gradient(transparent, var(--bg)), url('${item.portada || item.logo1}');">
+            <div class="hero-details">
+                <h2>${r}</h2>
+                <button class="btn-play-hero" onclick="abrirModal('${r}','${item.catAsignada}',null)">
+                    <i class="fa fa-play"></i> VER AHORA
+                </button>
+            </div>
         </div>`;
     }
 }

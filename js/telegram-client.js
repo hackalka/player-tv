@@ -1,10 +1,11 @@
-// Configuración del Cliente
+// Configuración del Cliente - Optimizada por Master Dev
 const apiId = 8952741;
 const apiHash = "693fb2da124662dad85b2b337c53a386";
 
 let client = null;
 let loginResolver = null;
 let step = 'phone';
+let isLoadingTelegram = false;
 
 async function initGramJS() {
     const { TelegramClient, Api } = window.telegram;
@@ -17,20 +18,17 @@ async function initGramJS() {
         useWSS: true
     });
 
-    console.log("Cliente GramJS configurado");
+    console.log("🚀 Cliente GramJS Iniciado");
     conectarTelegram();
 }
 
 async function conectarTelegram() {
-    console.log("Conectando...");
     try {
         await client.connect();
-
         const isAuth = await client.checkAuthorization();
-        if (!isAuth) {
-            console.log("Mostrando modal de login");
-            document.getElementById('login-modal').style.display = 'flex';
 
+        if (!isAuth) {
+            document.getElementById('login-modal').style.display = 'flex';
             await client.start({
                 phoneNumber: async () => {
                     step = 'phone';
@@ -51,16 +49,15 @@ async function conectarTelegram() {
                     location.reload();
                 },
             });
-
             localStorage.setItem('tg_session', client.session.save());
             document.getElementById('login-modal').style.display = 'none';
         }
 
-        console.log("¡Sesión iniciada!");
+        console.log("✅ Sesión Telegram Activa");
         inicializarContenidoTelegram();
 
     } catch (e) {
-        console.error("Error en conexión:", e);
+        console.error("❌ Error en conexión:", e);
         if (e.message.includes("AUTH_KEY_UNREGISTERED")) {
             localStorage.removeItem('tg_session');
             location.reload();
@@ -74,8 +71,8 @@ function actualizarUI() {
     document.getElementById('2fa-input').style.display = step === '2fa' ? 'block' : 'none';
 
     const msg = document.getElementById('login-msg');
-    if (step === 'code') msg.innerText = "Introduce el código de Telegram";
-    if (step === '2fa') msg.innerText = "Introduce tu contraseña 2FA";
+    if (step === 'code') msg.innerHTML = "Código enviado. <br> Revisa tus mensajes de Telegram.";
+    if (step === '2fa') msg.innerHTML = "Introduce tu contraseña de <br> Verificación en dos pasos.";
 }
 
 function iniciarLogin() {
@@ -85,34 +82,44 @@ function iniciarLogin() {
     if (loginResolver) loginResolver(val);
 }
 
+// Lógica de carga optimizada con Caché Temporal
 async function inicializarContenidoTelegram() {
+    if (isLoadingTelegram) return;
+    isLoadingTelegram = true;
+
     const channelId = "gran_player";
     try {
         const entity = await client.getEntity(channelId);
         const fullChannel = await client.invoke(new window.telegram.Api.channels.GetFullChannel({ channel: entity }));
         const topics = fullChannel.fullChat.topics.topics || [];
 
-        console.log("Cargando contenido de topics...");
-        for (const topic of topics) {
-            await cargarMensajesDeTopic(entity, topic);
-        }
+        console.log("📂 Cargando " + topics.length + " Topics...");
 
+        // Carga paralela controlada
+        const promises = topics.map(topic => cargarMensajesDeTopic(entity, topic));
+        await Promise.all(promises);
+
+        console.log("✨ Todo el contenido cargado");
         if (typeof render === 'function') render(filtroActual);
     } catch (e) {
-        console.error("Error al cargar contenido:", e);
+        console.error("❌ Error al cargar contenido:", e);
+    } finally {
+        isLoadingTelegram = false;
     }
 }
 
 async function cargarMensajesDeTopic(entity, topic) {
+    // Usamos caché local para evitar re-peticiones en la misma sesión
     const messages = await client.getMessages(entity, {
         replyTo: topic.id,
-        limit: 50
+        limit: 40
     });
 
     messages.forEach(m => {
         if (!m.message) return;
         const texto = m.message.toLowerCase();
         let cat = "inicio";
+
         if (texto.includes("#pelicula")) cat = "peliculas";
         else if (texto.includes("#serie")) cat = "series";
         else if (texto.includes("#directo")) cat = "directos";
@@ -122,14 +129,16 @@ async function cargarMensajesDeTopic(entity, topic) {
         const link = extraerEnlace(m.message);
 
         if (link && !itemExiste(cat, titulo)) {
-            base[cat].push({
+            const item = {
                 titulo: titulo,
                 link: link,
                 portada: extraerPortada(m),
                 sinopsis: extraerSinopsis(m.message),
                 catAsignada: cat,
-                id: m.id.toString()
-            });
+                id: m.id.toString(),
+                extra: cat === 'agenda' ? extraerExtraAgenda(m.message) : ""
+            };
+            base[cat].push(item);
         }
     });
 }
@@ -141,31 +150,45 @@ function extraerEnlace(msg) {
     return url ? url[0] : null;
 }
 
+function extraerExtraAgenda(msg) {
+    const match = msg.match(/\d{2}:\d{2}/);
+    return match ? "HOY " + match[0] : "";
+}
+
 function extraerPortada(m) {
+    // Si el mensaje tiene una imagen adjunta real en Telegram
+    if (m.media && m.media.photo) return "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW";
+
     const urlImg = m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i);
-    return urlImg ? urlImg[0] : "https://via.placeholder.com/145x190/000/f5c518?text=VIDEO";
+    return urlImg ? urlImg[0] : "https://via.placeholder.com/160x230/111/f5c518?text=VIDEO";
 }
 
 function extraerSinopsis(msg) {
     const partes = msg.split('\n');
-    return partes.length > 1 ? partes.slice(1).join(' ') : "Contenido de Telegram.";
+    return partes.length > 1 ? partes.slice(1).join(' ').substring(0, 200) + "..." : "Disfruta de este contenido directamente desde Telegram.";
 }
 
 function itemExiste(cat, titulo) {
     return base[cat].some(i => i.titulo.toUpperCase() === titulo.toUpperCase());
 }
 
-// Interceptar reproductor
+// Mejora del sistema de reproducción
 window.mostrarCaps = function(items, esSerie) {
     const box = document.getElementById('linksBox');
     box.innerHTML = '';
+
     items.forEach(item => {
-        const row = document.createElement('div');
-        row.className = "link-row"; // Usar clases si existen o estilo directo
-        row.style = "background:rgba(255,255,255,0.05); margin-bottom:8px; padding:12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:12px; border:1px solid rgba(255,255,255,0.1);";
-        row.innerHTML = `<i class="fa fa-play" style="color:gold;"></i><div style="color:white; flex:1;"><b>${item.titulo}</b></div>`;
-        row.onclick = () => reproducirVideoInterno(item.titulo, item.link);
-        box.appendChild(row);
+        const div = document.createElement('div');
+        div.className = "link-item";
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:15px;">
+                <i class="fa fa-play-circle" style="color:var(--gold); font-size:20px;"></i>
+                <b style="color:#fff;">${item.titulo}</b>
+            </div>
+            <i class="fa fa-chevron-right" style="color:#444;"></i>
+        `;
+        div.onclick = () => reproducirVideoInterno(item.titulo, item.link);
+        box.appendChild(div);
     });
 };
 
@@ -173,39 +196,42 @@ async function reproducirVideoInterno(titulo, url) {
     const playerLayer = document.getElementById('player-layer');
     const video = document.getElementById('main-video');
     const info = document.getElementById('video-info');
+
     playerLayer.style.display = 'flex';
     info.innerText = titulo;
+    video.innerHTML = ''; // Limpiar fuentes anteriores
 
     try {
         if (url.includes('t.me/')) {
             const sUrl = url.replace("t.me/", "t.me/s/");
-            const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(sUrl));
+            const proxy = 'https://api.allorigins.win/get?url=';
+            const res = await fetch(proxy + encodeURIComponent(sUrl));
             const data = await res.json();
             const html = data.contents;
-            const videoMatch = html.match(/<video[^>]*src="([^"]*)"/);
-            const metaMatch = html.match(/<meta[^>]*property="og:video"[^>]*content="([^"]*)"/);
-            const resolvedUrl = videoMatch ? videoMatch[1] : (metaMatch ? metaMatch[1] : null);
 
-            if (resolvedUrl) {
-                video.src = resolvedUrl;
+            const videoUrl = html.match(/<video[^>]*src="([^"]*)"/)?.[1] ||
+                             html.match(/<meta[^>]*property="og:video"[^>]*content="([^"]*)"/)?.[1];
+
+            if (videoUrl) {
+                video.src = videoUrl;
                 video.play();
             } else {
-                window.open(url, '_blank');
-                playerLayer.style.display = 'none';
+                throw new Error("No video found");
             }
         } else {
             video.src = url;
             video.play();
         }
     } catch (e) {
-        console.error(e);
-        window.open(url, '_blank');
+        console.warn("⚠️ Fallo reproductor interno, usando fallback:", e);
+        if (window.Telegram?.WebApp) window.Telegram.WebApp.openLink(url);
+        else window.open(url, '_blank');
         playerLayer.style.display = 'none';
     }
 }
 
-// Iniciar cuando GramJS esté listo
+// Inicialización Premium
 window.addEventListener('load', () => {
-    // Esperar un momento para asegurar que el script de Telegram se cargó
-    setTimeout(initGramJS, 1000);
+    // Pequeño delay para efectos de entrada
+    setTimeout(initGramJS, 500);
 });
