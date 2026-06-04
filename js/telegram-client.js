@@ -1,172 +1,116 @@
 /**
- * TELEGRAM ENGINE PRO - REVISIÓN MAESTRA
+ * MOTOR DE TELEGRAM (VERSIÓN AUTO-REPARABLE)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
-let client = null;
+let tgClient = null;
 let loginRes = null;
-let loginStep = 'phone';
+let step = 'phone';
 
-// Función para actualizar el estado en la pantalla
-function setStatus(msg, isError = false) {
-    const container = document.getElementById('content');
-    if (container) {
-        container.innerHTML = `<div style="text-align:center; padding:50px; color:${isError ? '#ff4436' : '#f5c518'}; font-family:sans-serif;">
-            <div class="spinner" style="margin: 0 auto 20px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #f5c518; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
-            <p style="font-size:18px; font-weight:bold;">${msg}</p>
-        </div>`;
-    }
-    console.log(isError ? "❌ " : "⏳ ", msg);
+function updateStatus(msg) {
+    const el = document.getElementById('status-text');
+    if (el) el.innerText = msg;
 }
 
-async function bootTelegram() {
+async function startEngine() {
+    // Verificamos si Buffer está disponible, si no, lo inyectamos de nuevo
+    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
+        window.Buffer = window.buffer.Buffer;
+    }
+
     if (!window.telegram || !window.Buffer) {
-        setStatus("Cargando librerías de seguridad...");
-        setTimeout(bootTelegram, 500);
+        console.log("⏳ Reintentando cargar librerías...");
+        setTimeout(startEngine, 1000);
         return;
     }
 
-    const { TelegramClient, Api } = window.telegram;
-    const { StringSession } = window.telegram.sessions;
+    const { TelegramClient, sessions } = window.telegram;
+    const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
-    // Limpieza de sesión si algo va mal
-    let sessionStr = localStorage.getItem('tg_session') || "";
-    const session = new StringSession(sessionStr);
-
-    setStatus("Estableciendo conexión segura con Telegram...");
-
-    client = new TelegramClient(session, API_ID, API_HASH, {
-        connectionRetries: 10,
-        useWSS: true,
-        autoReconnect: true,
-        timeout: 10000 // 10 segundos de timeout
+    tgClient = new TelegramClient(session, API_ID, API_HASH, {
+        connectionRetries: 5,
+        useWSS: true
     });
 
     try {
-        await client.connect();
+        updateStatus("Estableciendo conexión segura...");
+        await tgClient.connect();
 
-        const isAuth = await client.checkAuthorization();
-
+        const isAuth = await tgClient.checkAuthorization();
         if (!isAuth) {
-            setStatus("Esperando identificación del usuario...");
             document.getElementById('login-modal').style.display = 'flex';
-
-            await client.start({
-                phoneNumber: async () => {
-                    loginStep = 'phone';
-                    updateUI();
-                    return new Promise(r => loginRes = r);
-                },
-                phoneCode: async () => {
-                    loginStep = 'code';
-                    updateUI();
-                    return new Promise(r => loginRes = r);
-                },
-                password: async () => {
-                    loginStep = '2fa';
-                    updateUI();
-                    return new Promise(r => loginRes = r);
-                },
-                onError: (err) => {
-                    alert("Error de Telegram: " + err.message);
-                    localStorage.removeItem('tg_session');
-                    location.reload();
-                }
+            await tgClient.start({
+                phoneNumber: async () => { step='phone'; updateLoginUI(); return new Promise(r => loginRes=r); },
+                phoneCode: async () => { step='code'; updateLoginUI(); return new Promise(r => loginRes=r); },
+                password: async () => { step='2fa'; updateLoginUI(); return new Promise(r => loginRes=r); },
+                onError: (err) => alert("Error: " + err.message)
             });
-
-            localStorage.setItem('tg_session', client.session.save());
+            localStorage.setItem('tg_session', tgClient.session.save());
             document.getElementById('login-modal').style.display = 'none';
         }
 
-        setStatus("¡Conexión exitosa! Sincronizando tus videos...");
-        await fetchTelegramContent();
+        updateStatus("Sincronizando contenido...");
+        loadTelegramContent();
 
     } catch (e) {
-        setStatus("Fallo al conectar. Telegram está saturado o tu red bloquea la conexión.", true);
-        console.error("Error crítico:", e);
+        console.error(e);
+        updateStatus("Fallo al conectar con Telegram. Reintenta.");
     }
 }
 
-function updateUI() {
-    const modal = document.getElementById('login-modal');
-    if (!modal) return;
-
-    document.getElementById('phone-input').style.display = loginStep === 'phone' ? 'block' : 'none';
-    document.getElementById('code-input').style.display = loginStep === 'code' ? 'block' : 'none';
-    document.getElementById('2fa-input').style.display = loginStep === '2fa' ? 'block' : 'none';
-
-    const msg = document.getElementById('login-msg');
-    if (loginStep === 'code') msg.innerText = "Introduce el código que te acaba de llegar a Telegram:";
-    if (loginStep === '2fa') msg.innerText = "Introduce tu contraseña de Verificación en 2 Pasos:";
+function updateLoginUI() {
+    document.getElementById('phone-input').style.display = step==='phone'?'block':'none';
+    document.getElementById('code-input').style.display = step==='code'?'block':'none';
+    document.getElementById('2fa-input').style.display = step==='2fa'?'block':'none';
+    document.getElementById('login-msg').innerText = step==='code'?'Introduce el código':'Introduce el 2FA';
 }
 
 function iniciarLogin() {
-    const val = loginStep === 'phone' ? document.getElementById('phone-input').value :
-                loginStep === 'code' ? document.getElementById('code-input').value :
-                document.getElementById('2fa-input').value;
-
-    if (loginRes && val) {
-        loginRes(val);
-    } else {
-        alert("Por favor, rellena el campo.");
-    }
+    const v = step==='phone' ? document.getElementById('phone-input').value :
+              step==='code' ? document.getElementById('code-input').value :
+              document.getElementById('2fa-input').value;
+    if (loginRes && v) loginRes(v);
 }
 
-async function fetchTelegramContent() {
+async function loadTelegramContent() {
     try {
         const { Api } = window.telegram;
-        const channelId = "gran_player";
+        const entity = await tgClient.getEntity("gran_player");
+        const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+        const topics = full.fullChat.topics.topics || [];
 
-        const channel = await client.getEntity(channelId);
-        const fullChannel = await client.invoke(new Api.channels.GetFullChannel({ channel }));
-        const topics = fullChannel.fullChat.topics?.topics || [];
-
-        console.log(`Cargando ${topics.length} temas...`);
-
-        // Carga rápida
-        for (const topic of topics) {
-            const messages = await client.getMessages(channel, { replyTo: topic.id, limit: 20 });
-            messages.forEach(m => {
+        for (const t of topics) {
+            const msgs = await tgClient.getMessages(entity, { replyTo: t.id, limit: 30 });
+            msgs.forEach(m => {
                 if (!m.message) return;
-                procesarMensajeTelegram(m);
+                const txt = m.message.toLowerCase();
+                let cat = "inicio";
+                if (txt.includes("#pelicula")) cat = "peliculas";
+                else if (txt.includes("#serie")) cat = "series";
+                else if (txt.includes("#directo")) cat = "directos";
+                else if (txt.includes("#agenda")) cat = "agenda";
+
+                const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
+                const link = m.message.match(/https?:\/\/[^\s]+/)?.[0];
+
+                if (link && !base[cat].some(i => i.titulo === titulo)) {
+                    base[cat].push({
+                        titulo, link,
+                        portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW",
+                        sinopsis: m.message,
+                        catAsignada: cat
+                    });
+                }
             });
         }
-
         if (typeof render === 'function') render(filtroActual);
-        else setStatus("Error interno: La interfaz no puede renderizar.");
-
+        else console.error("No se encontró la función render");
     } catch (e) {
-        console.error("Error en sincronización:", e);
-        setStatus("Error al leer el canal @gran_player. Asegúrate de ser miembro.", true);
+        console.error(e);
     }
 }
 
-function procesarMensajeTelegram(m) {
-    const texto = m.message.toLowerCase();
-    let cat = "inicio";
-    if (texto.includes("#pelicula")) cat = "peliculas";
-    else if (texto.includes("#serie")) cat = "series";
-    else if (texto.includes("#directo")) cat = "directos";
-    else if (texto.includes("#agenda")) cat = "agenda";
-
-    const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
-    const link = m.message.match(/https?:\/\/[^\s]+/) ? m.message.match(/https?:\/\/[^\s]+/)[0] : null;
-
-    if (link && !base[cat].some(i => i.titulo === titulo)) {
-        base[cat].push({
-            titulo, link,
-            portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW",
-            sinopsis: m.message,
-            catAsignada: cat
-        });
-    }
-}
-
-// Estilos dinámicos para el loader
-const style = document.createElement('style');
-style.innerHTML = `@keyframes spin { to { transform: rotate(360deg); } }`;
-document.head.appendChild(style);
-
-window.addEventListener('load', () => setTimeout(bootTelegram, 500));
+// Iniciar cuando todo esté listo
+window.addEventListener('load', startEngine);

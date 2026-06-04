@@ -7,13 +7,13 @@
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
+<body style="background: #000; color: #fff; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222; background: #000;">
+    <header style="padding: 20px; text-align: center; background: #000; border-bottom: 1px solid #222;">
         <h1 style="color: #f5c518; margin: 0; font-size: 24px; letter-spacing: 2px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 15px; padding: 15px; background: #000;">
+    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000;">
         <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
         <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
         <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
@@ -21,38 +21,45 @@
     </nav>
 
     <div id="content">
-        <!-- Aquí saldrá el estado de la conexión -->
-        <div style="text-align: center; padding: 50px; color: #666;">
-            Iniciando sistema...
+        <div id="status-display" style="text-align: center; padding: 50px; color: #f5c518;">
+            <i class="fa fa-circle-notch fa-spin" style="font-size: 30px; margin-bottom: 15px;"></i>
+            <p id="status-text">Cargando motor de Telegram...</p>
         </div>
     </div>
 
-    <!-- LOGIN MODAL -->
-    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 99999; align-items:center; justify-content:center;">
-        <div style="background:#111; border:2px solid #f5c518; padding:35px; border-radius:20px; width:90%; max-width:380px; text-align:center; box-shadow: 0 0 40px rgba(245,197,24,0.2);">
-            <h2 style="color:#f5c518; margin:0 0 10px;">TELEGRAM</h2>
-            <p id="login-msg" style="color:#aaa; font-size: 14px; margin-bottom: 25px;">Introduce tu número con +34</p>
+    <!-- MODAL DE LOGIN (REDISEÑADO) -->
+    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
+        <div style="background:#111; border:2px solid #f5c518; padding:40px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
+            <h2 style="color:#f5c518; margin-top:0;">TELEGRAM</h2>
+            <p id="login-msg" style="color:#ccc; margin-bottom:25px;">Introduce tu teléfono (+34...)</p>
 
-            <input type="text" id="phone-input" placeholder="+34 600 000 000" style="width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #333; color:white; border-radius:10px; font-size:16px;">
-            <input type="text" id="code-input" placeholder="Código de 5 dígitos" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #333; color:white; border-radius:10px; font-size:16px;">
-            <input type="password" id="2fa-input" placeholder="Contraseña Cloud" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #333; color:white; border-radius:10px; font-size:16px;">
+            <input type="text" id="phone-input" placeholder="+34 600 000 000" style="width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
+            <input type="text" id="code-input" placeholder="Código" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
+            <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
 
-            <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; font-weight:bold; border-radius:10px; cursor:pointer; font-size:16px; color:#000;">ENTRAR</button>
+            <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;">ENVIAR</button>
         </div>
     </div>
 
-    <!-- SCRIPTS CORE -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <!-- SCRIPTS EN ORDEN DE SEGURIDAD -->
+    <!-- 1. Buffer desde un bundle que funciona sí o sí -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
     <script>
-        window.Buffer = window.buffer.Buffer;
-        window.process = { env: {} };
-        window.require = function() { return {}; };
+        // Fix de Buffer por fuerza bruta
+        window.onload = function() {
+            if (typeof window.buffer !== 'undefined') {
+                window.Buffer = window.buffer.Buffer;
+            } else if (typeof Buffer === 'undefined') {
+                console.error("Fallo crítico: No se pudo cargar Buffer");
+            }
+            window.process = { env: {} };
+        };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <!-- APP LOGIC -->
+    <!-- 2. Telegram Client -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
+
+    <!-- 3. Tu lógica de App -->
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
 
