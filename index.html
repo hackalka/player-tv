@@ -2,78 +2,110 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Player TV - Premium</title>
+    <title>PLAYER TV - Premium Edition</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Fix de Entorno -->
+    <!-- Fix de Entorno para MTProto -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
     <script>
         window.Buffer = window.buffer.Buffer;
         window.process = { env: {} };
+        window.require = function() { return {}; };
     </script>
-</head>
-<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow: hidden;">
 
-    <!-- PANTALLA DE INTRO (CINEFLIX STYLE) -->
-    <div id="intro-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <h1 style="color:#f5c518; font-size:40px; letter-spacing:5px; margin:0; animation: pulse 2s infinite;">PLAYER TV</h1>
-        <div id="boot-status" style="color:#666; margin-top:20px; font-size:14px;">Iniciando motor...</div>
-    </div>
-
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
-        <h1 style="color: #f5c518; margin: 0; font-size: 24px;">PLAYER TV</h1>
-    </header>
-
-    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px;">
-        <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
-        <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
-        <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
-    </nav>
-
-    <div id="content" style="padding: 10px; height: calc(100vh - 150px); overflow-y: auto;"></div>
-
-    <!-- MODAL DE LOGIN POR QR / TELÉFONO -->
-    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 100000; align-items:center; justify-content:center;">
-        <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518; margin:0;">CONECTAR</h2>
-
-            <!-- Zona QR -->
-            <div id="qr-container" style="background:#fff; width:200px; height:200px; margin:20px auto; padding:10px; border-radius:10px;">
-                <div id="qr-code"></div>
-                <div id="qr-loading" style="color:#000; padding-top:80px;">Generando QR...</div>
-            </div>
-            <p style="font-size:12px; color:#aaa;">Abre Telegram > Ajustes > Dispositivos > Escanear QR</p>
-
-            <div style="margin: 20px 0; border-top: 1px solid #333; position: relative;">
-                <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #111; padding: 0 10px; color: #555; font-size: 10px;">O USA TU NÚMERO</span>
-            </div>
-
-            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
-            <input type="text" id="code-input" placeholder="Código" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
-            <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
-
-            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer;">ENVIAR</button>
-        </div>
-    </div>
-
-    <!-- REPRODUCTOR MAESTRO -->
-    <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 150000; flex-direction:column; align-items:center; justify-content:center;">
-        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer;">CERRAR</button>
-        <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
-    </div>
-
-    <!-- Scripts -->
+    <!-- Librerías Core -->
     <script src="js/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body class="noir-theme">
+
+    <!-- INTRO ANIMATION (CINEFLIX STYLE) -->
+    <div id="cineflix-intro" class="cineflix-intro">
+        <div class="noir-container">
+            <div class="thunder" id="intro-thunder"></div>
+            <div class="rain"></div>
+            <div class="logo-container">
+                <h1 class="logo-text">PLAYER TV</h1>
+                <div class="subtitle">PREMIUM STREAMING</div>
+            </div>
+            <div id="boot-status" style="position:absolute; bottom:50px; color:#555; font-size:12px;">Iniciando protocolos...</div>
+        </div>
+    </div>
+
+    <div id="app">
+        <!-- VISTA: LOGIN -->
+        <div id="view-login" class="view" style="display:none;">
+            <div class="login-container">
+                <h1 class="login-title">PLAYER TV</h1>
+                <p class="login-subtitle">Conecta tu cuenta de Telegram</p>
+
+                <div id="qr-section" class="login-step active">
+                    <div id="qr-canvas" class="qr-container">
+                        <div id="qr-code"></div>
+                        <div id="qr-loading">Generando código...</div>
+                    </div>
+                    <p class="hint">Abre Telegram > Ajustes > Dispositivos > Escanear QR</p>
+
+                    <div class="divider"><span>O USA TU NÚMERO</span></div>
+
+                    <div class="input-row">
+                        <input type="tel" id="input-phone" placeholder="+34 600 000 000" value="+34">
+                        <button id="btn-phone" class="btn-primary">Enviar</button>
+                    </div>
+                </div>
+
+                <div id="step-otp" class="login-step">
+                    <label>Código de Verificación</label>
+                    <div class="input-row">
+                        <input type="text" id="input-otp" placeholder="12345" maxlength="5">
+                        <button id="btn-otp" class="btn-primary">Entrar</button>
+                    </div>
+                </div>
+
+                <div id="step-2fa" class="login-step">
+                    <label>Contraseña Cloud (2FA)</label>
+                    <div class="input-row">
+                        <input type="password" id="input-2fa" placeholder="Tu contraseña">
+                        <button id="btn-2fa" class="btn-primary">Verificar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA: CATÁLOGO -->
+        <div id="view-catalog" class="view" style="display:none;">
+            <header class="topbar">
+                <h1 class="topbar-title">PLAYER TV</h1>
+                <div class="topbar-search">
+                    <input type="text" id="search-input" placeholder="🔍 Buscar..." onkeyup="ejecutarBuscador()">
+                </div>
+            </header>
+
+            <nav class="main-nav">
+                <button class="nav-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
+                <button class="nav-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
+                <button class="nav-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
+                <button class="nav-btn" onclick="cambiarFiltro('agenda', this)">DEPORTES</button>
+            </nav>
+
+            <div id="netflix-content">
+                <div id="catalog-hero" class="hero-section"></div>
+                <div id="catalog-rows"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REPRODUCTOR -->
+    <div id="player-layer" style="display:none;">
+        <button class="btn-close-player" onclick="cerrarReproductor()">✕</button>
+        <video id="video-player" controls autoplay></video>
+    </div>
+
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
-
-    <style>
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-    </style>
 </body>
 </html>
