@@ -11,7 +11,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <!-- GramJS para conexión directa con Telegram -->
+    <!-- GramJS y dependencias -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
 </head>
 <body>
@@ -45,14 +46,14 @@
 <div id="content"></div>
 
 <!-- Modal de Login Telegram -->
-<div id="login-modal" class="modal" style="display:none; z-index: 5000;">
-    <div class="modal-content" style="max-width: 400px; padding: 30px; text-align: center;">
-        <h2 style="color:var(--gold);">CONECTAR TELEGRAM</h2>
-        <p id="login-msg" style="color:#ccc;">Introduce tu número para recibir el código</p>
-        <input type="text" id="phone-input" placeholder="+34123456789" style="width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid #444; background:#222; color:white;">
-        <input type="text" id="code-input" placeholder="Código de Telegram" style="display:none; width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid #444; background:#222; color:white;">
-        <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid #444; background:#222; color:white;">
-        <button id="btn-send-phone" onclick="iniciarLogin()" style="width:100%; background:var(--gold); border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px;">ENVIAR</button>
+<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index: 5000; align-items:center; justify-content:center;">
+    <div style="background:#111; border:1px solid var(--gold); max-width: 400px; width:90%; padding: 30px; text-align: center; border-radius:15px;">
+        <h2 style="color:var(--gold); margin-bottom:10px;">CONECTAR TELEGRAM</h2>
+        <p id="login-msg" style="color:#ccc; margin-bottom:20px;">Introduce tu número para recibir el código</p>
+        <input type="text" id="phone-input" placeholder="+34123456789" style="width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
+        <input type="text" id="code-input" placeholder="Código de Telegram" style="display:none; width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
+        <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:14px; margin:10px 0; border-radius:8px; border:1px solid #333; background:#222; color:white; font-size:16px;">
+        <button id="btn-send-phone" onclick="iniciarLogin()" style="width:100%; background:var(--gold); color:#000; border:none; padding:14px; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:15px; font-size:16px;">ENVIAR</button>
     </div>
 </div>
 
