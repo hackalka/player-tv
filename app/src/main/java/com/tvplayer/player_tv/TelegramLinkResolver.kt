@@ -11,11 +11,19 @@ object TelegramLinkResolver {
 
     suspend fun resolve(telegramUrl: String): String? = withContext(Dispatchers.IO) {
         try {
-            // Convert t.me/channel/123 to t.me/s/channel/123 for public view
-            val sUrl = if (!telegramUrl.contains("/s/")) {
-                telegramUrl.replace("t.me/", "t.me/s/")
+            // Clean URL: Convert t.me/channel/topic/id or t.me/channel/id to t.me/s/channel/id
+            val uri = telegramUrl.trim().removeSuffix("/")
+            val parts = uri.split("/")
+            
+            val sUrl = if (parts.size >= 5 && !uri.contains("/s/")) {
+                // Format: https://t.me/channel/topic/id -> https://t.me/s/channel/id
+                val channel = parts[3]
+                val msgId = parts.last()
+                "https://t.me/s/$channel/$msgId"
+            } else if (!uri.contains("/s/")) {
+                uri.replace("t.me/", "t.me/s/")
             } else {
-                telegramUrl
+                uri
             }
 
             val request = Request.Builder()
@@ -28,9 +36,20 @@ object TelegramLinkResolver {
                 val html = response.body.string()
                 val doc = Jsoup.parse(html)
                 
-                // Look for video tag
+                // 1. Try to find the <video> tag directly (common in /s/ preview)
                 val videoElement = doc.select("video").first()
-                videoElement?.attr("src")
+                val videoUrl = videoElement?.attr("src")
+                if (!videoUrl.isNullOrEmpty()) return@withContext videoUrl
+
+                // 2. Try to find meta tags (og:video)
+                val ogVideo = doc.select("meta[property=og:video]").first()?.attr("content")
+                if (!ogVideo.isNullOrEmpty()) return@withContext ogVideo
+
+                // 3. Try to find twitter:player:stream
+                val twitterVideo = doc.select("meta[name=twitter:player:stream]").first()?.attr("content")
+                if (!twitterVideo.isNullOrEmpty()) return@withContext twitterVideo
+                
+                null
             }
         } catch (e: Exception) {
             e.printStackTrace()
