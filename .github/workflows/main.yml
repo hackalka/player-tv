@@ -1,0 +1,22 @@
+name: Actualizar Firebase TV
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Se ejecuta cada 15 minutos
+  workflow_dispatch: # Permite darle al botón "Play" manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Configurar Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Instalar dependencias
+        run: pip install telethon requests
+      - name: Ejecutar Script
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python bot_tv.py

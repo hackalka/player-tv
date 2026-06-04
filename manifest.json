@@ -1,0 +1,23 @@
+{
+  "name": "PLAYER_TV PRO GOLD",
+  "short_name": "PLAYER_TV",
+  "description": "Tu plataforma de streaming personalizada",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#f5c518",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

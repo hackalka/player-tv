@@ -1,0 +1,357 @@
+// ══════════════════════════════════════════
+//  1. CONFIGURACIÓN Y VARIABLES
+// ══════════════════════════════════════════
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.ready();
+    tg.expand();
+    // Aplicar colores de Telegram
+    document.documentElement.style.setProperty('--bg', tg.themeParams.bg_color || '#06090e');
+    document.documentElement.style.setProperty('--surface', tg.themeParams.secondary_bg_color || '#10141d');
+    document.documentElement.style.setProperty('--gold', tg.themeParams.button_color || '#f5c518');
+    document.documentElement.style.setProperty('--text-color', tg.themeParams.text_color || '#ffffff');
+}
+
+const _db = "aHR0cHM6Ly9wbGF5ZXJ0di05NDQ5Yy1kZWZhdWx0LXJ0ZGIuZXVyb3BlLXdlc3QxLmZpcmViYXNlZGF0YWJhc2UuYXBwLw==";
+firebase.initializeApp({ databaseURL: atob(_db) });
+const db = firebase.database();
+
+let base = { peliculas: [], series: [], directos: [], agenda: [], destacados: null };
+let filtroActual = 'inicio';
+let subFiltroActual = 'TODOS';
+const IMG_CAMPO = "https://blog.marti.mx/wp-content/uploads/2023/06/campo_futbol_Header-770x449.webp";
+
+// ══════════════════════════════════════════
+//  2. CARGA DE DATOS
+// ══════════════════════════════════════════
+function cargar() {
+    db.ref('destacado_manual').on('value', snap => { 
+        base.destacados = snap.val(); 
+        render(filtroActual); 
+    });
+
+    ['peliculas', 'series', 'directos', 'agenda'].forEach(cat => {
+        db.ref(cat).on('value', snap => {
+            const data = snap.val() || {};
+            let list = Object.keys(data).map(k => ({ ...data[k], firebaseKey: k, catAsignada: cat }));
+            
+            if (cat === 'peliculas') list.reverse(); 
+            if (cat === 'agenda') list.sort((a, b) => obtenerValorCronologico(a.extra) - obtenerValorCronologico(b.extra));
+            
+            base[cat] = list;
+            render(filtroActual);
+        });
+    });
+}
+
+// ══════════════════════════════════════════
+//  3. LÓGICA DE FAVORITOS
+// ══════════════════════════════════════════
+function gestionarFavorito(item) {
+    let favs = JSON.parse(localStorage.getItem('favoritos')) || [];
+    const r = getRoot(item.titulo);
+    const index = favs.findIndex(i => getRoot(i.titulo) === r);
+
+    if (index > -1) {
+        favs.splice(index, 1);
+    } else {
+        favs.push(item);
+    }
+    localStorage.setItem('favoritos', JSON.stringify(favs));
+    
+    // Actualizar visualmente el botón del modal si está abierto
+    const btnModal = document.getElementById('btn-fav-modal');
+    if (btnModal) {
+        const esFav = favs.some(i => getRoot(i.titulo) === r);
+        btnModal.style.color = esFav ? 'gold' : '#ccc';
+        btnModal.innerHTML = `<i class="fa ${esFav ? 'fa-star' : 'fa-star-o'}"></i>`;
+    }
+    render(filtroActual);
+}
+
+function guardarSeguirViendo(item) {
+    let lista = JSON.parse(localStorage.getItem('seguirViendo')) || [];
+    lista = lista.filter(i => getRoot(i.titulo) !== getRoot(item.titulo));
+    lista.unshift(item);
+    if (lista.length > 20) lista.pop();
+    localStorage.setItem('seguirViendo', JSON.stringify(lista));
+}
+
+function eliminarElemento(e, tituloRaiz, claveStorage) {
+    e.stopPropagation();
+    let lista = JSON.parse(localStorage.getItem(claveStorage)) || [];
+    lista = lista.filter(i => getRoot(i.titulo) !== tituloRaiz);
+    localStorage.setItem(claveStorage, JSON.stringify(lista));
+    render(filtroActual);
+}
+
+// ══════════════════════════════════════════
+//  4. RENDERIZADO PRINCIPAL
+// ══════════════════════════════════════════
+function render(modo) {
+    filtroActual = modo;
+    const container = document.getElementById('content');
+    const subNav = document.getElementById('sub-nav');
+    if (!container) return;
+
+    container.innerHTML = '';
+    
+    if (subNav) {
+        subNav.innerHTML = '';
+        if (modo === 'peliculas' || modo === 'series') {
+            subNav.style.display = 'flex';
+            generarSubCategorias(modo);
+        } else { subNav.style.display = 'none'; }
+    }
+
+    renderHero();
+
+    if (modo === 'inicio') {
+        const favs = JSON.parse(localStorage.getItem('favoritos')) || [];
+        if (favs.length > 0) container.appendChild(crearSeccion("MIS FAVORITOS", favs, 'favoritos'));
+
+        const seguir = JSON.parse(localStorage.getItem('seguirViendo')) || [];
+        if (seguir.length > 0) container.appendChild(crearSeccion("SEGUIR VIENDO", seguir, 'seguirViendo'));
+
+        ['agenda', 'peliculas', 'series', 'directos'].forEach(cat => {
+            if (base[cat]?.length > 0) {
+                let t = cat === 'agenda' ? 'DEPORTES EN VIVO' : cat.toUpperCase();
+                container.appendChild(crearSeccion(t, base[cat].slice(0, 20), null));
+            }
+        });
+    } else {
+        const grid = document.createElement('div');
+        grid.style = "display: grid; grid-template-columns: repeat(auto-fill, 145px); gap: 15px; justify-content: center; padding: 15px;";
+        
+        let data = base[modo] || [];
+        if (subFiltroActual !== 'TODOS') data = data.filter(i => i.genero && i.genero.toUpperCase() === subFiltroActual);
+        
+        const visto = new Set();
+        data.forEach(item => {
+            const r = getRoot(item.titulo);
+            if (!visto.has(r)) { visto.add(r); grid.appendChild(crearCard(item)); }
+        });
+        container.appendChild(grid);
+    }
+}
+
+// ══════════════════════════════════════════
+//  5. CREACIÓN DE CARDS (TAMAÑO FIJO TV/DIRECTOS)
+// ══════════════════════════════════════════
+function crearSeccion(titulo, items, tipoStorage) {
+    const sec = document.createElement('div');
+    sec.style.marginBottom = "25px";
+    sec.innerHTML = `<h2 style="color:gold; margin:15px; font-size:1.3rem;">${titulo}</h2>`;
+    const row = document.createElement('div');
+    row.style = "display:flex; overflow-x:auto; gap:15px; padding:0 15px 10px; scrollbar-width:none;";
+    
+    const visto = new Set();
+    items.forEach(item => {
+        const r = getRoot(item.titulo);
+        if (!visto.has(r)) { visto.add(r); row.appendChild(crearCard(item, tipoStorage)); }
+    });
+    sec.appendChild(row);
+    return sec;
+}
+
+function crearCard(item, tipoStorage = null) {
+    const r = getRoot(item.titulo);
+    const card = document.createElement('div');
+    card.style = "flex:0 0 auto; width:145px; position:relative; cursor:pointer;";
+    card.onclick = () => { guardarSeguirViendo(item); abrirModal(r, item.catAsignada, item); };
+
+    const btnBorrar = tipoStorage ? `<div onclick="eliminarElemento(event, '${r}', '${tipoStorage}')" style="position:absolute; top:5px; right:5px; background:rgba(255,0,0,0.8); color:white; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:10; font-size:14px;">&times;</div>` : '';
+
+    let imgHTML = '';
+    if (item.logo1 && item.logo2) {
+        imgHTML = `<div style="background-image:url('${IMG_CAMPO}'); background-size:cover; display:flex; align-items:center; justify-content:center; gap:5px; height:190px; border-radius:12px;">
+            <img src="${item.logo1}" style="width:40%; height:55px; object-fit:contain; filter:drop-shadow(0 0 5px white);"><b style="color:white; font-size:10px;">VS</b><img src="${item.logo2}" style="width:40%; height:55px; object-fit:contain; filter:drop-shadow(0 0 5px white);">
+        </div>`;
+    } else {
+        // Forzamos el tamaño del póster a 145x190 pase lo que pase
+        imgHTML = `<img src="${item.portada || item.logo1}" style="width:145px; height:190px; object-fit:cover; display:block; border-radius:12px; background:#1a1a1a;">`;
+    }
+
+    const infoExtra = item.extra ? `<div style="font-size:10px; color:gold; margin-top:2px;">${item.extra}</div>` : '';
+
+    card.innerHTML = `
+        ${btnBorrar}
+        <div style="height:190px; width:145px; background:#1a1a1a; border-radius:12px; overflow:hidden; border:1px solid #333;">
+            ${imgHTML}
+        </div>
+        <div style="text-align:center; padding:8px 2px;">
+            <div style="color:#eee; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r}</div>
+            ${infoExtra}
+        </div>`;
+    return card;
+}
+
+// ══════════════════════════════════════════
+//  6. MODAL (CON ESTRELLA DE FAVORITOS)
+// ══════════════════════════════════════════
+function abrirModal(nombreRaiz, catKey, itemFallback) {
+    if (tg) {
+        tg.BackButton.show();
+        tg.BackButton.onClick(() => cerrarModal());
+    }
+    const modal = document.getElementById('modal');
+    modal.classList.add('active');
+    
+    let lista = [];
+    ['agenda', 'peliculas', 'series', 'directos'].forEach(c => {
+        const matches = base[c].filter(i => getRoot(i.titulo) === nombreRaiz);
+        if (matches.length > 0) lista = [...lista, ...matches];
+    });
+    if (lista.length === 0) lista = [itemFallback];
+
+    const principal = lista[0];
+    const favs = JSON.parse(localStorage.getItem('favoritos')) || [];
+    const esFav = favs.some(i => getRoot(i.titulo) === nombreRaiz);
+
+    // Actualizamos el título y añadimos la estrella al lado
+    document.getElementById('det-titulo').innerHTML = `${nombreRaiz} <span id="btn-fav-modal" style="margin-left:15px; cursor:pointer; color:${esFav?'gold':'#ccc'}; font-size:24px;"><i class="fa ${esFav?'fa-star':'fa-star-o'}"></i></span>`;
+    
+    document.getElementById('btn-fav-modal').onclick = () => gestionarFavorito(principal);
+    document.getElementById('det-sinopsis').textContent = principal.sinopsis || "Sin descripción.";
+
+    const header = document.getElementById('modalHeader');
+    if (principal.logo1 && principal.logo2) {
+        header.innerHTML = `<div style="background-image:url('${IMG_CAMPO}'); background-size:cover; height:200px; display:flex; align-items:center; justify-content:center; gap:20px;">
+            <img src="${principal.logo1}" style="height:90px; filter:drop-shadow(0 0 10px white);"><b style="font-size:25px; color:white;">VS</b><img src="${principal.logo2}" style="height:90px; filter:drop-shadow(0 0 10px white);">
+        </div>`;
+    } else {
+        header.innerHTML = `<div style="background-image: linear-gradient(transparent, #000), url('${principal.portada || principal.logo1}'); height:280px; background-size:cover; background-position:center;"></div>`;
+    }
+
+    const tabs = document.getElementById('tabsTemporadas');
+    tabs.innerHTML = '';
+    
+    if (catKey === 'series') {
+        const temps = {};
+        lista.forEach(i => {
+            const sMatch = i.titulo.match(/S(\d+)/i);
+            const sNum = sMatch ? sMatch[1] : "01";
+            if (!temps[sNum]) temps[sNum] = [];
+            temps[sNum].push(i);
+        });
+        Object.keys(temps).sort().forEach((s, idx) => {
+            const b = document.createElement('button');
+            b.className = `tab-temp ${idx === 0 ? 'active' : ''}`;
+            b.textContent = `TEMP ${s}`;
+            b.onclick = () => {
+                document.querySelectorAll('.tab-temp').forEach(btn => btn.classList.remove('active'));
+                b.classList.add('active');
+                mostrarCaps(temps[s], true);
+            };
+            tabs.appendChild(b);
+        });
+        mostrarCaps(temps[Object.keys(temps).sort()[0]], true);
+    } else {
+        mostrarCaps(lista, false);
+    }
+}
+
+function mostrarCaps(items, esSerie) {
+    const box = document.getElementById('linksBox');
+    box.innerHTML = '';
+    
+    if (esSerie) {
+        items.sort((a, b) => {
+            const numA = parseInt(a.titulo.match(/E(\d+)/i)?.[1] || 0);
+            const numB = parseInt(b.titulo.match(/E(\d+)/i)?.[1] || 0);
+            return numA - numB;
+        });
+    }
+
+    items.forEach(item => {
+        let label = item.titulo;
+        if (esSerie) {
+            const eMatch = item.titulo.match(/E(\d+)/i);
+            label = eMatch ? `CAPÍTULO ${parseInt(eMatch[1])}` : item.titulo;
+        }
+
+        const links = [
+            { u: item.link, n: 'LINK 1' },
+            { u: item.link1, n: 'LINK 2' },
+            { u: item.acestream, n: 'ACESTREAM' },
+            { u: item.id, n: 'ID ACESTREAM' }
+        ];
+
+        links.forEach(l => {
+            if (l.u && l.u.length > 5) {
+                const row = document.createElement('div');
+                row.style = "background:rgba(255,255,255,0.05); margin-bottom:8px; padding:12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:12px; border:1px solid rgba(255,255,255,0.1);";
+                const esAce = l.u.includes('acestream://') || l.u.length === 40;
+                row.innerHTML = `<i class="fa ${esAce ? 'fa-bolt' : 'fa-play'}" style="color:gold;"></i>
+                    <div style="color:white; flex:1;"><b style="font-size:13px;">${label}</b></div>`;
+                row.onclick = () => {
+                    let url = l.u;
+                    if (l.u.length === 40 && !l.u.includes('://')) url = 'acestream://' + l.u;
+
+                    if (tg && url.startsWith('http')) {
+                        tg.openLink(url);
+                    } else {
+                        window.location.href = url;
+                    }
+                };
+                box.appendChild(row);
+            }
+        });
+    });
+}
+
+// ══════════════════════════════════════════
+//  7. HERO Y UTILIDADES
+// ══════════════════════════════════════════
+function renderHero() {
+    const hero = document.getElementById('hero-container');
+    if (!hero || filtroActual !== 'inicio' || !base.destacados) { if(hero) hero.style.display='none'; return; }
+    hero.style.display = 'block';
+    const item = base.destacados;
+    const r = getRoot(item.titulo);
+    
+    if (item.logo1 && item.logo2) {
+        hero.innerHTML = `<div style="background-image:linear-gradient(rgba(0,0,0,0.4), #000), url('${IMG_CAMPO}'); background-size:cover; height:350px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:0 0 25px 25px; gap:15px;">
+            <div style="display:flex; align-items:center; gap:25px;">
+                <img src="${item.logo1}" style="height:100px; filter:drop-shadow(0 0 8px white);"><b style="color:white; font-size:25px;">VS</b><img src="${item.logo2}" style="height:100px; filter:drop-shadow(0 0 8px white);">
+            </div>
+            <h1 style="color:white; font-size:1.6rem; margin:0; text-align:center;">${r}</h1>
+            <button onclick="abrirModal('${r}','${item.catAsignada}',null)" style="background:gold; border:none; padding:12px 35px; font-weight:bold; border-radius:8px; cursor:pointer;">VER AHORA</button>
+        </div>`;
+    } else {
+        hero.innerHTML = `<div style="background-image:linear-gradient(transparent, #000), url('${item.portada || item.logo1}'); background-size:cover; background-position:center; height:350px; display:flex; align-items:flex-end; padding:25px; border-radius:0 0 25px 25px;">
+            <div style="width:100%;"><h1 style="color:white; font-size:2rem; margin:0; text-shadow:2px 2px 4px #000;">${r}</h1><button onclick="abrirModal('${r}','${item.catAsignada}',null)" style="background:gold; border:none; padding:12px 35px; font-weight:bold; border-radius:8px; margin-top:10px; cursor:pointer;">VER AHORA</button></div>
+        </div>`;
+    }
+}
+
+function generarSubCategorias(modo) {
+    const subNav = document.getElementById('sub-nav');
+    const gens = ['TODOS', 'ACCION', 'DRAMA', 'TERROR', 'COMEDIA', 'ANIMACION', 'FANTASIA'];
+    gens.forEach(g => {
+        const b = document.createElement('button');
+        b.style = `margin:5px; padding:8px 18px; border-radius:20px; border:none; cursor:pointer; background:${subFiltroActual===g?'gold':'#222'}; color:${subFiltroActual===g?'#000':'#fff'}; font-weight:bold;`;
+        b.textContent = g;
+        b.onclick = () => { subFiltroActual = g; render(modo); };
+        subNav.appendChild(b);
+    });
+}
+
+function cambiarFiltro(m, btn) {
+    document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    subFiltroActual = 'TODOS';
+    render(m);
+}
+
+function cerrarModal() {
+    document.getElementById('modal').classList.remove('active');
+    if (tg) tg.BackButton.hide();
+}
+function getRoot(t) { return t ? t.toUpperCase().split(/ S\d+| T\d+| TEMPORADA| CAPITULO| C\d+| E\d+/i)[0].trim() : ""; }
+function obtenerValorCronologico(str) {
+    const nums = str?.match(/\d+/g);
+    return nums ? parseInt(nums[0])*100 + parseInt(nums[1]) : 999999;
+}
+
+window.onload = cargar;

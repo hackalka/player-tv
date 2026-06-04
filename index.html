@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Player TV - Premium 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    
+    <link rel="stylesheet" href="css/reproductor.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+
+<header>
+    <div class="logo-box">
+        <h1>PLAYER TV</h1>
+    </div>
+</header>
+
+<div class="search-container">
+    <div class="search-bar">
+        <i class="fa fa-search"></i>
+        <input type="text" id="mainSearch" placeholder="Buscar películas, series, deportes..." onkeyup="ejecutarBuscador()">
+    </div>
+</div>
+
+<div id="hero-container"></div>
+
+<nav class="nav" data-zona="nav">
+    <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
+    <button class="f-btn" onclick="cambiarFiltro('agenda', this)">DEPORTES</button>
+    <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
+    <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
+    <button class="f-btn" onclick="cambiarFiltro('directos', this)">TV EN VIVO</button>
+    <button class="f-btn" onclick="cambiarFiltro('favoritos', this)"><i class="fa fa-star"></i></button>
+</nav>
+
+<div id="sub-nav" data-zona="subnav"></div>
+
+<div id="content"></div>
+
+<div class="zona-activa-label" id="zonaLabel"></div>
+
+<div id="modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <button class="close-btn" onclick="cerrarModal()">✕</button>
+        <div id="modalHeader"></div>
+        <div class="modal-details" style="padding: 20px;">
+            <h2 id="det-titulo" style="color:var(--gold); margin-top:0; text-transform: uppercase;"></h2>
+            <p id="det-sinopsis" style="font-size: 14px; color: #ccc; margin-bottom: 15px;"></p>
+            <div id="modalActions"></div>
+            <div id="tabsTemporadas" class="tabs-temporadas"></div>
+            <div id="linksBox"></div>
+        </div>
+    </div>
+</div>
+
+<div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index:4000; flex-direction:column; align-items:center; justify-content:center;">
+    <button class="btn-volver" onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:12px 24px; cursor:pointer; font-weight:bold; border-radius:8px;">
+        <i class="fa fa-arrow-left"></i> VOLVER
+    </button>
+    <h2 id="video-info" style="color:white; margin-bottom:15px; text-align:center;"></h2>
+    <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
+</div>
+
+<script src="js/main.js"></script>
+
+</body>
+</html>

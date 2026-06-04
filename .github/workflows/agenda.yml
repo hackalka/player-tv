@@ -1,0 +1,31 @@
+name: Actualizar Agenda Automatica
+
+on:
+  schedule:
+    - cron: '0 5 * * *'   # 6:00 AM España
+    - cron: '0 10 * * *'  # 11:00 AM España
+    - cron: '0 15 * * *'  # 16:00 PM España
+  workflow_dispatch:      # Permite darle al botón "Run workflow" manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Añadimos permisos de escritura por si acaso el entorno los requiere
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Instalar dependencias
+        run: |
+          pip install cloudscraper beautifulsoup4 requests pytz
+
+      - name: Correr Script
+        run: python agenda_auto.py  # <-- ASEGÚRATE de que tu archivo de Python se llame exactamente así
