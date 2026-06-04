@@ -1,20 +1,20 @@
 /**
- * LÓGICA DE TELEGRAM - VERSIÓN LIMPIA Y ROBUSTA
+ * TELEGRAM ENGINE (BULLETPROOF BROWSER VERSION)
  */
+
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
-let tgClient = null;
-let tgLoginResolve = null;
-let currentStep = 'phone';
+let client = null;
+let loginRes = null;
+let loginStep = 'phone';
 
-async function iniciarAppTelegram() {
-    console.log("🛠 Iniciando motor de Telegram...");
+async function bootTelegram() {
+    console.log("🚀 Iniciando Telegram...");
 
-    // Verificamos librerías cargadas
+    // Esperar a que window.telegram y window.Buffer existan
     if (!window.telegram || !window.Buffer) {
-        console.warn("⏳ Librerías no listas, reintentando...");
-        setTimeout(iniciarAppTelegram, 500);
+        setTimeout(bootTelegram, 500);
         return;
     }
 
@@ -22,130 +22,100 @@ async function iniciarAppTelegram() {
     const { StringSession } = window.telegram.sessions;
 
     const session = new StringSession(localStorage.getItem('tg_session') || "");
-    tgClient = new TelegramClient(session, API_ID, API_HASH, {
+
+    client = new TelegramClient(session, API_ID, API_HASH, {
         connectionRetries: 5,
         useWSS: true
     });
 
     try {
-        await tgClient.connect();
+        await client.connect();
 
-        if (!await tgClient.checkAuthorization()) {
-            console.log("🔐 Requiere autenticación");
+        if (!await client.checkAuthorization()) {
             document.getElementById('login-modal').style.display = 'flex';
-
-            await tgClient.start({
-                phoneNumber: async () => {
-                    currentStep = 'phone';
-                    return new Promise(res => tgLoginResolve = res);
-                },
-                phoneCode: async () => {
-                    currentStep = 'code';
-                    actualizarModalUI();
-                    return new Promise(res => tgLoginResolve = res);
-                },
-                password: async () => {
-                    currentStep = '2fa';
-                    actualizarModalUI();
-                    return new Promise(res => tgLoginResolve = res);
-                },
-                onError: (err) => alert("Error: " + err.message)
+            await client.start({
+                phoneNumber: async () => { loginStep='phone'; return new Promise(r => loginRes=r); },
+                phoneCode: async () => { loginStep='code'; updateUI(); return new Promise(r => loginRes=r); },
+                password: async () => { loginStep='2fa'; updateUI(); return new Promise(r => loginRes=r); },
+                onError: (err) => alert("Telegram Error: " + err.message)
             });
-
-            localStorage.setItem('tg_session', tgClient.session.save());
+            localStorage.setItem('tg_session', client.session.save());
             document.getElementById('login-modal').style.display = 'none';
         }
 
-        console.log("✅ Telegram conectado y autorizado");
-        sincronizarContenido();
-
+        console.log("✅ Conectado!");
+        fetchTelegramContent();
     } catch (e) {
-        console.error("❌ Fallo crítico en Telegram:", e);
+        console.error("Fallo de conexión:", e);
     }
 }
 
-function actualizarModalUI() {
-    const msg = document.getElementById('login-msg');
-    document.getElementById('phone-input').style.display = currentStep === 'phone' ? 'block' : 'none';
-    document.getElementById('code-input').style.display = currentStep === 'code' ? 'block' : 'none';
-    document.getElementById('2fa-input').style.display = currentStep === '2fa' ? 'block' : 'none';
-
-    if (currentStep === 'code') msg.innerText = "Introduce el código que has recibido en Telegram";
-    if (currentStep === '2fa') msg.innerText = "Introduce tu contraseña de Verificación en 2 pasos";
+function updateUI() {
+    document.getElementById('phone-input').style.display = loginStep==='phone'?'block':'none';
+    document.getElementById('code-input').style.display = loginStep==='code'?'block':'none';
+    document.getElementById('2fa-input').style.display = loginStep==='2fa'?'block':'none';
+    document.getElementById('login-msg').innerText = loginStep==='code'?'Introduce el código':'Introduce el 2FA';
 }
 
 function iniciarLogin() {
-    const input = currentStep === 'phone' ? document.getElementById('phone-input') :
-                  currentStep === 'code' ? document.getElementById('code-input') :
-                  document.getElementById('2fa-input');
-
-    if (tgLoginResolve && input.value) {
-        tgLoginResolve(input.value);
-    }
+    const v = loginStep==='phone' ? document.getElementById('phone-input').value :
+              loginStep==='code'  ? document.getElementById('code-input').value :
+                                    document.getElementById('2fa-input').value;
+    if (loginRes && v) loginRes(v);
 }
 
-async function sincronizarContenido() {
-    console.log("📥 Sincronizando contenido desde @gran_player...");
+async function fetchTelegramContent() {
+    const container = document.getElementById('content');
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:gold;">Sincronizando contenido...</div>';
+
     try {
-        const entity = await tgClient.getEntity("gran_player");
         const { Api } = window.telegram;
-        const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+        const channel = await client.getEntity("gran_player");
+        const full = await client.invoke(new Api.channels.GetFullChannel({ channel }));
         const topics = full.fullChat.topics.topics || [];
 
-        for (const topic of topics) {
-            const messages = await tgClient.getMessages(entity, { replyTo: topic.id, limit: 30 });
-
-            messages.forEach(m => {
+        for (const t of topics) {
+            const msgs = await client.getMessages(channel, { replyTo: t.id, limit: 30 });
+            msgs.forEach(m => {
                 if (!m.message) return;
-                procesarMensaje(m);
+                const txt = m.message.toLowerCase();
+                let cat = "inicio";
+                if (txt.includes("#pelicula")) cat = "peliculas";
+                else if (txt.includes("#serie")) cat = "series";
+                else if (txt.includes("#directo")) cat = "directos";
+                else if (txt.includes("#agenda")) cat = "agenda";
+
+                const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
+                const link = extraerLink(m.message);
+
+                if (link && !base[cat].some(i => i.titulo === titulo)) {
+                    base[cat].push({
+                        titulo, link,
+                        portada: extraerImg(m.message),
+                        sinopsis: m.message,
+                        catAsignada: cat
+                    });
+                }
             });
         }
-
         if (typeof render === 'function') render(filtroActual);
     } catch (e) {
-        console.error("❌ Error al sincronizar:", e);
+        console.error("Error cargando topics:", e);
+        container.innerHTML = '<div style="text-align:center; color:red;">Error al cargar contenido de Telegram.</div>';
     }
 }
 
-function procesarMensaje(m) {
-    const texto = m.message.toLowerCase();
-    let cat = "inicio";
-    if (texto.includes("#pelicula")) cat = "peliculas";
-    else if (texto.includes("#serie")) cat = "series";
-    else if (texto.includes("#directo")) cat = "directos";
-    else if (texto.includes("#agenda")) cat = "agenda";
-
-    const titulo = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
-    const link = extraerEnlace(m.message);
-
-    if (link && !itemExisteEnBase(cat, titulo)) {
-        base[cat].push({
-            titulo: titulo,
-            link: link,
-            portada: extraerPortada(m.message),
-            sinopsis: m.message,
-            catAsignada: cat
-        });
-    }
-}
-
-function extraerEnlace(msg) {
-    const ace = msg.match(/[a-f0-9]{40}/);
+function extraerLink(m) {
+    const ace = m.match(/[a-f0-9]{40}/);
     if (ace) return "acestream://" + ace[0];
-    const url = msg.match(/https?:\/\/[^\s]+/);
+    const url = m.match(/https?:\/\/[^\s]+/);
     return url ? url[0] : null;
 }
 
-function extraerPortada(msg) {
-    const url = msg.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i);
-    return url ? url[0] : "https://via.placeholder.com/160x230/111/f5c518?text=VIDEO";
+function extraerImg(m) {
+    const img = m.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i);
+    return img ? img[0] : "https://via.placeholder.com/160x230/111/f5c518?text=PREVIEW";
 }
 
-function itemExisteEnBase(cat, titulo) {
-    return base[cat].some(i => i.titulo.toUpperCase() === titulo.toUpperCase());
-}
-
-// Iniciar proceso cuando todo cargue
-window.addEventListener('load', () => {
-    setTimeout(iniciarAppTelegram, 1000);
-});
+// Iniciar
+window.addEventListener('load', () => setTimeout(bootTelegram, 500));
