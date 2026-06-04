@@ -2,23 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium</title>
+    <title>PLAYER TV</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- 1. BASE DE SEGURIDAD (Cimiento de todo) -->
-    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <!-- 1. BUFFER (Polyfill oficial para navegadores) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
     <script>
-        // Forzamos la disponibilidad global inmediata
-        window.Buffer = window.Buffer || (window.buffer ? window.buffer.Buffer : undefined);
+        // Asignación inmediata según el estándar de GramJS
+        window.Buffer = buffer.Buffer;
         window.process = { env: {} };
-        window.global = window;
     </script>
 
-    <!-- 2. LIBRERÍAS DE TELEGRAM Y QR -->
+    <!-- 2. GRAMJS (Versión oficial para navegador) -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js"></script>
 </head>
 <body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
@@ -40,15 +39,15 @@
 
     <div id="content" style="padding: 10px;"></div>
 
-    <!-- MODAL DE LOGIN -->
+    <!-- LOGIN MODAL -->
     <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
         <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518; margin:0;">LOGIN TELEGRAM</h2>
+            <h2 style="color:#f5c518; margin:0;">CONECTAR</h2>
             <div id="qr-container" style="background:#fff; width:210px; height:210px; margin:20px auto; padding:10px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
                 <div id="qr-code"></div>
-                <div id="qr-loading" style="color:#000;">Cargando QR...</div>
+                <div id="qr-loading" style="color:#000;">Generando QR...</div>
             </div>
-            <p style="font-size:12px; color:#aaa; margin-bottom: 20px;">Ajustes > Dispositivos > Escanear QR</p>
+            <p style="font-size:12px; color:#aaa; margin-bottom: 20px;">Escanea con Telegram (Ajustes > Dispositivos)</p>
             <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin:10px 0; background:#222; border:1px solid #333; color:white; border-radius:8px;">
             <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer; color:#000;">ENTRAR</button>
         </div>
@@ -60,7 +59,7 @@
         <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
     </div>
 
-    <!-- 3. SCRIPTS DE APP (Firebase y Lógica) -->
+    <!-- Scripts de Aplicación -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="js/main.js"></script>
