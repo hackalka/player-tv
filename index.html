@@ -2,26 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Player TV - Premium 2026</title>
+    <title>Player TV - Telegram Edition</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#06090e">
 
+    <!-- Estilos base -->
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Librerías de soporte (Buffer es vital para Telegram) -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        // FIX PARA LIBRERÍAS DE NODE EN NAVEGADOR
-        window.process = { env: { DEBUG: undefined } };
-        window.Buffer = window.Buffer || undefined;
-        window.require = function(t) { return {}; };
+        // Configuración global para evitar errores de librerías Node en el navegador
+        window.Buffer = window.buffer.Buffer;
+        window.process = { env: {} };
+        window.require = function() { return {}; };
     </script>
 
-    <!-- Cargamos Buffer -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-
-    <!-- Cargamos GramJS desde un bundle preparado para navegador -->
+    <!-- Motor de Telegram y Firebase -->
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
@@ -34,7 +32,7 @@
 <div class="search-container">
     <div class="search-bar">
         <i class="fa fa-search"></i>
-        <input type="text" id="mainSearch" placeholder="Buscar..." onkeyup="ejecutarBuscador()">
+        <input type="text" id="mainSearch" placeholder="Buscar contenido..." onkeyup="ejecutarBuscador()">
     </div>
 </div>
 
@@ -50,15 +48,19 @@
 
 <div id="content"></div>
 
-<!-- Modal Login Telegram -->
-<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; align-items:center; justify-content:center;">
-    <div style="background:#111; border:2px solid #f5c518; width:90%; max-width:400px; padding:30px; border-radius:15px; text-align:center;">
-        <h2 style="color:#f5c518;">CONECTAR TELEGRAM</h2>
-        <p id="login-msg" style="color:#ccc;">Introduce tu número con el prefijo (+34...)</p>
-        <input type="text" id="phone-input" style="width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;">
-        <input type="text" id="code-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Código">
-        <input type="password" id="2fa-input" style="display:none; width:100%; padding:15px; margin:10px 0; background:#222; border:1px solid #444; color:white; border-radius:8px;" placeholder="Contraseña 2FA">
-        <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">ENVIAR</button>
+<!-- MODAL DE LOGIN (CENTRAL) -->
+<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 10000; align-items:center; justify-content:center;">
+    <div style="background:#111; border:2px solid #f5c518; width:90%; max-width:400px; padding:40px; border-radius:15px; text-align:center; box-shadow: 0 0 30px rgba(245,197,24,0.3);">
+        <h2 style="color:#f5c518; margin-top:0;">CONECTAR TELEGRAM</h2>
+        <p id="login-msg" style="color:#ccc; margin-bottom:25px;">Introduce tu teléfono con prefijo</p>
+
+        <input type="text" id="phone-input" placeholder="+34123456789" style="width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px; font-size:16px;">
+
+        <input type="text" id="code-input" placeholder="Código de Telegram" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px; font-size:16px;">
+
+        <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px; font-size:16px;">
+
+        <button id="btn-login" onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; color:black; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;">ENVIAR</button>
     </div>
 </div>
 
@@ -67,19 +69,20 @@
         <button class="close-btn" onclick="cerrarModal()">✕</button>
         <div id="modalHeader"></div>
         <div class="modal-details" style="padding: 20px;">
-            <h2 id="det-titulo" style="color:#f5c518;"></h2>
-            <p id="det-sinopsis" style="color:#ccc;"></p>
+            <h2 id="det-titulo" style="color:#f5c518; margin-top:0;"></h2>
+            <p id="det-sinopsis" style="color:#ccc; margin-bottom:20px;"></p>
             <div id="linksBox"></div>
         </div>
     </div>
 </div>
 
 <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index:15000; flex-direction:column; align-items:center; justify-content:center;">
-    <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">VOLVER</button>
-    <h2 id="video-info" style="color:white; margin-bottom:15px;"></h2>
+    <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:12px 25px; border-radius:8px; font-weight:bold; cursor:pointer;">VOLVER</button>
+    <h2 id="video-info" style="color:white; margin-bottom:15px; text-align:center;"></h2>
     <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
 </div>
 
+<!-- Carga de Scripts en orden -->
 <script src="js/main.js"></script>
 <script src="js/telegram-client.js"></script>
 
