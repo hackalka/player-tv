@@ -2,60 +2,56 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium</title>
+    <title>PLAYER TV - Telegram Client</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Script de Telegram WebApp (Oficial) -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <!-- FIREBASE V10 MODULAR (La forma correcta) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-        const firebaseConfig = {
-            databaseURL: atob("aHR0cHM6Ly9wbGF5ZXJ0di05NDQ5Yy1kZWZhdWx0LXJ0ZGIuZXVyb3BlLXdlc3QxLmZpcmViYXNlZGF0YWJhc2UuYXBwLw==")
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
-        // Exponer herramientas necesarias a la ventana global
-        window.firebaseDB = db;
-        window.firebaseRef = ref;
-        window.firebaseOnValue = onValue;
-
-        console.log("✅ Firebase Engine Ready");
-        if (window.startApp) window.startApp();
-    </script>
+    <!-- Cimientos de Telegram -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script>window.Buffer = window.buffer.Buffer;</script>
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
 <body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222; background: #000;">
-        <h1 style="color: #f5c518; margin: 0; font-size: 24px; letter-spacing: 2px;">PLAYER TV</h1>
+    <!-- PANTALLA DE CARGA -->
+    <div id="loader-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <h1 style="color:#f5c518; font-size:30px; letter-spacing:5px;">PLAYER TV</h1>
+        <div id="boot-status" style="color:#666; margin-top:20px;">Iniciando Telegram...</div>
+    </div>
+
+    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
+        <h1 style="color: #f5c518; margin: 0; font-size: 24px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000; position: sticky; top: 0; z-index: 1000;">
-        <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
-        <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
-        <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
-        <button class="f-btn" onclick="cambiarFiltro('directos', this)">TV EN VIVO</button>
-    </nav>
+    <!-- Navegación Dinámica (Se llenará con los Topics) -->
+    <nav id="main-nav" class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; overflow-x: auto;"></nav>
 
-    <div id="content" style="padding: 15px; min-height: 80vh;">
-        <div style="text-align: center; color: #444; padding-top: 50px;">Conectando con la base de datos...</div>
+    <div id="content" style="padding: 10px;"></div>
+
+    <!-- LOGIN MODAL -->
+    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
+        <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
+            <h2 style="color:#f5c518; margin-top:0;">CONECTAR</h2>
+            <div id="qr-container" style="background:#fff; width:200px; height:200px; margin:20px auto; padding:10px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                <div id="qr-code"></div>
+                <div id="qr-loading" style="color:#000;">Generando QR...</div>
+            </div>
+            <p style="font-size:12px; color:#aaa; margin-bottom:20px;">Escanea con Telegram > Ajustes > Dispositivos</p>
+            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin:10px 0; background:#222; border:1px solid #333; color:white; border-radius:8px;">
+            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer; color:#000;">ENTRAR</button>
+        </div>
     </div>
 
-    <!-- REPRODUCTOR MAESTRO -->
+    <!-- REPRODUCTOR -->
     <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 150000; flex-direction:column; align-items:center; justify-content:center;">
-        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:12px 25px; border-radius:10px; font-weight:bold; cursor:pointer; z-index: 10;">VOLVER</button>
-        <h2 id="video-info" style="color:white; margin-bottom:15px; font-size: 18px; text-align:center;"></h2>
-        <video id="main-video" controls style="width:100%; max-height:80vh; background:#000;"></video>
+        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer;">CERRAR</button>
+        <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
     </div>
 
-    <!-- Lógica Principal -->
+    <!-- Scripts de Aplicación -->
     <script src="js/main.js"></script>
+    <script src="js/telegram-client.js"></script>
 </body>
 </html>
