@@ -6,62 +6,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body style="background: #000; color: #fff; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
-    <header style="padding: 20px; text-align: center; background: #000; border-bottom: 1px solid #222;">
-        <h1 style="color: #f5c518; margin: 0; font-size: 24px; letter-spacing: 2px;">PLAYER TV</h1>
+    <!-- Fix de Entorno -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script>
+        window.Buffer = window.buffer.Buffer;
+        window.process = { env: {} };
+    </script>
+</head>
+<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow: hidden;">
+
+    <!-- PANTALLA DE INTRO (CINEFLIX STYLE) -->
+    <div id="intro-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <h1 style="color:#f5c518; font-size:40px; letter-spacing:5px; margin:0; animation: pulse 2s infinite;">PLAYER TV</h1>
+        <div id="boot-status" style="color:#666; margin-top:20px; font-size:14px;">Iniciando motor...</div>
+    </div>
+
+    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
+        <h1 style="color: #f5c518; margin: 0; font-size: 24px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000;">
+    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px;">
         <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
         <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
         <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
-        <button class="f-btn" onclick="cambiarFiltro('agenda', this)">DEPORTES</button>
     </nav>
 
-    <div id="content">
-        <div id="status-display" style="text-align: center; padding: 50px; color: #f5c518;">
-            <i class="fa fa-circle-notch fa-spin" style="font-size: 30px; margin-bottom: 15px;"></i>
-            <p id="status-text">Cargando motor de Telegram...</p>
+    <div id="content" style="padding: 10px; height: calc(100vh - 150px); overflow-y: auto;"></div>
+
+    <!-- MODAL DE LOGIN POR QR / TELÉFONO -->
+    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index: 100000; align-items:center; justify-content:center;">
+        <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:20px; width:90%; max-width:400px; text-align:center;">
+            <h2 style="color:#f5c518; margin:0;">CONECTAR</h2>
+
+            <!-- Zona QR -->
+            <div id="qr-container" style="background:#fff; width:200px; height:200px; margin:20px auto; padding:10px; border-radius:10px;">
+                <div id="qr-code"></div>
+                <div id="qr-loading" style="color:#000; padding-top:80px;">Generando QR...</div>
+            </div>
+            <p style="font-size:12px; color:#aaa;">Abre Telegram > Ajustes > Dispositivos > Escanear QR</p>
+
+            <div style="margin: 20px 0; border-top: 1px solid #333; position: relative;">
+                <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #111; padding: 0 10px; color: #555; font-size: 10px;">O USA TU NÚMERO</span>
+            </div>
+
+            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
+            <input type="text" id="code-input" placeholder="Código" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
+            <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:12px; margin-bottom:10px; background:#222; border:1px solid #333; color:white; border-radius:8px;">
+
+            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer;">ENVIAR</button>
         </div>
     </div>
 
-    <!-- MODAL DE LOGIN (REDISEÑADO) -->
-    <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
-        <div style="background:#111; border:2px solid #f5c518; padding:40px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518; margin-top:0;">TELEGRAM</h2>
-            <p id="login-msg" style="color:#ccc; margin-bottom:25px;">Introduce tu teléfono (+34...)</p>
-
-            <input type="text" id="phone-input" placeholder="+34 600 000 000" style="width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
-            <input type="text" id="code-input" placeholder="Código" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
-            <input type="password" id="2fa-input" placeholder="Contraseña 2FA" style="display:none; width:100%; padding:15px; margin-bottom:15px; background:#222; border:1px solid #444; color:white; border-radius:8px;">
-
-            <button onclick="iniciarLogin()" style="width:100%; padding:15px; background:#f5c518; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px;">ENVIAR</button>
-        </div>
+    <!-- REPRODUCTOR MAESTRO -->
+    <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 150000; flex-direction:column; align-items:center; justify-content:center;">
+        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer;">CERRAR</button>
+        <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
     </div>
 
-    <!-- SCRIPTS EN ORDEN DE SEGURIDAD -->
-    <!-- 1. Buffer desde un bundle que funciona sí o sí -->
-    <script src="https://bundle.run/buffer@6.0.3"></script>
-    <script>
-        // Fix de Buffer por fuerza bruta
-        window.onload = function() {
-            if (typeof window.buffer !== 'undefined') {
-                window.Buffer = window.buffer.Buffer;
-            } else if (typeof Buffer === 'undefined') {
-                console.error("Fallo crítico: No se pudo cargar Buffer");
-            }
-            window.process = { env: {} };
-        };
-    </script>
-
-    <!-- 2. Telegram Client -->
+    <!-- Scripts -->
+    <script src="js/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
-
-    <!-- 3. Tu lógica de App -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
 
+    <style>
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
 </body>
 </html>
