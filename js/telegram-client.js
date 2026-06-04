@@ -1,26 +1,22 @@
 /**
- * MOTOR DE TELEGRAM PARA GITHUB PAGES (VERSIÓN BLINDADA)
+ * MOTOR DE TELEGRAM (REVISIÓN FINAL GITHUB PAGES)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let tgClient = null;
-let loginRes = null;
+let qrStep = true;
 
-async function bootSystem() {
-    console.log("🛠 Iniciando motor...");
+async function startApp() {
+    console.log("🚀 Iniciando arranque...");
 
-    // FORZADO DE LIBRERÍAS (Polyfill de emergencia)
-    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
-        window.Buffer = window.buffer.Buffer;
-    }
-
+    // Detección universal del motor GramJS
     const lib = window.telegram || window.gramjs;
 
     if (!lib || !window.Buffer) {
-        document.getElementById('boot-status').innerText = "Cargando motor de seguridad...";
-        setTimeout(bootSystem, 500);
+        console.warn("⏳ Librerías no detectadas, reintentando...");
+        setTimeout(startApp, 500);
         return;
     }
 
@@ -33,60 +29,54 @@ async function bootSystem() {
     });
 
     try {
-        document.getElementById('boot-status').innerText = "Estableciendo conexión...";
+        document.getElementById('boot-status').innerText = "Conectando...";
         await tgClient.connect();
 
         if (!await tgClient.checkAuthorization()) {
             document.getElementById('loader-screen').style.display = 'none';
             document.getElementById('login-modal').style.display = 'flex';
-            startQRLogin();
+            startQR();
         } else {
-            finalizeBoot();
+            onAuthorized();
         }
     } catch (e) {
         console.error("Error de arranque:", e);
-        document.getElementById('boot-status').innerText = "Fallo de red. Reintentando...";
-        setTimeout(bootSystem, 2000);
+        document.getElementById('boot-status').innerText = "Error de red. Reintentando...";
+        setTimeout(startApp, 2000);
     }
 }
 
-async function startQRLogin() {
-    const lib = window.telegram || window.gramjs;
+async function startQR() {
     try {
         await tgClient.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
-            onError: (err) => {
-                if (err.message.includes("SESSION_PASSWORD_NEEDED")) alert("Introduce tu contraseña 2FA en el campo.");
-            },
+            onError: (err) => console.error("QR Error:", err),
             qrCode: async (code) => {
                 const url = `tg://login?token=${code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-                renderQRCode(url);
+                const qr = qrcode(0, 'M');
+                qr.addData(url);
+                qr.make();
+                document.getElementById('qr-loading').style.display = 'none';
+                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
             }
         });
-        finalizeBoot();
-    } catch (e) {}
+        onAuthorized();
+    } catch (e) {
+        console.log("QR Flow reset");
+    }
 }
 
-function renderQRCode(data) {
-    if (!window.qrcode) return;
-    const qr = qrcode(0, 'M');
-    qr.addData(data);
-    qr.make();
-    document.getElementById('qr-loading').style.display = 'none';
-    document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
-}
-
-function finalizeBoot() {
+function onAuthorized() {
     localStorage.setItem('tg_session', tgClient.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
     document.body.style.overflow = 'auto';
-    syncContents();
+    sync();
 }
 
-async function syncContents() {
-    const lib = window.telegram || window.gramjs;
-    const { Api } = lib;
+async function sync() {
     try {
+        const lib = window.telegram || window.gramjs;
+        const { Api } = lib;
         const channelId = "gran_player";
         const entity = await tgClient.getEntity(channelId);
         const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: entity }));
@@ -115,7 +105,7 @@ async function syncContents() {
             });
         }
         if (typeof render === 'function') render('inicio');
-    } catch (e) { console.error("Error sincronizando:", e); }
+    } catch (e) { console.error("Sync Error:", e); }
 }
 
-window.addEventListener('load', bootSystem);
+window.addEventListener('load', startApp);
