@@ -1,29 +1,40 @@
 /**
- * MOTOR DE TELEGRAM (RECONSTRUCCIÓN MAESTRA)
+ * MOTOR DE TELEGRAM (VERSIÓN DIAGNÓSTICO MASTER)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let client = null;
+let retryCount = 0;
 
-async function startEngine() {
-    console.log("🚀 Arrancando motor...");
+async function startBoot() {
+    console.log("🚀 Verificando componentes...");
 
-    // AUTO-REPARACIÓN DE BUFFER
+    // Intentamos rescatar Buffer si el navegador lo escondió
     if (typeof window.Buffer === 'undefined' && window.buffer) {
         window.Buffer = window.buffer.Buffer;
     }
 
-    const lib = window.telegram;
+    const lib = window.telegram || window.gramjs;
+    const hasBuffer = typeof window.Buffer !== 'undefined';
+    const hasLib = !!lib;
 
-    if (!lib || !window.Buffer) {
-        console.error("❌ Librería no detectada. Esperando...");
-        document.getElementById('boot-status').innerText = "ESPERANDO LIBRERÍAS...";
-        setTimeout(startEngine, 1000);
+    if (!hasLib || !hasBuffer) {
+        retryCount++;
+        let missing = !hasLib ? "MOTOR TELEGRAM" : "SEGURIDAD (BUFFER)";
+        document.getElementById('boot-status').innerText = `ESPERANDO ${missing}... (${retryCount})`;
+
+        if (retryCount > 20) {
+            document.getElementById('boot-status').innerHTML = "<span style='color:red;'>ERROR CRÍTICO: LIBRERÍAS BLOQUEADAS POR EL NAVEGADOR</span>";
+            return;
+        }
+
+        setTimeout(startBoot, 500);
         return;
     }
 
+    console.log("✅ Componentes listos. Iniciando sesión...");
     const { TelegramClient, sessions } = lib;
     const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
@@ -33,80 +44,51 @@ async function startEngine() {
     });
 
     try {
-        document.getElementById('boot-status').innerText = "CONECTANDO...";
+        document.getElementById('boot-status').innerText = "ESTABLECIENDO CONEXIÓN...";
         await client.connect();
 
         if (!await client.checkAuthorization()) {
             document.getElementById('loader-screen').style.display = 'none';
             document.getElementById('login-modal').style.display = 'flex';
-            runQRFlow();
+            runQR();
         } else {
-            onAuthorized();
+            finalize();
         }
     } catch (e) {
         console.error(e);
-        document.getElementById('boot-status').innerHTML = "<span style='color:red;'>ERROR DE CONEXIÓN</span>";
+        document.getElementById('boot-status').innerText = "REINTENTANDO CONEXIÓN...";
+        setTimeout(startBoot, 2000);
     }
 }
 
-async function runQRFlow() {
+async function runQR() {
     try {
         await client.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
             qrCode: async (code) => {
                 const url = `tg://login?token=${code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-                if (window.qrcode) {
-                    const qr = qrcode(0, 'M');
-                    qr.addData(url);
-                    qr.make();
-                    document.getElementById('qr-loading').style.display = 'none';
-                    document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4 });
-                }
+                const qr = qrcode(0, 'M');
+                qr.addData(url);
+                qr.make();
+                document.getElementById('qr-loading').style.display = 'none';
+                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4 });
             }
         });
-        onAuthorized();
+        finalize();
     } catch (e) {}
 }
 
-function onAuthorized() {
+function finalize() {
     localStorage.setItem('tg_session', client.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
     document.body.style.overflow = 'auto';
-    sync();
+    if (typeof syncContents === 'undefined') {
+        // Si main.js no ha cargado funciones, las definimos o esperamos
+        setTimeout(finalize, 500);
+    } else {
+        syncContents();
+    }
 }
 
-async function sync() {
-    try {
-        const { Api } = window.telegram;
-        const chatId = "gran_player";
-        const channel = await client.getEntity(chatId);
-        const full = await client.invoke(new Api.channels.GetFullChannel({ channel }));
-        const topics = full.fullChat.topics.topics || [];
-
-        for (const t of topics) {
-            const msgs = await client.getMessages(channel, { replyTo: t.id, limit: 30 });
-            msgs.forEach(m => {
-                if (!m.message) return;
-                const txt = m.message.toLowerCase();
-                let cat = "inicio";
-                if (txt.includes("#pelicula")) cat = "peliculas";
-                else if (txt.includes("#serie")) cat = "series";
-
-                const tit = m.message.split('\n')[0].replace(/#\w+/g, '').trim();
-                const lnk = m.message.match(/https?:\/\/[^\s]+/)?.[0];
-
-                if (lnk && !base[cat].some(i => i.titulo === tit)) {
-                    base[cat].push({
-                        titulo: tit, link: lnk,
-                        chatId: chatId, msgId: m.id,
-                        portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=TV",
-                        sinopsis: m.message, catAsignada: cat
-                    });
-                }
-            });
-        }
-        if (typeof render === 'function') render('inicio');
-    } catch (e) { console.error("Error sincronizando:", e); }
-}
-
-window.addEventListener('load', startEngine);
+// Iniciar proceso
+window.addEventListener('load', startBoot);
