@@ -1,22 +1,26 @@
 /**
- * MOTOR DE TELEGRAM (OFFICIAL GRAMJS BROWSER IMPLEMENTATION)
+ * MOTOR DE TELEGRAM PARA GITHUB PAGES (VERSIÓN BLINDADA)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let tgClient = null;
-let loginStep = 'qr';
+let loginRes = null;
 
-async function bootApp() {
+async function bootSystem() {
     console.log("🛠 Iniciando motor...");
 
-    // En el navegador, GramJS suele registrarse como 'gramjs' o 'telegram'
-    const lib = window.gramjs || window.telegram;
+    // FORZADO DE LIBRERÍAS (Polyfill de emergencia)
+    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
+        window.Buffer = window.buffer.Buffer;
+    }
+
+    const lib = window.telegram || window.gramjs;
 
     if (!lib || !window.Buffer) {
-        console.warn("⏳ Reintentando carga de librerías...");
-        setTimeout(bootApp, 500);
+        document.getElementById('boot-status').innerText = "Cargando motor de seguridad...";
+        setTimeout(bootSystem, 500);
         return;
     }
 
@@ -29,7 +33,7 @@ async function bootApp() {
     });
 
     try {
-        document.getElementById('boot-status').innerText = "Conectando...";
+        document.getElementById('boot-status').innerText = "Estableciendo conexión...";
         await tgClient.connect();
 
         if (!await tgClient.checkAuthorization()) {
@@ -37,50 +41,50 @@ async function bootApp() {
             document.getElementById('login-modal').style.display = 'flex';
             startQRLogin();
         } else {
-            onAuthorized();
+            finalizeBoot();
         }
     } catch (e) {
-        console.error(e);
-        document.getElementById('boot-status').innerText = "Error. Reintentando...";
+        console.error("Error de arranque:", e);
+        document.getElementById('boot-status').innerText = "Fallo de red. Reintentando...";
+        setTimeout(bootSystem, 2000);
     }
 }
 
 async function startQRLogin() {
-    const lib = window.gramjs || window.telegram;
+    const lib = window.telegram || window.gramjs;
     try {
         await tgClient.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
             onError: (err) => {
-                if (err.message.includes("SESSION_PASSWORD_NEEDED")) {
-                    alert("Se requiere contraseña 2FA.");
-                }
+                if (err.message.includes("SESSION_PASSWORD_NEEDED")) alert("Introduce tu contraseña 2FA en el campo.");
             },
             qrCode: async (code) => {
                 const url = `tg://login?token=${code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-                renderQR(url);
+                renderQRCode(url);
             }
         });
-        onAuthorized();
+        finalizeBoot();
     } catch (e) {}
 }
 
-function renderQR(url) {
+function renderQRCode(data) {
     if (!window.qrcode) return;
     const qr = qrcode(0, 'M');
-    qr.addData(url);
+    qr.addData(data);
     qr.make();
     document.getElementById('qr-loading').style.display = 'none';
     document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
 }
 
-function onAuthorized() {
+function finalizeBoot() {
     localStorage.setItem('tg_session', tgClient.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
-    syncData();
+    document.body.style.overflow = 'auto';
+    syncContents();
 }
 
-async function syncData() {
-    const lib = window.gramjs || window.telegram;
+async function syncContents() {
+    const lib = window.telegram || window.gramjs;
     const { Api } = lib;
     try {
         const channelId = "gran_player";
@@ -103,6 +107,7 @@ async function syncData() {
                 if (lnk && !base[cat].some(i => i.titulo === tit)) {
                     base[cat].push({
                         titulo: tit, link: lnk,
+                        chatId: channelId, msgId: m.id,
                         portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=TV",
                         sinopsis: m.message, catAsignada: cat
                     });
@@ -110,7 +115,7 @@ async function syncData() {
             });
         }
         if (typeof render === 'function') render('inicio');
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error sincronizando:", e); }
 }
 
-window.addEventListener('load', bootApp);
+window.addEventListener('load', bootSystem);
