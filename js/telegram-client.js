@@ -1,29 +1,31 @@
 /**
- * TELEGRAM ENGINE MASTER (ESTILO CINEFLIX)
+ * MOTOR DE TELEGRAM MAESTRO (VERSIÓN AUTO-DETECT)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let tgClient = null;
-let loginResolver = null;
-let currentStep = 'qr';
+let loginRes = null;
+let loginStep = 'qr';
 
-async function initTelegram() {
-    console.log("🛠 Iniciando motor...");
+async function bootApp() {
+    console.log("🚀 Arrancando sistema...");
 
-    // Verificación y corrección de Buffer en tiempo real
-    if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
-        window.Buffer = window.buffer.Buffer;
+    // Auto-reparación de Buffer en tiempo real
+    if (typeof window.Buffer === 'undefined') {
+        if (window.buffer) window.Buffer = window.buffer.Buffer;
     }
 
-    if (!window.telegram || !window.Buffer) {
-        document.getElementById('boot-status').innerText = "Esperando motor...";
-        setTimeout(initTelegram, 500);
+    const lib = window.telegram || window.gramjs;
+
+    if (!lib || !window.Buffer) {
+        document.getElementById('boot-status').innerText = "Esperando librerías...";
+        setTimeout(bootApp, 500);
         return;
     }
 
-    const { TelegramClient, sessions } = window.telegram;
+    const { TelegramClient, sessions } = lib;
     const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
     tgClient = new TelegramClient(session, API_ID, API_HASH, {
@@ -38,47 +40,51 @@ async function initTelegram() {
         if (!await tgClient.checkAuthorization()) {
             document.getElementById('loader-screen').style.display = 'none';
             document.getElementById('login-modal').style.display = 'flex';
-            startLoginFlow();
+            startQRLogin();
         } else {
             onAuthorized();
         }
     } catch (e) {
         console.error(e);
-        document.getElementById('boot-status').innerText = "Fallo de conexión. Reintentando...";
+        document.getElementById('boot-status').innerText = "Error. Reconectando...";
     }
 }
 
-async function startLoginFlow() {
+async function startQRLogin() {
     try {
         await tgClient.signInUserWithQrCode({ apiId: API_ID, apiHash: API_HASH }, {
             onError: (err) => {
                 if (err.message.includes("SESSION_PASSWORD_NEEDED")) {
-                    currentStep = '2fa'; updateLoginUI();
-                } else alert("Error: " + err.message);
+                    alert("Por favor, pon tu contraseña 2FA en el campo de texto.");
+                }
             },
             qrCode: async (code) => {
                 const url = `tg://login?token=${code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
-                const qr = qrcode(0, 'M');
-                qr.addData(url);
-                qr.make();
-                document.getElementById('qr-loading').style.display = 'none';
-                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+                renderQRCode(url);
             }
         });
         onAuthorized();
     } catch (e) {}
 }
 
+function renderQRCode(data) {
+    const qr = qrcode(0, 'M');
+    qr.addData(data);
+    qr.make();
+    document.getElementById('qr-loading').style.display = 'none';
+    document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+}
+
 function onAuthorized() {
     localStorage.setItem('tg_session', tgClient.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
-    syncContents();
+    syncTelegram();
 }
 
-async function syncContents() {
+async function syncTelegram() {
     try {
-        const { Api } = window.telegram;
+        const { Api } = window.telegram || window.gramjs;
         const channel = await tgClient.getEntity("gran_player");
         const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel }));
         const topics = full.fullChat.topics.topics || [];
@@ -98,7 +104,6 @@ async function syncContents() {
                 if (lnk && !base[cat].some(i => i.titulo === tit)) {
                     base[cat].push({
                         titulo: tit, link: lnk,
-                        chatId: "gran_player", msgId: m.id,
                         portada: m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || "https://via.placeholder.com/160x230/111/f5c518?text=TV",
                         sinopsis: m.message, catAsignada: cat
                     });
@@ -109,4 +114,4 @@ async function syncContents() {
     } catch (e) { console.error(e); }
 }
 
-window.addEventListener('load', initTelegram);
+window.addEventListener('load', bootApp);
