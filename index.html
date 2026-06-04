@@ -2,70 +2,76 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Pro</title>
+    <title>PLAYER TV - Pro Edition</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="css/reproductor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- 1. DEFINIMOS EL ENTORNO ANTES DE NADA -->
+    <!-- 1. BASE DE NAVEGADOR (Cimiento Vital) -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
     <script>
+        // Inyección manual de Buffer para engañar a GramJS
         window.global = window;
-        window.process = { env: {} };
-        // Definimos un require falso para que no de error
-        window.require = function(m) {
-            if(m === "buffer") return { Buffer: window.Buffer };
-            return {};
-        };
+        window.Buffer = window.Buffer || (window.buffer ? window.buffer.Buffer : undefined);
+        window.process = { env: { DEBUG: undefined }, nextTick: function(f){setTimeout(f,0)} };
+        // Evitamos error de require
+        window.require = function(t){ return {}; };
     </script>
 
-    <!-- 2. CARGAMOS LAS PIEZAS DEL PUZLE -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-    <script>window.Buffer = buffer.Buffer;</script>
-
-    <!-- Librería oficial GramJS Browser -->
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+    <!-- 2. MOTOR TELEGRAM (Browser Version) -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
-<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif;">
+<body style="background: #000; color: #fff; margin: 0; font-family: sans-serif; overflow-x: hidden;">
 
+    <!-- PANTALLA DE CARGA -->
     <div id="loader-screen" style="position:fixed; inset:0; background:#000; z-index:200000; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <h1 style="color:#f5c518; font-size:30px; letter-spacing:5px;">PLAYER TV</h1>
-        <div id="boot-status" style="color:#666; margin-top:20px;">INICIANDO...</div>
+        <h1 id="main-logo" style="color:#f5c518; font-size:30px; letter-spacing:5px; margin:0;">PLAYER TV</h1>
+        <div id="boot-status" style="color:#444; margin-top:20px; font-size:12px; text-transform:uppercase; font-weight:bold;">Estableciendo protocolos...</div>
     </div>
 
-    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222;">
-        <h1 style="color: #f5c518; margin: 0; font-size: 24px;">PLAYER TV</h1>
+    <header style="padding: 20px; text-align: center; border-bottom: 1px solid #222; background: #000;">
+        <h1 style="color: #f5c518; margin: 0; font-size: 22px;">PLAYER TV</h1>
     </header>
 
-    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px;">
+    <nav class="nav" style="display: flex; justify-content: center; gap: 10px; padding: 15px; background: #000;">
         <button class="f-btn active" onclick="cambiarFiltro('inicio', this)">INICIO</button>
         <button class="f-btn" onclick="cambiarFiltro('peliculas', this)">PELÍCULAS</button>
         <button class="f-btn" onclick="cambiarFiltro('series', this)">SERIES</button>
     </nav>
 
-    <div id="content" style="padding: 10px;"></div>
+    <div id="content" style="padding: 15px;"></div>
 
+    <!-- MODAL LOGIN -->
     <div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index: 100000; align-items:center; justify-content:center;">
-        <div style="background:#111; border:2px solid #f5c518; padding:30px; border-radius:15px; width:90%; max-width:400px; text-align:center;">
-            <h2 style="color:#f5c518;">LOGIN</h2>
-            <div id="qr-container" style="background:#fff; width:210px; height:210px; margin:20px auto; padding:10px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+        <div style="background:#111; border:2px solid #f5c518; padding:35px; border-radius:20px; width:90%; max-width:400px; text-align:center; box-shadow: 0 0 50px rgba(0,0,0,1);">
+            <h2 style="color:#f5c518; margin:0 0 20px;">CONECTAR TELEGRAM</h2>
+
+            <div id="qr-container" style="background:#fff; width:220px; height:220px; margin:0 auto 20px; padding:10px; border-radius:12px; display:flex; align-items:center; justify-content:center;">
                 <div id="qr-code"></div>
-                <div id="qr-loading" style="color:#000;">QR...</div>
+                <div id="qr-loading" style="color:#000; font-weight:bold; font-size:14px;">GENERANDO QR...</div>
             </div>
-            <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:12px; margin:10px 0; background:#222; border:1px solid #333; color:white; border-radius:8px;">
-            <button onclick="iniciarLogin()" style="width:100%; padding:12px; background:#f5c518; border:none; font-weight:bold; border-radius:8px; cursor:pointer;">CONTINUAR</button>
+
+            <p style="font-size:12px; color:#888; margin-bottom: 25px;">Escanea este código desde los Ajustes de tu Telegram en el móvil.</p>
+
+            <div style="border-top: 1px solid #222; padding-top: 20px;">
+                <input type="text" id="phone-input" placeholder="+34..." style="width:100%; padding:14px; margin-bottom:12px; background:#222; border:1px solid #333; color:white; border-radius:10px; font-size:16px;">
+                <button onclick="iniciarLogin()" style="width:100%; padding:14px; background:#f5c518; border:none; font-weight:bold; border-radius:10px; cursor:pointer; color:#000; font-size:16px;">ENTRAR</button>
+            </div>
         </div>
     </div>
 
+    <!-- REPRODUCTOR -->
     <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 150000; flex-direction:column; align-items:center; justify-content:center;">
-        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold;">CERRAR</button>
-        <video id="main-video" controls style="width:100%; max-height:80vh;"></video>
+        <button onclick="cerrarReproductor()" style="position:absolute; top:20px; left:20px; background:#f44336; color:white; border:none; padding:12px 25px; border-radius:10px; font-weight:bold;">VOLVER</button>
+        <video id="main-video" controls style="width:100%; max-height:80vh; background:#000;"></video>
     </div>
 
-    <!-- Scripts de Aplicación -->
+    <!-- SCRIPTS APP -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="js/main.js"></script>
     <script src="js/telegram-client.js"></script>
+
 </body>
 </html>
