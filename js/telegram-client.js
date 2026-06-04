@@ -17,14 +17,16 @@ let isLoadingTelegram = false;
  * Robust Initialization Engine
  */
 async function initGramJS() {
-    if (!window.telegram || !window.Buffer) {
-        console.warn("⏳ Waiting for Telegram/Buffer libraries...");
+    const tgLib = window.telegram || window.gramjs;
+
+    if (!tgLib || !window.Buffer) {
+        console.warn("⏳ Esperando librerías...");
         setTimeout(initGramJS, 500);
         return;
     }
 
-    const { TelegramClient } = window.telegram;
-    const { StringSession } = window.telegram.sessions;
+    const { TelegramClient, Api } = tgLib;
+    const { StringSession } = tgLib.sessions;
 
     const stringSession = new StringSession(localStorage.getItem('tg_session') || "");
 
@@ -127,7 +129,8 @@ async function inicializarContenidoTelegram() {
     const channelId = "gran_player";
     try {
         const entity = await client.getEntity(channelId);
-        const { Api } = window.telegram;
+        const tgLib = window.telegram || window.gramjs;
+        const { Api } = tgLib;
 
         // Fetch full channel to get topics
         const fullChannel = await client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
