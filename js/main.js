@@ -1,64 +1,67 @@
 /**
- * MAIN UI & STREAMING ENGINE
+ * ENGINE MASTER: PURE TELEGRAM (NO FIREBASE)
  */
 
-// Registrar Service Worker para Streaming
+// REGISTRO DE STREAMING
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(reg => {
-        console.log("SW Streaming Activo");
         navigator.serviceWorker.ready.then(r => {
             const chan = new MessageChannel();
-            chan.port1.onmessage = handleStreamRequest;
+            chan.port1.onmessage = async (e) => {
+                const { type, requestId, streamId, start, size } = e.data;
+                if (type === 'FETCH_RANGE') {
+                    const [chatId, msgId] = streamId.split('-');
+                    // window.client es definido en telegram-client.js
+                    const msgs = await window.tgClient.getMessages(chatId, { ids: [parseInt(msgId)] });
+                    const chunk = await window.tgClient.downloadMedia(msgs[0].media, {
+                        start: BigInt(start),
+                        end: BigInt(start + size - 1),
+                        workers: 1
+                    });
+                    e.target.postMessage({ requestId, chunk });
+                }
+            };
             r.active.postMessage({ type: 'INIT' }, [chan.port2]);
         });
     });
 }
 
-async function handleStreamRequest(e) {
-    const { type, requestId, streamId, start, size } = e.data;
-    if (type === 'FETCH_RANGE') {
-        const [chatId, msgId] = streamId.split('-');
-        // Pedir al cliente de telegram el trozo
-        const buf = await window.client.downloadMedia(window.currentMedia, {
-            start: BigInt(start),
-            end: BigInt(start + size - 1),
-            workers: 1
-        });
-        e.target.postMessage({ requestId, chunk: buf });
-    }
-}
-
+// REPRODUCTOR REAL (SIN TVGRAM://)
 window.playVideo = async function(titulo, msg) {
-    const player = document.getElementById('player-layer');
+    const layer = document.getElementById('player-layer');
     const video = document.getElementById('main-video');
+    const info = document.getElementById('video-info');
 
-    player.style.display = 'flex';
+    layer.style.display = 'flex';
+    info.innerText = titulo;
+    video.src = ""; // Reset
 
     if (msg.media) {
-        window.currentMedia = msg.media;
-        const fileSize = msg.media.document?.size || msg.media.video?.size;
-        const streamId = `gran_player-${msg.id}`;
+        const size = msg.media.document?.size || msg.media.video?.size;
+        if (size) {
+            const streamId = `gran_player-${msg.id}`;
+            navigator.serviceWorker.controller.postMessage({
+                type: 'REGISTER', streamId, fileSize: Number(size), mimeType: 'video/mp4'
+            });
+            video.src = `tg-stream/${streamId}`;
+            video.play();
+            return;
+        }
+    }
 
-        navigator.serviceWorker.controller.postMessage({
-            type: 'REGISTER',
-            streamId,
-            fileSize: Number(fileSize),
-            mimeType: 'video/mp4'
-        });
-
-        video.src = `tg-stream/${streamId}`;
+    // Fallback: Si es un link normal en el mensaje
+    const link = msg.message?.match(/https?:\/\/[^\s]+/)?.[0];
+    if (link) {
+        video.src = link;
         video.play();
     } else {
-        const link = msg.message.match(/https?:\/\/[^\s]+/)?.[0];
-        if (link) {
-            video.src = link;
-            video.play();
-        }
+        alert("Este mensaje no contiene un video reproducible.");
+        layer.style.display = 'none';
     }
 };
 
-function cerrarReproductor() {
+window.cerrarReproductor = function() {
     const v = document.getElementById('main-video');
     v.pause(); v.src = "";
     document.getElementById('player-layer').style.display = 'none';
-}
+};
