@@ -1,1 +1,0 @@
-Couldn't find the requested file /browser/telegram.js in telegram.

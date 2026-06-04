@@ -1,5 +1,5 @@
 /**
- * MOTOR DE TELEGRAM (INYECTOR MAESTRO)
+ * MOTOR DE TELEGRAM (REVISIÓN MAESTRA - NO MORE ERRORS)
  */
 
 const API_ID = 8952741;
@@ -7,15 +7,18 @@ const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let client = null;
 
-async function startLogin() {
-    console.log("⚡ Iniciando conexión...");
+async function startEngine() {
+    console.log("🚀 Arrancando motor...");
 
-    // Forzamos Buffer por si acaso
-    if (typeof window.Buffer === 'undefined' && window.buffer) {
-        window.Buffer = window.buffer.Buffer;
+    // Verificación de librerías
+    const lib = window.telegram || window.gramjs;
+
+    if (!lib || !window.Buffer) {
+        console.warn("⏳ Esperando componentes vitales...");
+        setTimeout(startEngine, 500);
+        return;
     }
 
-    const lib = window.telegram || window.gramjs;
     const { TelegramClient, sessions } = lib;
     const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
 
@@ -33,11 +36,12 @@ async function startLogin() {
             document.getElementById('login-modal').style.display = 'flex';
             runQR();
         } else {
-            finalize();
+            onSuccess();
         }
     } catch (e) {
-        console.error(e);
-        document.getElementById('boot-status').innerText = "ERROR DE CONEXIÓN. REFRESCA.";
+        console.error("Fallo de arranque:", e);
+        document.getElementById('boot-status').innerText = "REINTENTANDO...";
+        setTimeout(startEngine, 2000);
     }
 }
 
@@ -55,11 +59,11 @@ async function runQR() {
                 }
             }
         });
-        finalize();
+        onSuccess();
     } catch (e) {}
 }
 
-function finalize() {
+function onSuccess() {
     localStorage.setItem('tg_session', client.session.save());
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
@@ -67,7 +71,4 @@ function finalize() {
     if (typeof syncContents === 'function') syncContents();
 }
 
-// El inyector de index.html llamará a esta función al terminar
-window.iniciarTodo = startLogin;
-// Iniciamos automáticamente tras un pequeño delay para asegurar estabilidad
-setTimeout(startLogin, 500);
+window.addEventListener('load', startEngine);
