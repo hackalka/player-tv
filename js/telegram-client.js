@@ -1,22 +1,21 @@
 /**
- * MOTOR DE TELEGRAM (REVISIÓN FINAL GITHUB PAGES)
+ * TELEGRAM ENGINE MASTER (NO-FALLBACK VERSION)
  */
 
 const API_ID = 8952741;
 const API_HASH = "693fb2da124662dad85b2b337c53a386";
 
 let tgClient = null;
-let qrStep = true;
 
-async function startApp() {
-    console.log("🚀 Iniciando arranque...");
+async function bootSystem() {
+    console.log("🛠 Iniciando motor...");
 
-    // Detección universal del motor GramJS
-    const lib = window.telegram || window.gramjs;
+    // Esta versión de Telegram ya trae su propio Buffer
+    const lib = window.telegram;
 
-    if (!lib || !window.Buffer) {
-        console.warn("⏳ Librerías no detectadas, reintentando...");
-        setTimeout(startApp, 500);
+    if (!lib) {
+        console.warn("⏳ Esperando motor principal...");
+        setTimeout(bootSystem, 500);
         return;
     }
 
@@ -40,9 +39,9 @@ async function startApp() {
             onAuthorized();
         }
     } catch (e) {
-        console.error("Error de arranque:", e);
-        document.getElementById('boot-status').innerText = "Error de red. Reintentando...";
-        setTimeout(startApp, 2000);
+        console.error("Error crítico:", e);
+        document.getElementById('boot-status').innerText = "Fallo de conexión. Reintentando...";
+        setTimeout(bootSystem, 3000);
     }
 }
 
@@ -56,13 +55,11 @@ async function startQR() {
                 qr.addData(url);
                 qr.make();
                 document.getElementById('qr-loading').style.display = 'none';
-                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+                document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0 });
             }
         });
         onAuthorized();
-    } catch (e) {
-        console.log("QR Flow reset");
-    }
+    } catch (e) {}
 }
 
 function onAuthorized() {
@@ -70,13 +67,12 @@ function onAuthorized() {
     document.getElementById('loader-screen').style.display = 'none';
     document.getElementById('login-modal').style.display = 'none';
     document.body.style.overflow = 'auto';
-    sync();
+    syncContents();
 }
 
-async function sync() {
+async function syncContents() {
     try {
-        const lib = window.telegram || window.gramjs;
-        const { Api } = lib;
+        const { Api } = window.telegram;
         const channelId = "gran_player";
         const entity = await tgClient.getEntity(channelId);
         const full = await tgClient.invoke(new Api.channels.GetFullChannel({ channel: entity }));
@@ -105,7 +101,7 @@ async function sync() {
             });
         }
         if (typeof render === 'function') render('inicio');
-    } catch (e) { console.error("Sync Error:", e); }
+    } catch (e) { console.error("Sync error:", e); }
 }
 
-window.addEventListener('load', startApp);
+window.addEventListener('load', bootSystem);
