@@ -21,6 +21,7 @@ async function initGramJS() {
 
     if (!tgLib || !window.Buffer) {
         console.warn("⏳ Esperando librerías...");
+        if (typeof buffer !== 'undefined') window.Buffer = buffer.Buffer;
         setTimeout(initGramJS, 500);
         return;
     }
