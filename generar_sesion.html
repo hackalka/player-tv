@@ -4,51 +4,39 @@
     <meta charset="UTF-8">
     <title>Generador de Sesión - PLAYER TV</title>
 
-    <!-- 1. BUFFER VERSION BROWSER (VERIFICADA: Sin require) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-    <script>
-        // Verificamos e inyectamos el objeto Buffer manualmente
-        if (typeof window.buffer !== 'undefined') {
-            window.Buffer = window.buffer.Buffer;
-        }
-        window.process = { env: {} };
-    </script>
-
-    <!-- 2. MOTOR TELEGRAM (BROWSER BUNDLE) -->
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
-
     <style>
-        body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        body { background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
         .card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 15px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.8); }
         h2 { color: #f5c518; letter-spacing: 2px; margin-bottom: 5px; }
-        p { color: #666; font-size: 13px; margin-bottom: 30px; }
-        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; }
+        p { color: #888; font-size: 13px; margin-bottom: 30px; min-height: 40px; }
+        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; border: 1px solid transparent; }
         input:focus { border-color: #f5c518; }
         button { width: 100%; padding: 16px; background: #f5c518; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; color: #000; }
         button:disabled { background: #333; color: #555; cursor: wait; }
-        #output-container { margin-top: 25px; display: none; }
-        #session-res { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 150px; overflow-y: auto; text-align: left; }
+        #session-res { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 150px; overflow-y: auto; text-align: left; display: none; margin-top: 20px; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>TELEGRAM SETUP</h2>
-        <p id="info">Iniciando motor seguro...</p>
+        <p id="info">Cargando cimientos del sistema...</p>
 
         <div id="login-form">
             <input type="tel" id="phone" placeholder="+34 600 000 000">
             <input type="text" id="code" placeholder="Código de 5 dígitos" style="display:none;">
             <input type="password" id="2fa" placeholder="Contraseña Cloud" style="display:none;">
-            <button id="btn-main" onclick="handleLogin()" disabled>CARGANDO...</button>
+            <button id="btn-main" onclick="handleLogin()" disabled>CONECTANDO...</button>
         </div>
 
-        <div id="output-container">
-            <label style="color:#22c55e; font-size:11px; font-weight:bold;">SESIÓN GENERADA (CÓPIALA):</label>
-            <div id="session-res"></div>
-            <button onclick="location.reload()" style="background:#222; color:#fff; margin-top:20px;">REPETIR</button>
-        </div>
+        <div id="session-res"></div>
     </div>
+
+    <!-- 1. BUFFER (Fallback total) -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+
+    <!-- 2. GRAMJS BROWSER -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
 
     <script>
         const apiId = 8952741;
@@ -58,22 +46,38 @@
         let resolver = null;
 
         async function init() {
-            // Esperamos a que el objeto Buffer esté listo (cdnjs lo inyecta como 'buffer')
-            if (!window.telegram || (!window.Buffer && !window.buffer)) {
+            const info = document.getElementById('info');
+            const btn = document.getElementById('btn-main');
+
+            // Polyfill para Buffer
+            if (typeof window.Buffer === 'undefined') {
+                if (typeof window.buffer !== 'undefined') window.Buffer = window.buffer.Buffer;
+                else if (typeof require !== 'undefined') {
+                    try { window.Buffer = require('buffer').Buffer; } catch(e){}
+                }
+            }
+
+            window.process = { env: {} };
+
+            const lib = window.telegram || window.gramjs;
+
+            if (!lib || !window.Buffer) {
+                info.innerText = "⏳ Esperando librerías... (Si tarda más de 5 seg, usa otro navegador)";
                 setTimeout(init, 500);
                 return;
             }
 
-            if (!window.Buffer) window.Buffer = window.buffer.Buffer;
+            try {
+                const { TelegramClient } = lib;
+                const { StringSession } = lib.sessions;
+                client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
 
-            const { TelegramClient } = window.telegram;
-            const { StringSession } = window.telegram.sessions;
-            client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
-
-            document.getElementById('info').innerText = "Motor listo. Introduce tu teléfono.";
-            const btn = document.getElementById('btn-main');
-            btn.disabled = false;
-            btn.innerText = "ENVIAR TELÉFONO";
+                info.innerText = "✅ Motor listo. Escribe tu teléfono con +34...";
+                btn.disabled = false;
+                btn.innerText = "ENVIAR TELÉFONO";
+            } catch (e) {
+                info.innerText = "❌ Error en el motor: " + e.message;
+            }
         }
 
         async function handleLogin() {
@@ -82,10 +86,10 @@
 
             if (step === 'phone') {
                 const phone = document.getElementById('phone').value.trim();
-                if (!phone) return alert("Escribe tu número");
+                if (!phone) return alert("Pon tu número");
 
                 btn.disabled = true;
-                btn.innerText = "CONECTANDO...";
+                btn.innerText = "CONECTANDO A TELEGRAM...";
 
                 try {
                     await client.start({
@@ -96,7 +100,7 @@
                             document.getElementById('code').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR CÓDIGO";
-                            info.innerText = "Introduce el código que has recibido.";
+                            info.innerText = "Telegram te ha enviado un código. Ponlo abajo.";
                             return new Promise(r => resolver = r);
                         },
                         password: async () => {
@@ -108,27 +112,29 @@
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
-                            alert("Fallo: " + err.message);
+                            alert("Error de Telegram: " + err.message);
                             location.reload();
                         }
                     });
 
                     // ÉXITO
                     document.getElementById('login-form').style.display = 'none';
-                    document.getElementById('output-container').style.display = 'block';
-                    document.getElementById('session-res').innerText = client.session.save();
-                    info.innerText = "✅ Sesión creada con éxito.";
-                    document.querySelector('h2').innerText = "¡TERMINADO!";
+                    const resBox = document.getElementById('session-res');
+                    resBox.innerText = client.session.save();
+                    resBox.style.display = 'block';
+                    info.innerHTML = "<b style='color:#f5c518'>✅ SESIÓN GENERADA.</b><br>Copia el código verde y pégalo en Render.";
+                    document.querySelector('h2').innerText = "¡TODO LISTO!";
 
                 } catch (e) {
                     alert("Error crítico: " + e.message);
                     location.reload();
                 }
             } else {
-                const val = (step === 'code') ? document.getElementById('code').value : document.getElementById('2fa').value;
+                const val = (step === 'code') ? document.getElementById('code').value.trim() : document.getElementById('2fa').value.trim();
                 if (resolver) resolver(val);
             }
         }
+
         init();
     </script>
 </body>
