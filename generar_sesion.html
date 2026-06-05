@@ -1,0 +1,80 @@
+
+ <!DOCTYPE html>
+ <html lang="es">
+ <head>
+     <meta charset="UTF-8">
+     <title>Generador de Sesión - PLAYER TV</title>
+     <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+     <style>
+         body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+         .card { background: #111; border: 2px solid #f5c518; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; }
+         input { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; box-sizing: border-box; }
+         button { width: 100%; padding: 15px; background: #f5c518; border: none; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 10px; }
+         #output { background: #000; padding: 15px; border: 1px dashed #555; margin-top: 20px; word-break: break-all; font-family: monospace; display: none; color: #22c55e; }
+     </style>
+ </head>
+ <body>
+     <div class="card">
+         <h2 style="color: #f5c518;">PASO 1: CREAR SESIÓN</h2>
+         <p style="color: #888;">Introduce tu teléfono para recibir el código de Telegram</p>
+         
+         <input type="text" id="phone" placeholder="+34 600 000 000">
+         <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
+         <input type="password" id="password" placeholder="Tu 2FA (si tienes)" style="display:none;">
+         
+         <button id="btn-main" onclick="handleAction()">ENVIAR TELÉFONO</button>
+         
+         <div id="output"></div>
+     </div>
+​
+     <script>
+         const apiId = 8952741;
+         const apiHash = "693fb2da124662dad85b2b337c53a386";
+         let client = null;
+         let step = 'phone';
+         let resolver = null;
+​
+         async function init() {
+             const { TelegramClient } = window.telegram;
+             const { StringSession } = window.telegram.sessions;
+             client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
+         }
+​
+         async function handleAction() {
+             const btn = document.getElementById('btn-main');
+             const output = document.getElementById('output');
+             
+             if (step === 'phone') {
+                 const phone = document.getElementById('phone').value;
+                 btn.innerText = "CONECTANDO...";
+                 
+                 await client.start({
+                     phoneNumber: async () => phone,
+                     phoneCode: async () => {
+                         step = 'code';
+                         document.getElementById('code').style.display = 'block';
+                         btn.innerText = "VERIFICAR CÓDIGO";
+                         return new Promise(r => resolver = r);
+                     },
+                     password: async () => {
+                         document.getElementById('password').style.display = 'block';
+                         btn.innerText = "ENTRAR";
+                         return new Promise(r => resolver = r);
+                     },
+                     onError: (err) => alert(err.message)
+                 });
+​
+                 output.innerText = client.session.save();
+                 output.style.display = 'block';
+                 btn.style.display = 'none';
+                 document.querySelector('h2').innerText = "✅ ¡SESIÓN GENERADA!";
+                 document.querySelector('p').innerText = "Copia este código y pégalo en Render (SESSION)";
+             } else {
+                 const val = step === 'code' ? document.getElementById('code').value : document.getElementById('password').value;
+                 if (resolver) resolver(val);
+             }
+         }
+         init();
+     </script>
+ </body>
+ </html>
