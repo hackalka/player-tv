@@ -2,39 +2,41 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium Netflix</title>
+    <title>PLAYER TV - Pro</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --red: #E50914; --bg: #141414; }
-        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', Helvetica, sans-serif; margin: 0; overflow-x: hidden; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; overflow-x: hidden; }
+        .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; }
+        .logo { color: var(--red); font-size: 28px; font-weight: 900; text-decoration: none; letter-spacing: 2px; }
 
-        .header { position: fixed; top: 0; width: 100%; padding: 20px 4%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; }
-        .logo { color: var(--red); font-size: 30px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
+        .hero { height: 80vh; position: relative; display: flex; align-items: flex-end; padding: 0 5% 80px; background-size: cover; background-position: center; }
+        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg), transparent 50%), linear-gradient(to right, rgba(0,0,0,0.7), transparent); }
+        .hero-content { position: relative; z-index: 10; max-width: 600px; }
+        .hero-title { font-size: 3.5rem; margin: 0; font-weight: 900; }
+        .hero-desc { font-size: 1.1rem; color: #ccc; margin: 20px 0; line-height: 1.5; }
 
-        .hero { height: 85vh; position: relative; display: flex; align-items: flex-end; padding: 0 4% 100px; background-size: cover; background-position: center; transition: background 0.5s; }
-        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(77deg, rgba(0,0,0,0.8) 0, transparent 85%), linear-gradient(0deg, var(--bg) 0, transparent 40%); }
-        .hero-content { position: relative; z-index: 5; max-width: 700px; }
-        .hero-title { font-size: 4rem; margin: 0 0 10px; font-weight: bold; }
-        .hero-desc { font-size: 1.2rem; line-height: 1.4; margin-bottom: 25px; color: #ccc; text-shadow: 1px 1px 2px #000; }
-
-        .row { margin: 20px 0; padding-left: 4%; }
-        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
-        .carousel { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; padding: 10px 0; }
+        .row { margin: 30px 0; padding-left: 5%; }
+        .row-title { font-size: 1.3rem; font-weight: bold; margin-bottom: 15px; }
+        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 10px 0; }
         .carousel::-webkit-scrollbar { display: none; }
 
-        .card { flex: 0 0 180px; height: 260px; background: #222; border-radius: 4px; transition: transform 0.3s; cursor: pointer; position: relative; }
-        .card:hover { transform: scale(1.1); z-index: 10; outline: 2px solid white; }
-        .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+        .card { flex: 0 0 160px; height: 240px; background: #222; border-radius: 6px; transition: transform 0.3s; cursor: pointer; border: 1px solid #333; position: relative; overflow: hidden; }
+        .card:hover { transform: scale(1.08); z-index: 10; border-color: #fff; }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.8); font-size: 11px; text-align: center; }
 
-        /* Modal de Episodios */
-        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:20000; overflow-y:auto; padding: 50px 10%; }
-        .ep-list { display: grid; gap: 10px; margin-top: 20px; }
-        .ep-item { background: #333; padding: 15px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; }
-        .ep-item:hover { background: #444; }
+        /* FICHA DETALLE */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:50000; padding: 60px 5%; overflow-y: auto; }
+        .modal-grid { display: flex; gap: 40px; flex-wrap: wrap; }
+        .modal-poster { width: 250px; height: 380px; border-radius: 10px; object-fit: cover; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .modal-info { flex: 1; min-width: 300px; }
+        .btn-play { background: white; color: black; border: none; padding: 12px 30px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 10px 0; width: fit-content; }
+        .btn-play:hover { background: #e6e6e6; }
+        .btn-close { position: absolute; top: 30px; right: 30px; background: none; border: none; color: white; font-size: 30px; cursor: pointer; }
 
-        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 30000; align-items: center; justify-content: center; }
-        .btn-close { position: absolute; top: 30px; left: 30px; background: var(--red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; }
+        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -44,22 +46,28 @@
     <div id="hero" class="hero">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <h1 id="hero-title" class="hero-title">Iniciando...</h1>
+            <h1 id="hero-title" class="hero-title">Cargando...</h1>
             <p id="hero-desc" class="hero-desc"></p>
-            <button id="hero-btn" class="ep-item" style="background:white; color:black; font-weight:bold; width:200px; justify-content:center;">▶ Reproducir</button>
+            <div id="hero-actions"></div>
         </div>
     </div>
 
     <div id="catalog"></div>
 
-    <div id="ep-modal" class="modal">
-        <button class="btn-close" onclick="cerrarModal()">✕ CERRAR</button>
-        <h1 id="modal-title"></h1>
-        <div id="modal-list" class="ep-list"></div>
+    <div id="detail-modal" class="modal">
+        <button class="btn-close" onclick="cerrarModal()">✕</button>
+        <div class="modal-grid">
+            <img id="modal-img" class="modal-poster">
+            <div class="modal-info">
+                <h1 id="modal-title" style="font-size: 3rem; margin-top: 0;"></h1>
+                <p id="modal-desc" style="font-size: 1.2rem; color: #aaa; margin-bottom: 30px;"></p>
+                <div id="modal-links"></div>
+            </div>
+        </div>
     </div>
 
     <div id="player-layer">
-        <button class="btn-close" onclick="cerrarPlayer()">✕ SALIR</button>
+        <button onclick="cerrarPlayer()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:15px 25px; border-radius:5px; font-weight:bold; cursor:pointer; z-index:10;">← VOLVER</button>
         <video id="main-video" controls autoplay style="width: 100%; height: 100%;"></video>
     </div>
 
@@ -67,26 +75,27 @@
         const API_URL = "https://player-tv-a8f4.onrender.com";
 
         async function init() {
-            const res = await fetch(`${API_URL}/api/catalogo`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_URL}/api/catalogo`);
+                const data = await res.json();
 
-            // Hero
-            if(data.peliculas.length) {
-                const h = data.peliculas[0];
-                document.getElementById('hero-title').innerText = h.titulo;
-                document.getElementById('hero-desc').innerText = h.sinopsis;
-                document.getElementById('hero').style.backgroundImage = `url('${API_URL}${h.portada}')`;
-                document.getElementById('hero-btn').onclick = () => play(h.id);
-            }
+                // Hero dinámico
+                const top = data.peliculas[0] || data.series[0];
+                if (top) {
+                    document.getElementById('hero-title').innerText = top.titulo;
+                    document.getElementById('hero-desc').innerText = top.sinopsis.substring(0, 150) + "...";
+                    document.getElementById('hero').style.backgroundImage = `url('${API_URL}${top.portada}')`;
+                    renderButtons(document.getElementById('hero-actions'), top.links);
+                }
 
-            renderRow("PELÍCULAS", data.peliculas, false);
-            renderRow("SERIES UNIFICADAS", data.series, true);
-            renderRow("DEPORTES", data.deportes, false);
+                renderRow("PELÍCULAS", data.peliculas);
+                renderRow("SERIES", data.series);
+                renderRow("DEPORTES", data.deportes);
+            } catch (e) { console.error(e); }
         }
 
-        function renderRow(title, items, isSeries) {
-            if(!items.length) return;
-            const container = document.getElementById('catalog');
+        function renderRow(title, items) {
+            if (!items.length) return;
             const row = document.createElement('div');
             row.className = 'row';
             row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
@@ -95,39 +104,43 @@
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'card';
-                const img = item.portada ? (item.portada.startsWith('/') ? API_URL+item.portada : item.portada) : 'https://via.placeholder.com/180x260/111/f5c518?text=TV';
-                card.innerHTML = `<img src="${img}">`;
-                card.onclick = () => isSeries ? showEpisodes(item) : play(item.id);
+                const img = item.portada ? API_URL + item.portada : 'https://via.placeholder.com/160x240/111/f5c518?text=NO+IMAGE';
+                card.innerHTML = `<img src="${img}"><div class="card-label">${item.titulo}</div>`;
+                card.onclick = () => showDetail(item);
                 carousel.appendChild(card);
             });
-            container.appendChild(row);
+            document.getElementById('catalog').appendChild(row);
         }
 
-        function showEpisodes(serie) {
-            document.getElementById('modal-title').innerText = serie.titulo;
-            const list = document.getElementById('modal-list');
-            list.innerHTML = '';
-            serie.episodios.forEach(ep => {
-                const div = document.createElement('div');
-                div.className = 'ep-item';
-                div.innerHTML = `<span>${ep.titulo}</span> <i class="fa fa-play"></i>`;
-                div.onclick = () => play(ep.id);
-                list.appendChild(div);
+        function showDetail(item) {
+            document.getElementById('modal-title').innerText = item.titulo;
+            document.getElementById('modal-desc').innerText = item.sinopsis;
+            document.getElementById('modal-img').src = item.portada ? API_URL + item.portada : '';
+            renderButtons(document.getElementById('modal-links'), item.links);
+            document.getElementById('detail-modal').style.display = 'block';
+        }
+
+        function renderButtons(container, links) {
+            container.innerHTML = '';
+            links.forEach(l => {
+                const b = document.createElement('button');
+                b.className = 'btn-play';
+                b.innerHTML = `<i class="fa fa-play"></i> ${l.label}`;
+                b.onclick = (e) => { e.stopPropagation(); play(l.id); };
+                container.appendChild(b);
             });
-            document.getElementById('ep-modal').style.display = 'block';
         }
 
         function play(id) {
-            const layer = document.getElementById('player-layer');
             const video = document.getElementById('main-video');
-            layer.style.display = 'flex';
+            document.getElementById('player-layer').style.display = 'flex';
             video.src = `${API_URL}/api/stream/${id}`;
         }
 
-        function cerrarModal() { document.getElementById('ep-modal').style.display = 'none'; }
+        function cerrarModal() { document.getElementById('detail-modal').style.display = 'none'; }
         function cerrarPlayer() {
-            const video = document.getElementById('main-video');
-            video.pause(); video.src = "";
+            const v = document.getElementById('main-video');
+            v.pause(); v.src = "";
             document.getElementById('player-layer').style.display = 'none';
         }
 

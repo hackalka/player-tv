@@ -19,71 +19,82 @@ const TOPICS = { PELICULAS: 3185, SERIES: 1663, DEPORTES: 10583 };
 (async () => {
     if (process.env.SESSION) {
         await client.connect();
-        console.log("✅ Servidor Maestro Conectado");
+        console.log("✅ Motor de Fichas Técnicas Activo");
     }
 })();
 
-// Función para limpiar nombres y agrupar series
-function parseTitle(text) {
-    const rawTitle = text.split('\n')[0].trim();
-    // Detecta patrones como S01E01, Temporada 1, etc.
-    const rootTitle = rawTitle.split(/ S\d+| T\d+| TEMPORADA| CAPITULO/i)[0].trim();
-    return { full: rawTitle, root: rootTitle };
+function parseMessage(m) {
+    const lines = m.message ? m.message.split('\n') : ["Sin título"];
+    const titleLine = lines[0].trim();
+
+    // Extraer enlaces del texto
+    const links = [];
+    const urlRegex = /https?:\/\/t\.me\/[^\s]+/g;
+    const matches = m.message ? m.message.match(urlRegex) : [];
+
+    if (matches) {
+        matches.forEach((url, index) => {
+            const parts = url.split('/');
+            const msgId = parts[parts.length - 1];
+            links.push({
+                id: msgId,
+                label: `OPCIÓN ${index + 1}`
+            });
+        });
+    }
+
+    // Si el mensaje mismo es un video y no tiene links en el texto
+    if (m.media && !links.length) {
+        links.push({ id: m.id, label: "REPRODUCIR" });
+    }
+
+    // Sinopsis: todas las líneas excepto la primera y los links
+    const sinopsis = lines.slice(1).filter(l => !l.includes('t.me/')).join(' ').trim();
+
+    // Portada
+    const hasPhoto = m.media && (m.media.photo || (m.media.document && m.media.document.thumbs));
+    const posterUrl = hasPhoto ? `/api/poster/${m.id}` : null;
+
+    return {
+        id: m.id,
+        titulo: titleLine,
+        sinopsis: sinopsis || "Disfruta de este contenido.",
+        portada: posterUrl,
+        links: links
+    };
 }
 
 app.get("/api/catalogo", async (req, res) => {
     try {
-        const catalogo = { peliculas: [], series: {}, deportes: [] };
+        const catalogo = { peliculas: [], series: [], deportes: [] };
 
         for (const [key, topicId] of Object.entries(TOPICS)) {
             const messages = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 100 });
 
             messages.forEach(m => {
                 if (!m.message && !m.media) return;
-
-                const texto = m.message || "";
-                const { full, root } = parseTitle(texto);
-                const sinopsis = texto.split('\n').slice(1).join(' ').trim() || "Sin descripción disponible.";
-
-                // DETECCIÓN INTELIGENTE DE PORTADA
-                // 1. Si hay foto 2. Si hay miniatura de video 3. Si hay link de imagen en el texto
-                const hasPhoto = m.media && (m.media.photo || (m.media.document && m.media.document.thumbs));
-                const posterUrl = hasPhoto ? `/api/poster/${m.id}` : (texto.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || null);
-
-                const item = { id: m.id, titulo: full, sinopsis, portada: posterUrl };
-
-                if (key === 'SERIES') {
-                    if (!catalogo.series[root]) {
-                        catalogo.series[root] = { titulo: root, portada: posterUrl, sinopsis, episodios: [] };
-                    }
-                    catalogo.series[root].episodios.push(item);
-                } else {
-                    catalogo[key.toLowerCase()].push(item);
+                const data = parseMessage(m);
+                // Solo añadir si tiene portada o es un mensaje maestro
+                if (data.portada || data.links.length > 0) {
+                    catalogo[key.toLowerCase()].push(data);
                 }
             });
         }
-        // Convertir objeto de series a array
-        catalogo.series = Object.values(catalogo.series);
         res.json(catalogo);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Endpoint para servir la foto de Telegram como carátula
 app.get("/api/poster/:id", async (req, res) => {
     try {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
         if (msgs.length && msgs[0].media) {
-            const media = msgs[0].media;
-            // Intentar descargar foto o miniatura de video/documento
-            const buffer = await client.downloadMedia(media, {
-                thumb: true // Esto descarga la miniatura si es un video
-            });
+            const buffer = await client.downloadMedia(msgs[0].media, { thumb: true });
             if (buffer) {
                 res.setHeader('Content-Type', 'image/jpeg');
                 return res.send(buffer);
             }
         }
-        res.redirect('https://via.placeholder.com/200x300?text=NO+POSTER');
+        res.redirect('https://via.placeholder.com/200x300?text=SIN+POSTER');
     } catch (e) { res.status(500).send(e.message); }
 });
 
@@ -97,4 +108,4 @@ app.get("/api/stream/:id", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Motor Pro V3 Listo`));
+app.listen(PORT, () => console.log(`🚀 Motor V4: Fichas Maestras Listo`));
