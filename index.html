@@ -2,132 +2,136 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium Netflix Edition</title>
+    <title>PLAYER TV - Premium Netflix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --netflix-red: #E50914; --bg-black: #141414; --card-w: 160px; --card-h: 240px; }
-        body { background: var(--bg-black); color: white; font-family: 'Helvetica Neue', Helvetica, sans-serif; margin: 0; overflow-x: hidden; }
+        :root { --red: #E50914; --bg: #141414; }
+        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', Helvetica, sans-serif; margin: 0; overflow-x: hidden; }
 
-        .header { position: fixed; top: 0; width: 100%; padding: 20px 4%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; display: flex; align-items: center; }
-        .logo { color: var(--netflix-red); font-size: 28px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
+        .header { position: fixed; top: 0; width: 100%; padding: 20px 4%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; }
+        .logo { color: var(--red); font-size: 30px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
 
-        .hero { height: 75vh; position: relative; display: flex; align-items: flex-end; padding: 0 4% 100px; background-size: cover; background-position: center; }
-        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(77deg, rgba(0,0,0,0.6) 0, rgba(0,0,0,0) 85%), linear-gradient(0deg, var(--bg-black) 0, transparent 50%); }
-        .hero-content { position: relative; z-index: 5; max-width: 600px; }
-        .hero-title { font-size: 3.5rem; margin: 0 0 15px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.45); }
-        .hero-desc { font-size: 1.2rem; margin-bottom: 20px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .hero { height: 85vh; position: relative; display: flex; align-items: flex-end; padding: 0 4% 100px; background-size: cover; background-position: center; transition: background 0.5s; }
+        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(77deg, rgba(0,0,0,0.8) 0, transparent 85%), linear-gradient(0deg, var(--bg) 0, transparent 40%); }
+        .hero-content { position: relative; z-index: 5; max-width: 700px; }
+        .hero-title { font-size: 4rem; margin: 0 0 10px; font-weight: bold; }
+        .hero-desc { font-size: 1.2rem; line-height: 1.4; margin-bottom: 25px; color: #ccc; text-shadow: 1px 1px 2px #000; }
 
-        .row { margin: 3vw 0; padding-left: 4%; }
-        .row-title { font-size: 1.4vw; font-weight: bold; margin-bottom: 0.5em; color: #e5e5e5; }
+        .row { margin: 20px 0; padding-left: 4%; }
+        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
         .carousel { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; padding: 10px 0; }
         .carousel::-webkit-scrollbar { display: none; }
 
-        .card { flex: 0 0 var(--card-w); height: var(--card-h); background: #222; border-radius: 4px; transition: transform 0.3s; cursor: pointer; position: relative; overflow: hidden; }
-        .card:hover { transform: scale(1.08); z-index: 10; }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card-title { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.7); font-size: 11px; text-align: center; }
+        .card { flex: 0 0 180px; height: 260px; background: #222; border-radius: 4px; transition: transform 0.3s; cursor: pointer; position: relative; }
+        .card:hover { transform: scale(1.1); z-index: 10; outline: 2px solid white; }
+        .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
 
-        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 20000; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-close { position: absolute; top: 30px; left: 30px; background: rgba(255,255,255,0.2); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; z-index: 100; }
+        /* Modal de Episodios */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:20000; overflow-y:auto; padding: 50px 10%; }
+        .ep-list { display: grid; gap: 10px; margin-top: 20px; }
+        .ep-item { background: #333; padding: 15px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; }
+        .ep-item:hover { background: #444; }
 
-        @media (max-width: 768px) {
-            .hero-title { font-size: 2rem; }
-            .row-title { font-size: 1.1rem; }
-            :root { --card-w: 120px; --card-h: 180px; }
-        }
+        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 30000; align-items: center; justify-content: center; }
+        .btn-close { position: absolute; top: 30px; left: 30px; background: var(--red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; }
     </style>
 </head>
 <body>
 
-    <header class="header">
-        <a href="#" class="logo">PLAYER TV</a>
-    </header>
+    <header class="header"><a href="#" class="logo">PLAYER TV</a></header>
 
     <div id="hero" class="hero">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <h1 id="hero-title" class="hero-title">Cargando...</h1>
+            <h1 id="hero-title" class="hero-title">Iniciando...</h1>
             <p id="hero-desc" class="hero-desc"></p>
-            <button onclick="reproducirDestacado()" style="padding: 10px 30px; background: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1.1rem;"><i class="fa fa-play"></i> Reproducir</button>
+            <button id="hero-btn" class="ep-item" style="background:white; color:black; font-weight:bold; width:200px; justify-content:center;">▶ Reproducir</button>
         </div>
     </div>
 
-    <div id="catalog-container"></div>
+    <div id="catalog"></div>
+
+    <div id="ep-modal" class="modal">
+        <button class="btn-close" onclick="cerrarModal()">✕ CERRAR</button>
+        <h1 id="modal-title"></h1>
+        <div id="modal-list" class="ep-list"></div>
+    </div>
 
     <div id="player-layer">
-        <button class="btn-close" onclick="cerrar()">✕ VOLVER</button>
-        <video id="main-video" controls autoplay style="width: 100%; max-height: 100vh;"></video>
+        <button class="btn-close" onclick="cerrarPlayer()">✕ SALIR</button>
+        <video id="main-video" controls autoplay style="width: 100%; height: 100%;"></video>
     </div>
 
     <script>
         const API_URL = "https://player-tv-a8f4.onrender.com";
-        let destacadoId = null;
 
-        async function cargar() {
-            try {
-                const res = await fetch(`${API_URL}/api/catalogo`);
-                const data = await res.json();
-                render(data);
-            } catch (e) { console.error("Error API:", e); }
-        }
+        async function init() {
+            const res = await fetch(`${API_URL}/api/catalogo`);
+            const data = await res.json();
 
-        function render(data) {
-            const container = document.getElementById('catalog-container');
-            container.innerHTML = '';
-
-            const sections = [
-                { id: 'peliculas', label: 'PELÍCULAS' },
-                { id: 'series', label: 'SERIES' },
-                { id: 'deportes', label: 'DEPORTES EN VIVO' }
-            ];
-
-            sections.forEach(sec => {
-                const items = data[sec.id];
-                if (items && items.length > 0) {
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    row.innerHTML = `<div class="row-title">${sec.label}</div><div class="carousel" id="row-${sec.id}"></div>`;
-                    container.appendChild(row);
-
-                    const carousel = document.getElementById(`row-${sec.id}`);
-                    items.forEach(item => {
-                        const card = document.createElement('div');
-                        card.className = 'card';
-                        const img = item.portada || `https://via.placeholder.com/160x240/111/f5c518?text=${encodeURIComponent(item.titulo)}`;
-                        card.innerHTML = `<img src="${img}"><div class="card-title">${item.titulo}</div>`;
-                        card.onclick = () => reproducir(item.id);
-                        carousel.appendChild(card);
-                    });
-                }
-            });
-
-            // Hero dinámico con la primera película
-            if (data.peliculas.length > 0) {
-                const p = data.peliculas[0];
-                document.getElementById('hero-title').innerText = p.titulo;
-                document.getElementById('hero-desc').innerText = p.sinopsis.substring(0, 200) + "...";
-                document.getElementById('hero').style.backgroundImage = `url('${p.portada || ''}')`;
-                destacadoId = p.id;
+            // Hero
+            if(data.peliculas.length) {
+                const h = data.peliculas[0];
+                document.getElementById('hero-title').innerText = h.titulo;
+                document.getElementById('hero-desc').innerText = h.sinopsis;
+                document.getElementById('hero').style.backgroundImage = `url('${API_URL}${h.portada}')`;
+                document.getElementById('hero-btn').onclick = () => play(h.id);
             }
+
+            renderRow("PELÍCULAS", data.peliculas, false);
+            renderRow("SERIES UNIFICADAS", data.series, true);
+            renderRow("DEPORTES", data.deportes, false);
         }
 
-        function reproducir(id) {
+        function renderRow(title, items, isSeries) {
+            if(!items.length) return;
+            const container = document.getElementById('catalog');
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
+            const carousel = row.querySelector('.carousel');
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                const img = item.portada ? (item.portada.startsWith('/') ? API_URL+item.portada : item.portada) : 'https://via.placeholder.com/180x260/111/f5c518?text=TV';
+                card.innerHTML = `<img src="${img}">`;
+                card.onclick = () => isSeries ? showEpisodes(item) : play(item.id);
+                carousel.appendChild(card);
+            });
+            container.appendChild(row);
+        }
+
+        function showEpisodes(serie) {
+            document.getElementById('modal-title').innerText = serie.titulo;
+            const list = document.getElementById('modal-list');
+            list.innerHTML = '';
+            serie.episodios.forEach(ep => {
+                const div = document.createElement('div');
+                div.className = 'ep-item';
+                div.innerHTML = `<span>${ep.titulo}</span> <i class="fa fa-play"></i>`;
+                div.onclick = () => play(ep.id);
+                list.appendChild(div);
+            });
+            document.getElementById('ep-modal').style.display = 'block';
+        }
+
+        function play(id) {
             const layer = document.getElementById('player-layer');
             const video = document.getElementById('main-video');
             layer.style.display = 'flex';
             video.src = `${API_URL}/api/stream/${id}`;
         }
 
-        function reproducirDestacado() { if(destacadoId) reproducir(destacadoId); }
-
-        function cerrar() {
+        function cerrarModal() { document.getElementById('ep-modal').style.display = 'none'; }
+        function cerrarPlayer() {
             const video = document.getElementById('main-video');
-            video.pause();
+            video.pause(); video.src = "";
             document.getElementById('player-layer').style.display = 'none';
         }
 
-        cargar();
+        init();
     </script>
 </body>
 </html>
