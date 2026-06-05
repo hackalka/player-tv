@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <title>Generador de Sesión - PLAYER TV</title>
 
-    <!-- 1. BASE DE SEGURIDAD (Buffer) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <!-- 1. BASE DE SEGURIDAD (Buffer) - Cargado con redundancia -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        window.Buffer = window.buffer.Buffer;
-        window.process = { env: {} };
+        // Función de seguridad para inyectar Buffer sin errores
+        function checkDependencies() {
+            if (typeof window.buffer !== 'undefined') {
+                window.Buffer = window.buffer.Buffer;
+            }
+            window.process = { env: {} };
+        }
+        checkDependencies();
     </script>
 
     <!-- 2. MOTOR TELEGRAM -->
@@ -19,14 +25,15 @@
         .card { background: #111; border: 2px solid #f5c518; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 0 30px rgba(245,197,24,0.2); }
         input { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 15px; background: #f5c518; border: none; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 10px; color: #000; }
+        button:disabled { background: #555; cursor: not-allowed; }
         #output { background: #000; padding: 15px; border: 1px dashed #555; margin-top: 20px; word-break: break-all; font-family: monospace; display: none; color: #22c55e; font-size: 12px; max-height: 150px; overflow-y: auto; }
         #status-msg { color: #888; font-size: 14px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 style="color: #f5c518; margin-top:0;">LOGIN TELEGRAM</h2>
-        <p id="status-msg">Iniciando motor...</p>
+        <h2 style="color: #f5c518; margin-top:0;">CONECTAR TELEGRAM</h2>
+        <p id="status-msg">Cargando componentes...</p>
 
         <input type="text" id="phone" placeholder="+34 600 000 000">
         <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
@@ -46,20 +53,25 @@
 
         async function init() {
             try {
+                // Re-verificar Buffer antes de iniciar
+                if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
+                    window.Buffer = window.buffer.Buffer;
+                }
+
                 if (!window.telegram || !window.Buffer) {
                     setTimeout(init, 500);
                     return;
                 }
+
                 const { TelegramClient } = window.telegram;
                 const { StringSession } = window.telegram.sessions;
                 client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
 
                 document.getElementById('btn-main').disabled = false;
                 document.getElementById('btn-main').innerText = "ENVIAR TELÉFONO";
-                document.getElementById('status-msg').innerText = "Introduce tu teléfono para recibir el código";
-                console.log("✅ Motor listo");
+                document.getElementById('status-msg').innerText = "Motor listo. Introduce tu número.";
             } catch (e) {
-                document.getElementById('status-msg').innerText = "Error cargando motor: " + e.message;
+                document.getElementById('status-msg').innerText = "Error: " + e.message;
             }
         }
 
@@ -96,20 +108,19 @@
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
-                            alert("Error de Telegram: " + err.message);
+                            alert("Error: " + err.message);
                             location.reload();
                         }
                     });
 
-                    const session = client.session.save();
-                    output.innerText = session;
+                    output.innerText = client.session.save();
                     output.style.display = 'block';
                     btn.style.display = 'none';
                     status.style.color = "#f5c518";
-                    status.innerText = "✅ COPIA EL CÓDIGO DE ABAJO Y PÉGALO EN RENDER (SESSION)";
-                    document.querySelector('h2').innerText = "¡SESIÓN LISTA!";
+                    status.innerText = "✅ COPIA EL CÓDIGO VERDE DE ABAJO Y PÉGALO EN RENDER";
+                    document.querySelector('h2').innerText = "¡LISTO!";
                 } catch (e) {
-                    alert("Error: " + e.message);
+                    alert("Fallo: " + e.message);
                     location.reload();
                 }
             } else {
