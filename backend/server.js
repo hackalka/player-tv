@@ -19,7 +19,7 @@ const TOPICS = { PELICULAS: 2, SERIES: 4, DEPORTES: 6 };
 let globalCatalog = { peliculas: [], series: [], deportes: [] };
 
 async function syncTelegram() {
-    console.log("🔄 Sincronizando contenidos...");
+    console.log("🔄 Sincronizando contenidos directos de Telegram...");
     try {
         const catalogo = { peliculas: [], series: [], deportes: [] };
         for (const [key, topicId] of Object.entries(TOPICS)) {
@@ -32,22 +32,23 @@ async function syncTelegram() {
                 const item = { id: m.id, titulo: title, sinopsis: "", portada: `/api/poster/${m.id}`, links: [] };
 
                 const sinopsisLines = [];
-                lines.slice(1).forEach(line => {
+                lines.forEach(line => {
                     const linkMatch = line.match(/https?:\/\/t\.me\/(?:c\/)?[\d\w]+\/(\d+)\/(\d+)/) || line.match(/https?:\/\/t\.me\/(?:c\/)?[\d\w]+\/(\d+)/);
                     if (linkMatch) {
                         const msgId = linkMatch[linkMatch.length - 1];
-                        let label = line.split('http')[0].trim();
-                        if (!label) label = `ENLACE ${item.links.length + 1}`;
+                        let label = line.split('http')[0].replace(/[:\-]/g, '').trim();
+                        if (!label) label = `OPCIÓN ${item.links.length + 1}`;
                         item.links.push({ id: msgId, label: label });
-                    } else if (line.trim() && !line.includes('t.me')) {
+                    } else if (line.trim() && !line.includes('t.me') && line.trim() !== title) {
                         sinopsisLines.push(line.trim());
                     }
                 });
+
                 item.sinopsis = sinopsisLines.join(' ');
                 if ((m.media.document || m.media.video) && item.links.length === 0) {
-                    item.links.push({ id: m.id, label: "REPRODUCIR AHORA" });
+                    item.links.push({ id: m.id, label: "REPRODUCIR DIRECTO" });
                 }
-                catalogo[key.toLowerCase()].push(item);
+                if (item.links.length > 0) catalogo[key.toLowerCase()].push(item);
             });
         }
         globalCatalog = catalogo;
@@ -71,26 +72,36 @@ app.get("/api/poster/:id", async (req, res) => {
             const buffer = await client.downloadMedia(msgs[0], { thumb: true });
             if (buffer) {
                 res.setHeader('Content-Type', 'image/jpeg');
+                res.setHeader('Cache-Control', 'public, max-age=86400');
                 return res.send(buffer);
             }
         }
-        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=TV');
+        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=NO+IMAGE');
     } catch (e) { res.status(500).send(e.message); }
 });
 
-// MOTOR DE STREAMING COMPATIBLE CON EXOPLAYER Y SMART TV
+// MOTOR DE STREAMING DEFINITIVO (COMPATIBLE CON EXOPLAYER, VLC Y WEB)
 app.get("/api/stream/:id", async (req, res) => {
     try {
-        const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
-        if (!msgs.length || !msgs[0].media) return res.status(404).send("No media");
+        const msgId = parseInt(req.params.id);
+        const msgs = await client.getMessages(CHANNEL_ID, { ids: [msgId] });
+
+        if (!msgs.length || !msgs[0].media) {
+            // Si no está en el canal principal, lo buscamos en todo Telegram (por si es un link /c/)
+            return res.status(404).send("Media no encontrada");
+        }
 
         const media = msgs[0].media;
         const document = media.document || media.video;
+        if (!document) return res.status(400).send("No es un archivo de video");
+
         const size = document.size;
         const mime = document.mimeType || 'video/mp4';
 
+        // Cabeceras cruciales para que ExoPlayer y el Navegador no fallen
         res.setHeader('Content-Type', mime);
         res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Disposition', `inline; filename="video.${mime.split('/')[1]}"`);
 
         const range = req.headers.range;
         if (range) {
@@ -107,13 +118,17 @@ app.get("/api/stream/:id", async (req, res) => {
                 outputFile: res,
                 start: BigInt(start),
                 end: BigInt(end),
-                workers: 16 // Máxima potencia para evitar buffering
+                workers: 16 // Máxima velocidad de bombeo
             });
         } else {
             res.setHeader('Content-Length', size);
             await client.downloadMedia(media, { outputFile: res, workers: 16 });
         }
-    } catch (e) { res.status(500).send(e.message); }
+    } catch (e) {
+        console.error("Stream error:", e);
+        res.status(500).send(e.message);
+    }
 });
 
-app.listen(10000, () => console.log("🚀 Motor Universal Player TV Online"));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("🚀 Motor de Streaming Pro V14 Listo"));
