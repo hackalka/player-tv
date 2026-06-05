@@ -4,87 +4,85 @@
     <meta charset="UTF-8">
     <title>Generador de Sesión - PLAYER TV</title>
 
-    <!-- 1. Cimientos de seguridad (Buffer) -->
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <!-- 1. BUFFER VERSION BROWSER (VERIFICADA: Sin require) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
     <script>
-        // Polyfill robusto para navegadores
-        window.Buffer = window.Buffer || window.buffer?.Buffer;
+        // Verificamos e inyectamos el objeto Buffer manualmente
+        if (typeof window.buffer !== 'undefined') {
+            window.Buffer = window.buffer.Buffer;
+        }
         window.process = { env: {} };
-        window.global = window;
     </script>
 
-    <!-- 2. Motor Telegram (Versión oficial para navegador) -->
+    <!-- 2. MOTOR TELEGRAM (BROWSER BUNDLE) -->
     <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
 
     <style>
-        body { background: #000; color: #fff; font-family: 'Helvetica Neue', Helvetica, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        h2 { color: #f5c518; margin-bottom: 10px; font-weight: 800; }
-        p { color: #888; font-size: 14px; margin-bottom: 30px; }
-        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; padding: 16px; background: #f5c518; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; transition: background 0.3s; }
-        button:hover { background: #e2b616; }
-        button:disabled { background: #444; color: #777; cursor: wait; }
-        #output-box { margin-top: 30px; text-align: left; display: none; }
-        #session-string { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 6px; font-family: monospace; font-size: 12px; word-break: break-all; max-height: 150px; overflow-y: auto; }
-        .label-copy { font-size: 11px; color: #22c55e; margin-bottom: 5px; display: block; font-weight: bold; }
+        body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 15px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.8); }
+        h2 { color: #f5c518; letter-spacing: 2px; margin-bottom: 5px; }
+        p { color: #666; font-size: 13px; margin-bottom: 30px; }
+        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #f5c518; }
+        button { width: 100%; padding: 16px; background: #f5c518; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; color: #000; }
+        button:disabled { background: #333; color: #555; cursor: wait; }
+        #output-container { margin-top: 25px; display: none; }
+        #session-res { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 150px; overflow-y: auto; text-align: left; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>TELEGRAM LOGIN</h2>
-        <p id="status">Iniciando motor de conexión...</p>
+        <h2>TELEGRAM SETUP</h2>
+        <p id="info">Iniciando motor seguro...</p>
 
-        <div id="login-fields">
-            <input type="tel" id="phone" placeholder="+34600000000" autocomplete="tel">
-            <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
-            <input type="password" id="2fa" placeholder="Contraseña 2FA (si tienes)" style="display:none;">
-            <button id="btn-action" onclick="processLogin()" disabled>ESPERE...</button>
+        <div id="login-form">
+            <input type="tel" id="phone" placeholder="+34 600 000 000">
+            <input type="text" id="code" placeholder="Código de 5 dígitos" style="display:none;">
+            <input type="password" id="2fa" placeholder="Contraseña Cloud" style="display:none;">
+            <button id="btn-main" onclick="handleLogin()" disabled>CARGANDO...</button>
         </div>
 
-        <div id="output-box">
-            <span class="label-copy">COPIA ESTA SESIÓN EN RENDER (SESSION):</span>
-            <div id="session-string"></div>
-            <button onclick="location.reload()" style="background:#333; color:white; margin-top:20px;">GENERAR OTRA</button>
+        <div id="output-container">
+            <label style="color:#22c55e; font-size:11px; font-weight:bold;">SESIÓN GENERADA (CÓPIALA):</label>
+            <div id="session-res"></div>
+            <button onclick="location.reload()" style="background:#222; color:#fff; margin-top:20px;">REPETIR</button>
         </div>
     </div>
 
     <script>
-        const API_ID = 8952741;
-        const API_HASH = "693fb2da124662dad85b2b337c53a386";
+        const apiId = 8952741;
+        const apiHash = "693fb2da124662dad85b2b337c53a386";
         let client = null;
-        let loginStep = 'phone';
-        let loginPromise = null;
+        let step = 'phone';
+        let resolver = null;
 
         async function init() {
-            try {
-                // Esperar a que las librerías se carguen
-                if (!window.telegram || !window.Buffer) {
-                    setTimeout(init, 500);
-                    return;
-                }
-
-                const { TelegramClient } = window.telegram;
-                const { StringSession } = window.telegram.sessions;
-                client = new TelegramClient(new StringSession(""), API_ID, API_HASH, { connectionRetries: 5 });
-
-                document.getElementById('status').innerText = "Introduce tu teléfono para recibir el código.";
-                const btn = document.getElementById('btn-action');
-                btn.innerText = "ENVIAR TELÉFONO";
-                btn.disabled = false;
-            } catch (e) {
-                document.getElementById('status').innerText = "Error: " + e.message;
+            // Esperamos a que el objeto Buffer esté listo (cdnjs lo inyecta como 'buffer')
+            if (!window.telegram || (!window.Buffer && !window.buffer)) {
+                setTimeout(init, 500);
+                return;
             }
+
+            if (!window.Buffer) window.Buffer = window.buffer.Buffer;
+
+            const { TelegramClient } = window.telegram;
+            const { StringSession } = window.telegram.sessions;
+            client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
+
+            document.getElementById('info').innerText = "Motor listo. Introduce tu teléfono.";
+            const btn = document.getElementById('btn-main');
+            btn.disabled = false;
+            btn.innerText = "ENVIAR TELÉFONO";
         }
 
-        async function processLogin() {
-            const btn = document.getElementById('btn-action');
-            const status = document.getElementById('status');
+        async function handleLogin() {
+            const btn = document.getElementById('btn-main');
+            const info = document.getElementById('info');
 
-            if (loginStep === 'phone') {
+            if (step === 'phone') {
                 const phone = document.getElementById('phone').value.trim();
-                if (!phone) return alert("Pon tu teléfono");
+                if (!phone) return alert("Escribe tu número");
 
                 btn.disabled = true;
                 btn.innerText = "CONECTANDO...";
@@ -93,45 +91,44 @@
                     await client.start({
                         phoneNumber: async () => phone,
                         phoneCode: async () => {
-                            loginStep = 'code';
+                            step = 'code';
                             document.getElementById('phone').style.display = 'none';
                             document.getElementById('code').style.display = 'block';
-                            btn.innerText = "VERIFICAR CÓDIGO";
                             btn.disabled = false;
-                            status.innerText = "Escribe el código que te envió Telegram.";
-                            return new Promise(r => loginPromise = r);
+                            btn.innerText = "VERIFICAR CÓDIGO";
+                            info.innerText = "Introduce el código que has recibido.";
+                            return new Promise(r => resolver = r);
                         },
                         password: async () => {
                             document.getElementById('code').style.display = 'none';
                             document.getElementById('2fa').style.display = 'block';
-                            btn.innerText = "VERIFICAR 2FA";
                             btn.disabled = false;
-                            status.innerText = "Introduce tu contraseña de 2 pasos.";
-                            return new Promise(r => loginPromise = r);
+                            btn.innerText = "VERIFICAR 2FA";
+                            info.innerText = "Tu cuenta tiene Verificación en 2 pasos.";
+                            return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
-                            alert("Error: " + err.message);
+                            alert("Fallo: " + err.message);
                             location.reload();
                         }
                     });
 
-                    // Éxito: Guardar sesión
-                    document.getElementById('login-fields').style.display = 'none';
-                    document.getElementById('output-box').style.display = 'block';
-                    document.getElementById('session-string').innerText = client.session.save();
-                    status.innerText = "✅ Sesión generada con éxito.";
-                    document.querySelector('h2').innerText = "¡LISTO!";
+                    // ÉXITO
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('output-container').style.display = 'block';
+                    document.getElementById('session-res').innerText = client.session.save();
+                    info.innerText = "✅ Sesión creada con éxito.";
+                    document.querySelector('h2').innerText = "¡TERMINADO!";
 
                 } catch (e) {
-                    alert("Fallo crítico: " + e.message);
+                    alert("Error crítico: " + e.message);
                     location.reload();
                 }
             } else {
-                const val = (loginStep === 'code') ? document.getElementById('code').value : document.getElementById('2fa').value;
-                if (loginPromise) loginPromise(val);
+                const val = (step === 'code') ? document.getElementById('code').value : document.getElementById('2fa').value;
+                if (resolver) resolver(val);
             }
         }
-
         init();
     </script>
 </body>
