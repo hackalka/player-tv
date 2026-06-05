@@ -2,100 +2,144 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium</title>
+    <title>PLAYER TV - Premium Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Soporte para IPTV/HLS -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        :root { --accent: #f5c518; --bg: #0a0a0a; --surface: #1a1a1a; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; overflow-x: hidden; }
+        :root { --red: #E50914; --bg: #0a0a0a; --surface: #141414; --accent: #f5c518; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow-x: hidden; }
 
-        .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: rgba(0,0,0,0.9); z-index: 1000; border-bottom: 1px solid #222; }
-        .logo { color: var(--accent); font-size: 26px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
+        /* HEADER Y BUSCADOR */
+        .header { position: fixed; top: 0; width: 100%; padding: 15px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); z-index: 1000; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
+        .logo { color: var(--red); font-size: 28px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
+        .search-box { background: rgba(255,255,255,0.1); border: 1px solid #333; border-radius: 20px; padding: 8px 20px; display: flex; align-items: center; gap: 10px; width: 250px; }
+        .search-box input { background: none; border: none; color: white; outline: none; width: 100%; font-size: 14px; }
 
+        /* CATALOGO NETFLIX */
         .catalog { padding-top: 100px; }
         .row { margin: 30px 0; padding-left: 5%; }
-        .row-title { font-size: 1.2rem; font-weight: 800; margin-bottom: 15px; color: #ddd; letter-spacing: 1px; }
-        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 10px 0; }
+        .row-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 15px; color: #e5e5e5; display: flex; align-items: center; gap: 10px; }
+        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 15px 0; }
+        .carousel::-webkit-scrollbar { display: none; }
 
-        .card { flex: 0 0 160px; height: 240px; background: var(--surface); border-radius: 8px; cursor: pointer; border: 1px solid #333; position: relative; overflow: hidden; transition: 0.3s; }
-        .card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .card { flex: 0 0 170px; height: 250px; background: var(--surface); border-radius: 6px; cursor: pointer; border: 2px solid transparent; overflow: hidden; position: relative; transition: transform 0.3s; }
+        .card:hover, .card:focus { transform: scale(1.1); border-color: white; outline: none; z-index: 10; }
         .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card-title { position: absolute; bottom: 0; width: 100%; padding: 10px; background: linear-gradient(to top, #000, transparent); font-size: 10px; text-align: center; }
+        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.7); font-size: 11px; text-align: center; }
 
-        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:50000; padding: 5%; overflow-y: auto; }
-        .modal-content { max-width: 900px; margin: 0 auto; display: flex; gap: 40px; flex-wrap: wrap; }
-        .modal-poster { width: 250px; height: 380px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.5); border: 1px solid #333; }
+        /* MODAL DE DETALLES */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:50000; padding: 50px 5%; overflow-y: auto; }
+        .modal-content { max-width: 1000px; margin: 0 auto; display: flex; gap: 40px; flex-wrap: wrap; position: relative; }
+        .modal-poster { width: 280px; height: 420px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
         .modal-info { flex: 1; min-width: 300px; }
+        .modal-title { font-size: 3.5rem; margin: 0 0 15px; font-weight: 800; }
+        .modal-synopsis { font-size: 1.2rem; color: #ccc; line-height: 1.5; margin-bottom: 30px; }
 
-        .btn-play { background: white; color: black; border: none; padding: 15px 30px; border-radius: 6px; font-weight: 800; cursor: pointer; width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .btn-open-with { background: var(--accent); color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 11px; }
+        /* EPISODIOS */
+        .ep-item { background: #262626; padding: 15px 25px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s; }
+        .ep-item:hover, .ep-item:focus { background: #333; outline: 2px solid var(--accent); }
+        .btn-play-sm { background: white; color: black; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-open-with { background: var(--accent); color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; margin-left: 10px; }
 
         #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-back { position: absolute; top: 20px; left: 20px; background: #f44336; color: white; border: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-back { position: absolute; top: 30px; left: 30px; background: var(--red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; }
+
+        @media (max-width: 768px) { .modal-poster { width: 100%; height: auto; } .modal-title { font-size: 2.2rem; } }
     </style>
 </head>
 <body>
 
-    <header class="header"><a href="#" class="logo">PLAYER TV</a></header>
+    <header class="header">
+        <a href="#" class="logo">PLAYER TV</a>
+        <div class="search-box">
+            <i class="fa fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Buscar películas o series..." onkeyup="ejecutarBuscador()">
+        </div>
+    </header>
 
     <div id="catalog" class="catalog">
-        <div style="text-align:center; padding:100px; color:var(--accent);">Sincronizando con Telegram...</div>
+        <!-- Contenido personal de usuario -->
+        <div id="user-rows"></div>
+        <!-- Contenido general de Telegram -->
+        <div id="telegram-rows"></div>
     </div>
 
     <div id="detail-modal" class="modal">
         <div class="modal-content">
-            <button onclick="cerrarModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:white; font-size:30px; cursor:pointer;">✕</button>
+            <button onclick="cerrarModal()" style="position:absolute; top:0; right:0; background:none; border:none; color:white; font-size:40px; cursor:pointer;">✕</button>
             <img id="modal-img" class="modal-poster">
             <div class="modal-info">
-                <h1 id="modal-title" style="margin-top:0;"></h1>
-                <p id="modal-desc" style="color:#aaa; line-height:1.6; margin-bottom:30px;"></p>
+                <h1 id="modal-title" class="modal-title"></h1>
+                <p id="modal-desc" class="modal-synopsis"></p>
                 <div id="modal-links"></div>
             </div>
         </div>
     </div>
 
     <div id="player-layer">
-        <button class="btn-back" onclick="cerrarPlayer()">VOLVER</button>
-        <video id="main-video" controls autoplay style="width:100%; max-height:100vh;"></video>
+        <button class="btn-back" onclick="cerrarPlayer()">← VOLVER</button>
+        <h2 id="player-info" style="position:absolute; top:30px; right:50px; margin:0; font-size:16px; color:#666;"></h2>
+        <video id="main-video" controls autoplay style="width: 100%; height: 100%;"></video>
     </div>
 
     <script>
         const API_URL = "https://player-tv-a8f4.onrender.com";
+        let fullCatalog = { peliculas: [], series: [], deportes: [] };
+        let hlsPlayer = null;
 
+        // 1. CARGA INICIAL
         async function init() {
             try {
+                // Cargar desde caché para rapidez instantánea
+                const cache = localStorage.getItem('tv_cache');
+                if (cache) render(JSON.parse(cache));
+
                 const res = await fetch(`${API_URL}/api/catalogo`);
-                const data = await res.json();
-                renderCatalog(data);
-            } catch (e) { console.error(e); }
+                fullCatalog = await res.json();
+                localStorage.setItem('tv_cache', JSON.stringify(fullCatalog));
+                render(fullCatalog);
+            } catch (e) { console.error("Error cargando catálogo:", e); }
         }
 
-        function renderCatalog(data) {
-            const container = document.getElementById('catalog');
+        function render(data) {
+            renderUserRows();
+            const container = document.getElementById('telegram-rows');
             container.innerHTML = '';
-            const sections = [
-                { id: 'peliculas', label: 'PELÍCULAS' },
-                { id: 'series', label: 'SERIES' },
-                { id: 'deportes', label: 'DEPORTES EN VIVO' }
-            ];
 
-            sections.forEach(sec => {
-                const items = data[sec.id];
-                if (items && items.length > 0) {
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    row.innerHTML = `<div class="row-title">${sec.label}</div><div class="carousel"></div>`;
-                    const carousel = row.querySelector('.carousel');
-                    items.forEach(item => {
-                        const card = document.createElement('div');
-                        card.className = 'card';
-                        card.innerHTML = `<img src="${API_URL}${item.portada}"><div class="card-title">${item.titulo}</div>`;
-                        card.onclick = () => showDetail(item);
-                        carousel.appendChild(card);
-                    });
-                    container.appendChild(row);
-                }
+            renderRow(container, "PELÍCULAS", data.peliculas);
+            renderRow(container, "SERIES", data.series);
+            renderRow(container, "DEPORTES EN VIVO", data.deportes);
+        }
+
+        function renderUserRows() {
+            const container = document.getElementById('user-rows');
+            container.innerHTML = '';
+
+            const favs = JSON.parse(localStorage.getItem('favoritos') || '[]');
+            if (favs.length) renderRow(container, "⭐ MI LISTA", favs);
+
+            const seguir = JSON.parse(localStorage.getItem('seguirViendo') || '[]');
+            if (seguir.length) renderRow(container, "▶️ SEGUIR VIENDO", seguir);
+        }
+
+        function renderRow(container, title, items) {
+            if (!items || !items.length) return;
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
+            const carousel = row.querySelector('.carousel');
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.tabIndex = 0;
+                card.innerHTML = `<img src="${API_URL}${item.portada}"><div class="card-label">${item.titulo}</div>`;
+                card.onclick = () => showDetail(item);
+                carousel.appendChild(card);
             });
+            container.appendChild(row);
         }
 
         function showDetail(item) {
@@ -108,30 +152,98 @@
             item.links.forEach(l => {
                 const streamUrl = `${API_URL}/api/stream/${l.id}`;
                 const div = document.createElement('div');
-                div.className = 'btn-play';
-                div.innerHTML = `<span>${l.label}</span>
+                div.className = 'ep-item';
+                div.tabIndex = 0;
+                div.innerHTML = `
+                    <span style="font-weight:bold;">${l.label}</span>
                     <div style="display:flex; gap:10px;">
-                        <button onclick="play('${streamUrl}')" style="background:none; border:none; color:blue; font-weight:bold; cursor:pointer;">REPRODUCIR</button>
+                        <button class="btn-play-sm" onclick="play('${streamUrl}', '${item.titulo}')">▶ WEB</button>
                         <button class="btn-open-with" onclick="openWith('${streamUrl}', '${item.titulo}')">ABRIR CON...</button>
                     </div>`;
+                div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') play(streamUrl, item.titulo); };
                 box.appendChild(div);
             });
+
+            // Guardar en historial (Seguir Viendo)
+            guardarSeguirViendo(item);
             document.getElementById('detail-modal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function play(url, title) {
+            const playerLayer = document.getElementById('player-layer');
+            const video = document.getElementById('main-video');
+            document.getElementById('player-info').innerText = title;
+            playerLayer.style.display = 'flex';
+
+            if (hlsPlayer) { hlsPlayer.destroy(); hlsPlayer = null; }
+
+            if (url.includes('.m3u8')) {
+                if (Hls.isSupported()) {
+                    hlsPlayer = new Hls();
+                    hlsPlayer.loadSource(url);
+                    hlsPlayer.attachMedia(video);
+                }
+            } else {
+                video.src = url;
+            }
+            video.play().catch(e => {
+                alert("Este formato requiere reproductor externo. Pulsa el botón dorado.");
+                cerrarPlayer();
+            });
         }
 
         function openWith(url, title) {
-            // Intent universal de Android para abrir el diálogo "¿Con qué aplicación?"
-            const intent = `intent:${url}#Intent;type=video/*;S.title=${encodeURIComponent(title)};end`;
-            window.location.href = intent;
+            // Intent universal para Android que pregunta qué app usar (VLC, MX, etc)
+            window.location.href = `intent:${url}#Intent;type=video/*;S.title=${encodeURIComponent(title)};end`;
         }
 
-        function play(url) {
-            document.getElementById('player-layer').style.display = 'flex';
-            document.getElementById('main-video').src = url;
+        function guardarSeguirViendo(item) {
+            let lista = JSON.parse(localStorage.getItem('seguirViendo') || '[]');
+            lista = lista.filter(i => i.id !== item.id);
+            lista.unshift(item);
+            localStorage.setItem('seguirViendo', JSON.stringify(lista.slice(0, 20)));
         }
 
-        function cerrarModal() { document.getElementById('detail-modal').style.display = 'none'; }
-        function cerrarPlayer() { document.getElementById('main-video').pause(); document.getElementById('player-layer').style.display = 'none'; }
+        function ejecutarBuscador() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = {
+                peliculas: fullCatalog.peliculas.filter(i => i.titulo.toLowerCase().includes(query)),
+                series: fullCatalog.series.filter(i => i.titulo.toLowerCase().includes(query)),
+                deportes: fullCatalog.deportes.filter(i => i.titulo.toLowerCase().includes(query))
+            };
+            render(filtered);
+        }
+
+        function cerrarModal() {
+            document.getElementById('detail-modal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        function cerrarPlayer() {
+            const v = document.getElementById('main-video');
+            v.pause(); v.src = "";
+            document.getElementById('player-layer').style.display = 'none';
+        }
+
+        // CONTROL DE MANDO (Flechas y Enter)
+        document.addEventListener('keydown', (e) => {
+            const active = document.activeElement;
+            if (e.key === 'ArrowRight') {
+                if (active.classList.contains('card') || active.classList.contains('ep-item')) {
+                    active.nextElementSibling?.focus();
+                }
+            }
+            if (e.key === 'ArrowLeft') {
+                if (active.classList.contains('card') || active.classList.contains('ep-item')) {
+                    active.previousElementSibling?.focus();
+                }
+            }
+            if (e.key === 'Enter') active.click();
+            if (e.key === 'Backspace' || e.key === 'Escape') {
+                if (document.getElementById('player-layer').style.display === 'flex') cerrarPlayer();
+                else cerrarModal();
+            }
+        });
 
         init();
     </script>
