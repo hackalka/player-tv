@@ -2,247 +2,127 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <title>TELEGRAM ENGINE - PLAYER TV</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TELEGRAM - Generar Sesión</title>
+
+    <!-- FIX PARA EVITAR BLOQUEOS Y ERRORES DE REQUIRE -->
+    <script>
+        window.Buffer = null;
+        window.process = { env: {} };
+        window.require = function(m) {
+            if (m === "buffer") return { Buffer: window.Buffer };
+            return {};
+        };
+    </script>
+
+    <!-- Cargamos Buffer de forma segura -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script>
+        if (typeof window.buffer !== 'undefined') window.Buffer = window.buffer.Buffer;
+    </script>
+
+    <!-- Cargamos Telegram (Versión estable) -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.19.12/browser/telegram.js"></script>
+
     <style>
-        :root {
-            --tg-orange: #ff5500;
-            --tg-dark: #121212;
-            --tg-surface: #1e1e1e;
-            --text-color: #ffffff;
-            --border-color: #333333;
-        }
-
-        body {
-            background-color: var(--tg-dark);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .session-container {
-            background-color: var(--tg-surface);
-            border: 1px solid var(--border-color);
-            border-top: 4px solid var(--tg-orange);
-            border-radius: 8px;
-            padding: 30px;
-            width: 90%;
-            max-width: 450px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-            text-align: center;
-        }
-
-        .logo-area h1 {
-            color: var(--tg-orange);
-            margin: 0;
-            font-size: 26px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .logo-area p {
-            color: #888;
-            margin: 5px 0 25px 0;
-            font-size: 14px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #ccc;
-            font-size: 14px;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            background-color: #121212;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: white;
-            box-sizing: border-box;
-            font-size: 16px;
-            outline: none;
-        }
-
-        input:focus {
-            border-color: var(--tg-orange);
-        }
-
-        .btn-submit {
-            width: 100%;
-            background-color: var(--tg-orange);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .btn-submit:hover:not(:disabled) {
-            background-color: #e04b00;
-        }
-
-        .btn-submit:disabled {
-            background-color: #444;
-            cursor: not-allowed;
-        }
-
-        .status-box {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 4px;
-            background-color: #1a1a1a;
-            border-left: 3px solid var(--tg-orange);
-            font-size: 13px;
-            color: #aaa;
-            word-break: break-all;
-            display: block;
-        }
-
-        #sessionOutput {
-            background: #000;
-            color: #22c55e;
-            padding: 15px;
-            font-family: monospace;
-            display: none;
-            margin-top: 15px;
-            border: 1px dashed #22c55e;
-            text-align: left;
-        }
+        body { background: #06090e; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #10141d; border: 2px solid #ff5500; padding: 40px; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        h1 { color: #ff5500; font-size: 24px; margin-bottom: 5px; }
+        p { color: #888; font-size: 13px; margin-bottom: 25px; }
+        input { width: 100%; padding: 14px; margin: 8px 0; background: #1a1a2e; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; }
+        button { width: 100%; padding: 14px; background: #ff5500; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; }
+        button:disabled { background: #444; cursor: wait; }
+        #output { background: #000; color: #22c55e; padding: 15px; font-family: monospace; font-size: 11px; word-break: break-all; margin-top: 20px; border: 1px dashed #22c55e; display: none; text-align: left; }
     </style>
-
-    <!-- LIBRERÍAS CORE -->
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
 </head>
 <body>
 
-    <div class="session-container">
-        <div class="logo-area">
-            <h1>PLAYER TV</h1>
-            <p>Generador de Sesión para Render</p>
-        </div>
+    <div class="card">
+        <h1>PLAYER TV</h1>
+        <p id="msg">Iniciando protocolos de seguridad...</p>
 
         <div id="login-form">
-            <div class="form-group" id="group-phone">
-                <label>Número de Teléfono</label>
-                <input type="text" id="phone" placeholder="+34 600 000 000">
-            </div>
-
-            <div class="form-group" id="group-code" style="display:none;">
-                <label>Código de Telegram</label>
-                <input type="text" id="code" placeholder="12345">
-            </div>
-
-            <div class="form-group" id="group-2fa" style="display:none;">
-                <label>Contraseña 2FA (Cloud Password)</label>
-                <input type="password" id="password" placeholder="Tu contraseña...">
-            </div>
-
-            <button class="btn-submit" id="mainBtn">CONECTANDO MOTOR...</button>
+            <input type="tel" id="phone" placeholder="+34 600 000 000">
+            <input type="text" id="code" placeholder="Código" style="display:none;">
+            <input type="password" id="2fa" placeholder="Contraseña 2FA" style="display:none;">
+            <button id="btn" onclick="handle()" disabled>ESPERE...</button>
         </div>
 
-        <div id="statusOutput" class="status-box">Inicializando componentes...</div>
-        <div id="sessionOutput"></div>
+        <div id="output"></div>
     </div>
 
     <script>
-        const API_ID = 8952741;
-        const API_HASH = "693fb2da124662dad85b2b337c53a386";
+        const apiId = 8952741;
+        const apiHash = "693fb2da124662dad85b2b337c53a386";
         let client = null;
         let step = 'phone';
         let resolver = null;
 
-        document.addEventListener("DOMContentLoaded", async () => {
-            const status = document.getElementById("statusOutput");
-            const btn = document.getElementById("mainBtn");
+        async function init() {
+            const msg = document.getElementById('msg');
+            const btn = document.getElementById('btn');
 
-            // Polyfill de Buffer
-            if (typeof window.buffer !== 'undefined') window.Buffer = window.buffer.Buffer;
-            window.process = { env: {} };
-
-            // COMPROBACIÓN SEGURA
-            const lib = window.telegram || window.gramjs;
-            if (!lib || !window.Buffer) {
-                status.style.borderLeftColor = "#ff3333";
-                status.innerHTML = "<strong>Error:</strong> Tu navegador bloquea las librerías. <br> Usa una <b>ventana de incógnito</b> o Chrome en el móvil.";
-                btn.disabled = true;
+            if (!window.telegram || !window.Buffer) {
+                setTimeout(init, 500);
                 return;
             }
 
-            // Motor listo
-            status.innerText = "Motor listo. Introduce tu teléfono.";
+            const { TelegramClient } = window.telegram;
+            const { StringSession } = window.telegram.sessions;
+            client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
+
+            msg.innerText = "Listo. Introduce tu teléfono (+34...).";
+            btn.disabled = false;
             btn.innerText = "ENVIAR TELÉFONO";
-            btn.onclick = handleAction;
+        }
 
-            const { TelegramClient } = lib;
-            const { StringSession } = lib.sessions;
-            client = new TelegramClient(new StringSession(""), API_ID, API_HASH, { connectionRetries: 5 });
-        });
-
-        async function handleAction() {
-            const btn = document.getElementById("mainBtn");
-            const status = document.getElementById("statusOutput");
+        async function handle() {
+            const btn = document.getElementById('btn');
+            const msg = document.getElementById('msg');
 
             if (step === 'phone') {
-                const phone = document.getElementById('phone').value;
+                const phone = document.getElementById('phone').value.trim();
                 btn.disabled = true;
-                btn.innerText = "ESPERANDO...";
+                btn.innerText = "CONECTANDO...";
 
                 try {
                     await client.start({
                         phoneNumber: async () => phone,
                         phoneCode: async () => {
                             step = 'code';
-                            document.getElementById('group-phone').style.display = 'none';
-                            document.getElementById('group-code').style.display = 'block';
+                            document.getElementById('phone').style.display = 'none';
+                            document.getElementById('code').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR CÓDIGO";
-                            status.innerText = "Introduce el código recibido en tu Telegram.";
+                            msg.innerText = "Escribe el código que te mandó Telegram.";
                             return new Promise(r => resolver = r);
                         },
                         password: async () => {
-                            document.getElementById('group-code').style.display = 'none';
-                            document.getElementById('group-2fa').style.display = 'block';
+                            document.getElementById('code').style.display = 'none';
+                            document.getElementById('2fa').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "ENTRAR";
-                            status.innerText = "Introduce tu contraseña de 2 pasos.";
+                            msg.innerText = "Tu cuenta tiene contraseña. Ponla abajo.";
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => alert(err.message)
                     });
 
-                    // FINALIZADO
                     document.getElementById('login-form').style.display = 'none';
-                    status.style.borderLeftColor = "#22c55e";
-                    status.innerHTML = "<strong>¡SESIÓN GENERADA!</strong><br>Copia el código de abajo y ponlo en Render.";
-                    const output = document.getElementById('sessionOutput');
-                    output.innerText = client.session.save();
-                    output.style.display = 'block';
-
+                    const out = document.getElementById('output');
+                    out.innerText = client.session.save();
+                    out.style.display = 'block';
+                    msg.innerHTML = "<b style='color:#ff5500'>✅ SESIÓN LISTA.</b><br>Copia el código verde y pégalo en Render.";
                 } catch (e) {
                     alert("Error: " + e.message);
                     location.reload();
                 }
             } else {
-                const val = step === 'code' ? document.getElementById('code').value : document.getElementById('password').value;
+                const val = (step === 'code') ? document.getElementById('code').value : document.getElementById('2fa').value;
                 if (resolver) resolver(val);
             }
         }
+        init();
     </script>
 </body>
 </html>
