@@ -14,13 +14,14 @@
         button { width: 100%; padding: 16px; background: #f5c518; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; color: #000; }
         button:disabled { background: #333; color: #555; cursor: wait; }
         #session-res { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 150px; overflow-y: auto; text-align: left; display: none; margin-top: 20px; }
+        .error-hint { color: #ff4436; font-size: 12px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>TELEGRAM SETUP</h2>
-        <p id="info">Cargando cimientos del sistema...</p>
+        <p id="info">Iniciando motores de seguridad...</p>
 
         <div id="login-form">
             <input type="tel" id="phone" placeholder="+34 600 000 000">
@@ -30,13 +31,17 @@
         </div>
 
         <div id="session-res"></div>
+        <div id="error-hint" class="error-hint">
+            ⚠️ Tu navegador está bloqueando la conexión. <br>
+            <b>Prueba desde Chrome en el móvil o desactiva "Protección contra rastreo".</b>
+        </div>
     </div>
 
-    <!-- 1. BUFFER (Fallback total) -->
-    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <!-- 1. CARGA ROBUSTA DE BUFFER -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js" crossorigin="anonymous"></script>
 
-    <!-- 2. GRAMJS BROWSER -->
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+    <!-- 2. CARGA ROBUSTA DE TELEGRAM (GramJS) -->
+    <script src="https://unpkg.com/telegram/browser/telegram.js" crossorigin="anonymous"></script>
 
     <script>
         const apiId = 8952741;
@@ -49,34 +54,37 @@
             const info = document.getElementById('info');
             const btn = document.getElementById('btn-main');
 
-            // Polyfill para Buffer
+            // Polyfill para Buffer (A veces el navegador lo bloquea si es global)
+            window.process = { env: {} };
             if (typeof window.Buffer === 'undefined') {
                 if (typeof window.buffer !== 'undefined') window.Buffer = window.buffer.Buffer;
-                else if (typeof require !== 'undefined') {
-                    try { window.Buffer = require('buffer').Buffer; } catch(e){}
-                }
             }
-
-            window.process = { env: {} };
 
             const lib = window.telegram || window.gramjs;
 
             if (!lib || !window.Buffer) {
-                info.innerText = "⏳ Esperando librerías... (Si tarda más de 5 seg, usa otro navegador)";
-                setTimeout(init, 500);
+                info.innerText = "⏳ Esperando librerías (Tracking Prevention detectado)...";
+                document.getElementById('error-hint').style.display = 'block';
+                setTimeout(init, 1000);
                 return;
             }
 
             try {
+                document.getElementById('error-hint').style.display = 'none';
                 const { TelegramClient } = lib;
                 const { StringSession } = lib.sessions;
-                client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
 
-                info.innerText = "✅ Motor listo. Escribe tu teléfono con +34...";
+                // Usamos sesión en memoria para evitar que Tracking Prevention bloquee localStorage
+                client = new TelegramClient(new StringSession(""), apiId, apiHash, {
+                    connectionRetries: 5,
+                    useWSS: true
+                });
+
+                info.innerText = "✅ ¡Listo! Introduce tu teléfono con +34...";
                 btn.disabled = false;
                 btn.innerText = "ENVIAR TELÉFONO";
             } catch (e) {
-                info.innerText = "❌ Error en el motor: " + e.message;
+                info.innerText = "❌ Error: " + e.message;
             }
         }
 
@@ -86,10 +94,10 @@
 
             if (step === 'phone') {
                 const phone = document.getElementById('phone').value.trim();
-                if (!phone) return alert("Pon tu número");
+                if (!phone) return alert("Escribe tu número");
 
                 btn.disabled = true;
-                btn.innerText = "CONECTANDO A TELEGRAM...";
+                btn.innerText = "SOLICITANDO CÓDIGO...";
 
                 try {
                     await client.start({
@@ -100,7 +108,7 @@
                             document.getElementById('code').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR CÓDIGO";
-                            info.innerText = "Telegram te ha enviado un código. Ponlo abajo.";
+                            info.innerText = "Revisa tu Telegram y pon el código abajo.";
                             return new Promise(r => resolver = r);
                         },
                         password: async () => {
@@ -108,25 +116,25 @@
                             document.getElementById('2fa').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR 2FA";
-                            info.innerText = "Tu cuenta tiene Verificación en 2 pasos.";
+                            info.innerText = "Escribe tu contraseña de Verificación en 2 pasos.";
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
-                            alert("Error de Telegram: " + err.message);
+                            alert("Telegram dice: " + err.message);
                             location.reload();
                         }
                     });
 
-                    // ÉXITO
+                    // GENERAR SESIÓN
                     document.getElementById('login-form').style.display = 'none';
                     const resBox = document.getElementById('session-res');
                     resBox.innerText = client.session.save();
                     resBox.style.display = 'block';
-                    info.innerHTML = "<b style='color:#f5c518'>✅ SESIÓN GENERADA.</b><br>Copia el código verde y pégalo en Render.";
-                    document.querySelector('h2').innerText = "¡TODO LISTO!";
+                    info.innerHTML = "<b style='color:#f5c518'>✅ CÓDIGO GENERADO.</b><br>Cópialo y ponlo en Render.";
+                    document.querySelector('h2').innerText = "¡CONSEGUIDO!";
 
                 } catch (e) {
-                    alert("Error crítico: " + e.message);
+                    alert("Fallo crítico: " + e.message);
                     location.reload();
                 }
             } else {

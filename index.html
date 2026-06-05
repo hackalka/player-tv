@@ -8,48 +8,68 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --netflix-red: #E50914; --bg-black: #141414; }
-        body { background: var(--bg-black); color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; }
-        .hero { height: 70vh; background: linear-gradient(to top, var(--bg-black), transparent), url('https://via.placeholder.com/1200x800/111/f5c518?text=PLAYER+TV') center/cover; display: flex; align-items: flex-end; padding: 50px; }
+        body { background: var(--bg-black); color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; overflow-x: hidden; }
+        .header { position: fixed; top: 0; width: 100%; padding: 20px 50px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; box-sizing: border-box; }
+        .hero { height: 80vh; background: linear-gradient(to top, var(--bg-black), transparent), url('https://via.placeholder.com/1200x800/111/f5c518?text=PLAYER+TV') center/cover; display: flex; align-items: flex-end; padding: 50px; box-sizing: border-box; }
         .row { padding: 20px 0 20px 50px; }
-        .row-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 10px; }
-        .carousel { display: flex; overflow-x: scroll; gap: 10px; scrollbar-width: none; }
-        .card { flex: 0 0 200px; height: 300px; background: #222; border-radius: 4px; transition: transform 0.3s; cursor: pointer; }
-        .card:hover { transform: scale(1.05); z-index: 10; }
-        .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; color: #e5e5e5; }
+        .carousel { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+        .carousel::-webkit-scrollbar { display: none; }
+        .card { flex: 0 0 200px; height: 280px; background: #1a1a1a; border-radius: 6px; transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); cursor: pointer; position: relative; overflow: hidden; border: 1px solid #333; }
+        .card:hover { transform: scale(1.08); z-index: 10; border-color: #f5c518; }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card-info { position: absolute; bottom: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); font-size: 13px; font-weight: 500; }
+        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 20000; flex-direction: column; align-items: center; justify-content: center; }
+        .btn-back { position: absolute; top: 30px; left: 30px; background: var(--netflix-red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; font-size: 14px; }
+        #main-video { width: 100%; max-height: 100vh; outline: none; }
+        .error-msg { text-align: center; padding: 100px 20px; color: #666; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
-    <header style="position: fixed; top: 0; width: 100%; padding: 20px 50px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent); z-index: 1000;">
-        <h1 style="color: var(--netflix-red); margin: 0; font-size: 30px;">PLAYER TV</h1>
+    <header class="header">
+        <h1 style="color: var(--netflix-red); margin: 0; font-size: 32px; letter-spacing: 2px; font-weight: 900;">PLAYER TV</h1>
     </header>
 
     <div id="hero" class="hero">
-        <div>
-            <h1 id="hero-title" style="font-size: 3rem; margin: 0;">Cargando...</h1>
-            <p id="hero-desc" style="max-width: 600px; font-size: 1.2rem;">Conectando con el catálogo de Telegram...</p>
+        <div style="max-width: 600px;">
+            <h1 id="hero-title" style="font-size: 3.5rem; margin: 0; text-shadow: 2px 2px 10px #000;">Cargando...</h1>
+            <p id="hero-desc" style="font-size: 1.2rem; line-height: 1.4; text-shadow: 1px 1px 5px #000; margin-top: 15px;">Iniciando conexión con el servidor para obtener tu catálogo de Telegram.</p>
         </div>
     </div>
 
-    <div id="content"></div>
+    <div id="content">
+        <div class="error-msg">Conectando con el servidor en Render...</div>
+    </div>
 
-    <!-- REPRODUCTOR -->
-    <div id="player-layer" style="display:none; position:fixed; inset:0; background:#000; z-index: 10000; flex-direction:column; align-items:center; justify-content:center;">
-        <button onclick="cerrar()" style="position:absolute; top:20px; left:20px; background:var(--netflix-red); color:white; border:none; padding:15px; border-radius:4px; font-weight:bold; cursor:pointer;">← VOLVER</button>
-        <video id="main-video" controls style="width:100%; max-height:90vh;"></video>
+    <div id="player-layer">
+        <button class="btn-back" onclick="cerrar()">← VOLVER</button>
+        <video id="main-video" controls autoplay></video>
     </div>
 
     <script>
-        const API_URL = "https://tu-servidor-node.up.railway.app"; // 👈 AQUÍ PONDRÁS TU URL DEL BACKEND
+        // CONFIGURACIÓN: Pon aquí la URL que te de Render cuando subas el backend
+        const API_URL = "https://tu-backend-render.onrender.com";
 
         async function cargar() {
+            if (API_URL.includes("tu-backend")) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error-msg" style="color: #f5c518;">
+                        <i class="fa fa-exclamation-triangle"></i><br><br>
+                        ¡Falta configurar la URL de tu servidor!<br>
+                        Sube el backend a Render y cambia la variable <b>API_URL</b> en el código.
+                    </div>`;
+                return;
+            }
+
             try {
                 const res = await fetch(`${API_URL}/api/catalogo`);
+                if (!res.ok) throw new Error("Error en la respuesta");
                 const data = await res.json();
                 render(data);
             } catch (e) {
                 console.error("Error cargando API:", e);
-                document.getElementById('hero-title').innerText = "Servidor Desconectado";
+                document.getElementById('content').innerHTML = `<div class="error-msg">❌ No se pudo conectar con el servidor backend en Render.</div>`;
             }
         }
 
@@ -57,44 +77,55 @@
             const container = document.getElementById('content');
             container.innerHTML = '';
 
-            // Agrupar por categorías (Peliculas, Series, etc)
-            const cats = ['peliculas', 'series', 'otros'];
-            cats.forEach(c => {
-                const filtrados = items.filter(i => i.categoria === c);
-                if (filtrados.length > 0) {
+            const categories = [
+                { id: 'peliculas', title: 'PELÍCULAS RECIENTES' },
+                { id: 'series', title: 'SERIES Y TEMPORADAS' },
+                { id: 'otros', title: 'CONTENIDO VARIADO' }
+            ];
+
+            categories.forEach(cat => {
+                const filtered = items.filter(i => i.categoria === cat.id);
+                if (filtered.length > 0) {
                     const row = document.createElement('div');
                     row.className = 'row';
-                    row.innerHTML = `<div class="row-title">${c.toUpperCase()}</div><div class="carousel" id="row-${c}"></div>`;
+                    row.innerHTML = `<div class="row-title">${cat.title}</div><div class="carousel" id="row-${cat.id}"></div>`;
                     container.appendChild(row);
 
-                    const carousel = document.getElementById(`row-${c}`);
-                    filtrados.forEach(item => {
+                    const carousel = document.getElementById(`row-${cat.id}`);
+                    filtered.forEach(item => {
                         const card = document.createElement('div');
                         card.className = 'card';
-                        card.innerHTML = `<img src="https://via.placeholder.com/200x300/111/f5c518?text=${item.titulo}">`;
-                        card.onclick = () => reproducir(item.id);
+                        // Usamos un placeholder con el título para las portadas que falten
+                        const imgUrl = item.portada || `https://via.placeholder.com/200x280/111/f5c518?text=${encodeURIComponent(item.titulo)}`;
+                        card.innerHTML = `
+                            <img src="${imgUrl}">
+                            <div class="card-info">${item.titulo}</div>
+                        `;
+                        card.onclick = () => reproducir(item.id, item.titulo);
                         carousel.appendChild(card);
                     });
                 }
             });
 
-            if (items[0]) {
+            if (items.length > 0) {
                 document.getElementById('hero-title').innerText = items[0].titulo;
-                document.getElementById('hero-desc').innerText = items[0].sinopsis.substring(0, 200) + "...";
+                document.getElementById('hero-desc').innerText = items[0].sinopsis ? items[0].sinopsis.substring(0, 180) + "..." : "Disfruta de este contenido directamente desde Telegram.";
+                document.getElementById('hero').style.backgroundImage = `linear-gradient(to top, var(--bg-black), transparent), url('${items[0].portada || ''}')`;
             }
         }
 
-        function reproducir(id) {
+        function reproducir(id, titulo) {
             const player = document.getElementById('player-layer');
             const video = document.getElementById('main-video');
             player.style.display = 'flex';
             video.src = `${API_URL}/api/stream/${id}`;
-            video.play();
+            console.log("Reproduciendo:", titulo);
         }
 
         function cerrar() {
             const video = document.getElementById('main-video');
             video.pause();
+            video.src = "";
             document.getElementById('player-layer').style.display = 'none';
         }
 
