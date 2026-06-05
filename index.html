@@ -2,200 +2,114 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium</title>
+    <title>PLAYER TV - Pro</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --netflix-red: #E50914; --bg-black: #141414; }
-        body { background: var(--bg-black); color: white; font-family: 'Helvetica Neue', Helvetica, sans-serif; margin: 0; overflow-x: hidden; }
-        .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); z-index: 1000; display: flex; align-items: center; justify-content: space-between; }
-        .logo { color: var(--netflix-red); font-size: 32px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
-
-        .hero { height: 85vh; background-size: cover; background-position: center; display: flex; align-items: flex-end; padding: 0 5% 100px; position: relative; transition: 0.5s; }
-        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg-black) 0%, transparent 50%), linear-gradient(to right, rgba(0,0,0,0.8) 0%, transparent 100%); }
-        .hero-content { position: relative; z-index: 10; max-width: 700px; }
-        .hero-title { font-size: 4rem; margin: 0; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        .hero-desc { font-size: 1.2rem; color: #ccc; margin: 20px 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-
+        :root { --red: #E50914; --bg: #141414; --gold: #f5c518; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; overflow-x: hidden; }
+        .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); z-index: 1000; }
+        .logo { color: var(--red); font-size: 30px; font-weight: 900; text-decoration: none; letter-spacing: 2px; }
         .row { margin: 40px 0; padding-left: 5%; }
-        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; color: #e5e5e5; display: flex; align-items: center; gap: 10px; }
-        .carousel { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; padding: 10px 0; }
-        .carousel::-webkit-scrollbar { display: none; }
-
-        .card { flex: 0 0 170px; height: 250px; background: #1a1a1a; border-radius: 4px; transition: transform 0.3s, border 0.2s; cursor: pointer; border: 2px solid transparent; overflow: hidden; position: relative; }
+        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 10px 0; }
+        .card { flex: 0 0 170px; height: 250px; background: #1a1a1a; border-radius: 6px; cursor: pointer; border: 1px solid transparent; overflow: hidden; position: relative; transition: 0.3s; }
         .card:hover { transform: scale(1.08); border-color: #fff; z-index: 10; }
         .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.7); font-size: 11px; text-align: center; }
-
         .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index:50000; padding: 50px 5%; overflow-y: auto; }
-        .modal-grid { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
-        .modal-poster { width: 280px; height: 420px; border-radius: 8px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
-
-        .btn-play { background: white; color: black; border: none; padding: 12px 35px; border-radius: 4px; font-weight: 800; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; margin: 10px 0; }
-        .btn-fav { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 12px 35px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; }
-
+        .modal-poster { width: 280px; height: 420px; border-radius: 8px; object-fit: cover; }
+        .btn-play { background: white; color: black; border: none; padding: 12px 35px; border-radius: 4px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 5px 0; width: 100%; justify-content: space-between; }
+        .btn-vlc { background: var(--gold); color: black; border: none; padding: 5px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px; }
         #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-back { position: absolute; top: 30px; left: 30px; background: var(--netflix-red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; }
     </style>
 </head>
 <body>
 
-    <header class="header">
-        <a href="#" class="logo">PLAYER TV</a>
-        <div id="user-status" style="font-size: 12px; color: #666;"></div>
-    </header>
-
-    <div id="hero" class="hero">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <h1 id="hero-title" class="hero-title">Cargando...</h1>
-            <p id="hero-desc" class="hero-desc"></p>
-            <div id="hero-actions"></div>
+    <header class="header"><a href="#" class="logo">PLAYER TV</a></header>
+    <div id="hero" style="height:70vh; background-size:cover; background-position:center; display:flex; align-items:flex-end; padding:50px 5%;">
+        <div style="max-width:600px; z-index:10;">
+            <h1 id="hero-title" style="font-size:3.5rem; margin:0;"></h1>
+            <p id="hero-desc" style="color:#ccc; margin:20px 0;"></p>
         </div>
     </div>
-
-    <!-- Secciones dinámicas -->
-    <div id="user-rows"></div>
-    <div id="catalog-container"></div>
+    <div id="catalog"></div>
 
     <div id="detail-modal" class="modal">
         <button onclick="cerrarModal()" style="position:absolute; top:30px; right:30px; background:none; border:none; color:white; font-size:40px; cursor:pointer;">✕</button>
-        <div class="modal-grid">
+        <div style="display:flex; gap:40px; flex-wrap:wrap; justify-content:center;">
             <img id="modal-img" class="modal-poster">
-            <div class="modal-info" style="flex:1; min-width:320px; max-width:800px;">
-                <h1 id="modal-title" style="font-size: 3.5rem; margin-top:0;"></h1>
-                <p id="modal-desc" style="font-size:1.2rem; color:#aaa; line-height:1.6; margin-bottom:40px;"></p>
-                <div id="modal-links" style="display:flex; gap:15px; flex-wrap:wrap;"></div>
+            <div style="flex:1; min-width:300px; max-width:600px;">
+                <h1 id="modal-title" style="margin-top:0;"></h1>
+                <p id="modal-desc" style="color:#aaa; line-height:1.6;"></p>
+                <div id="modal-links"></div>
             </div>
         </div>
     </div>
 
     <div id="player-layer">
-        <button class="btn-back" onclick="cerrarPlayer()">← VOLVER</button>
-        <video id="main-video" controls autoplay style="width:100%; height:100%;"></video>
+        <button onclick="cerrarPlayer()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:15px 30px; border-radius:6px; font-weight:bold; cursor:pointer;">← VOLVER</button>
+        <video id="main-video" controls autoplay style="width:100%; max-height:100vh;"></video>
     </div>
 
     <script>
         const API_URL = "https://player-tv-a8f4.onrender.com";
-        let fullData = null;
 
-        // 1. CARGA INICIAL: Usar caché local si existe
         async function init() {
-            const cache = localStorage.getItem('catalog_cache');
-            if (cache) {
-                console.log("📦 Usando catálogo guardado...");
-                render(JSON.parse(cache));
+            const res = await fetch(`${API_URL}/api/catalogo`);
+            const data = await res.json();
+
+            const top = data.peliculas[0] || data.series[0];
+            if (top) {
+                document.getElementById('hero-title').innerText = top.titulo;
+                document.getElementById('hero-desc').innerText = top.sinopsis.substring(0, 150);
+                document.getElementById('hero').style.backgroundImage = `linear-gradient(transparent, #141414), url('${API_URL}${top.portada}')`;
             }
 
-            try {
-                const res = await fetch(`${API_URL}/api/catalogo`);
-                fullData = await res.json();
-                localStorage.setItem('catalog_cache', JSON.stringify(fullData));
-                render(fullData);
-                document.getElementById('user-status').innerText = "Catálogo Actualizado";
-            } catch (e) {
-                console.error(e);
-                document.getElementById('user-status').innerText = "Modo Offline (Caché)";
-            }
+            renderRow("PELÍCULAS", data.peliculas);
+            renderRow("SERIES", data.series);
+            renderRow("DEPORTES", data.deportes);
         }
 
-        function render(data) {
-            // Renderizar Filas Personales (Favoritos y Seguir Viendo)
-            renderUserRows(data);
-
-            const container = document.getElementById('catalog-container');
-            container.innerHTML = '';
-            const sections = [
-                { id: 'peliculas', label: 'PELÍCULAS' },
-                { id: 'series', label: 'SERIES' },
-                { id: 'deportes', label: 'DEPORTES' }
-            ];
-
-            sections.forEach(sec => {
-                const items = data[sec.id];
-                if (items && items.length > 0) {
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    row.innerHTML = `<div class="row-title">${sec.label}</div><div class="carousel"></div>`;
-                    const carousel = row.querySelector('.carousel');
-                    items.forEach(item => {
-                        const card = crearCard(item);
-                        carousel.appendChild(card);
-                    });
-                    container.appendChild(row);
-                }
+        function renderRow(title, items) {
+            if (!items.length) return;
+            const container = document.getElementById('catalog');
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
+            const carousel = row.querySelector('.carousel');
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `<img src="${API_URL}${item.portada}">`;
+                card.onclick = () => showDetail(item);
+                carousel.appendChild(card);
             });
-
-            // Hero
-            const first = data.peliculas[0] || data.series[0];
-            if (first) {
-                document.getElementById('hero-title').innerText = first.titulo;
-                document.getElementById('hero-desc').innerText = first.sinopsis;
-                document.getElementById('hero').style.backgroundImage = `url('${API_URL}${first.portada}')`;
-                const actions = document.getElementById('hero-actions');
-                actions.innerHTML = `<button class="btn-play" onclick='showDetail(${JSON.stringify(first)})'><i class="fa fa-info-circle"></i> Más Información</button>`;
-            }
-        }
-
-        function renderUserRows(data) {
-            const userContainer = document.getElementById('user-rows');
-            userContainer.innerHTML = '';
-
-            const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-            if (favs.length > 0) {
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.innerHTML = `<div class="row-title"><i class="fa fa-star" style="color:gold;"></i> MI LISTA</div><div class="carousel"></div>`;
-                const carousel = row.querySelector('.carousel');
-                favs.forEach(item => carousel.appendChild(crearCard(item)));
-                userContainer.appendChild(row);
-            }
-        }
-
-        function crearCard(item) {
-            const card = document.createElement('div');
-            card.className = 'card';
-            const img = item.portada ? API_URL + item.portada : 'https://via.placeholder.com/170x250/111/f5c518?text=TV';
-            card.innerHTML = `<img src="${img}"><div class="card-label">${item.titulo}</div>`;
-            card.onclick = () => showDetail(item);
-            return card;
+            container.appendChild(row);
         }
 
         function showDetail(item) {
             document.getElementById('modal-title').innerText = item.titulo;
             document.getElementById('modal-desc').innerText = item.sinopsis;
-            document.getElementById('modal-img').src = item.portada ? API_URL + item.portada : '';
+            document.getElementById('modal-img').src = API_URL + item.portada;
 
-            const linksContainer = document.getElementById('modal-links');
-            linksContainer.innerHTML = '';
-
+            const box = document.getElementById('modal-links');
+            box.innerHTML = '';
             item.links.forEach(l => {
-                const b = document.createElement('button');
-                b.className = 'btn-play';
-                b.innerHTML = `<i class="fa fa-play"></i> ${l.label}`;
-                b.onclick = () => play(`${API_URL}/api/stream/${l.id}`);
-                linksContainer.appendChild(b);
+                const streamUrl = `${API_URL}/api/stream/${l.id}`;
+                const div = document.createElement('div');
+                div.className = 'btn-play';
+                div.innerHTML = `<span>${l.label}</span>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="play('${streamUrl}')" style="background:none; border:none; cursor:pointer;">▶ WEB</button>
+                        <button class="btn-vlc" onclick="openVLC('${streamUrl}', '${item.titulo}')">VLC</button>
+                    </div>`;
+                box.appendChild(div);
             });
-
-            // Botón Favoritos
-            const favBtn = document.createElement('button');
-            favBtn.className = 'btn-fav';
-            const isFav = (JSON.parse(localStorage.getItem('favs') || '[]')).some(f => f.id === item.id);
-            favBtn.innerHTML = `<i class="fa ${isFav?'fa-check':'fa-plus'}"></i> ${isFav?'En mi lista':'Añadir a mi lista'}`;
-            favBtn.onclick = () => toggleFav(item);
-            linksContainer.appendChild(favBtn);
-
             document.getElementById('detail-modal').style.display = 'block';
         }
 
-        function toggleFav(item) {
-            let favs = JSON.parse(localStorage.getItem('favs') || '[]');
-            const index = favs.findIndex(f => f.id === item.id);
-            if (index > -1) favs.splice(index, 1);
-            else favs.push(item);
-            localStorage.setItem('favs', JSON.stringify(favs));
-            showDetail(item);
-            renderUserRows(fullData);
+        function openVLC(url, tit) {
+            window.location.href = `intent:${url}#Intent;type=video/*;package=org.videolan.vlc;S.title=${encodeURIComponent(tit)};end`;
         }
 
         function play(url) {

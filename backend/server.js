@@ -16,12 +16,10 @@ const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRet
 const CHANNEL_ID = "-1003924237464";
 const TOPICS = { PELICULAS: 2, SERIES: 4, DEPORTES: 6 };
 
-// CEREBRO DEL SERVIDOR: Catálogo siempre listo en memoria
 let globalCatalog = { peliculas: [], series: [], deportes: [] };
-const posterCache = new Map();
 
 async function syncTelegram() {
-    console.log("🔄 Sincronizando catálogo con Telegram...");
+    console.log("🔄 Sincronizando con Canal Privado...");
     try {
         const catalogo = { peliculas: [], series: {}, deportes: [] };
         const results = await Promise.all(Object.entries(TOPICS).map(async ([key, topicId]) => {
@@ -32,67 +30,65 @@ async function syncTelegram() {
         results.forEach(resObj => {
             resObj.msgs.forEach(m => {
                 if (!m.message && !m.media) return;
+
                 const text = m.message || "";
-                const title = text.split('\n')[0].trim();
+                const lines = text.split('\n');
+                const title = lines[0].trim();
                 const root = title.split(/(\s\d+[xX]\d+|\s[sS]\d+|\s[tT]\d+|\sTEMPORADA|\sCAPITULO)/i)[0].trim();
-                const sinopsis = text.split('\n').slice(1).filter(l => !l.includes('http')).join(' ').trim() || "Sin descripción.";
 
                 const item = {
                     id: m.id,
                     titulo: title,
-                    sinopsis: sinopsis,
+                    sinopsis: lines.slice(1).filter(l => !l.includes('t.me/')).join(' ').trim(),
                     portada: m.media ? `/api/poster/${m.id}` : null,
                     links: []
                 };
 
-                const matches = text.match(/https?:\/\/t\.me\/[^\s]+/g);
-                if (matches) matches.forEach((url, i) => item.links.push({ id: url.split('/').pop(), label: `OPCIÓN ${i + 1}` }));
+                // EXTRACCIÓN INTELIGENTE DE EPISODIOS
+                lines.forEach(line => {
+                    const linkMatch = line.match(/https?:\/\/t\.me\/(?:c\/)?[\d\w]+\/(\d+)\/(\d+)/) || line.match(/https?:\/\/t\.me\/(?:c\/)?[\d\w]+\/(\d+)/);
+                    if (linkMatch) {
+                        const msgId = linkMatch[linkMatch.length - 1];
+                        // El label es el texto antes del link
+                        let label = line.split('http')[0].replace(/[:\-]/g, '').trim();
+                        if (!label) label = `VER CONTENIDO`;
+                        item.links.push({ id: msgId, label: label });
+                    }
+                });
+
                 if (m.media && !item.links.length) item.links.push({ id: m.id, label: "REPRODUCIR" });
 
                 if (resObj.key === 'series') {
                     if (!catalogo.series[root]) catalogo.series[root] = { titulo: root, portada: item.portada, sinopsis: item.sinopsis, links: [] };
                     if (item.portada) catalogo.series[root].portada = item.portada;
-                    item.links.forEach(l => { l.label = item.titulo; catalogo.series[root].links.push(l); });
+                    item.links.forEach(l => catalogo.series[root].links.push(l));
                 } else {
                     catalogo[resObj.key].push(item);
                 }
             });
         });
         catalogo.series = Object.values(catalogo.series);
-        globalCatalog = catalogo; // Guardar en el cerebro
-        console.log("✅ Catálogo actualizado y listo en memoria");
-    } catch (e) { console.error("Error en sync:", e); }
+        globalCatalog = catalogo;
+    } catch (e) { console.error(e); }
 }
 
 (async () => {
     if (process.env.SESSION) {
         await client.connect();
         await syncTelegram();
-        // Sincronizar automáticamente cada 10 minutos
-        setInterval(syncTelegram, 10 * 60 * 1000);
+        setInterval(syncTelegram, 15 * 60 * 1000);
     }
 })();
 
-// RESPUESTA INSTANTÁNEA: No consulta a Telegram, responde desde la memoria
 app.get("/api/catalogo", (req, res) => res.json(globalCatalog));
 
 app.get("/api/poster/:id", async (req, res) => {
-    const msgId = parseInt(req.params.id);
-    if (posterCache.has(msgId)) return res.send(posterCache.get(msgId));
-
     try {
-        const msgs = await client.getMessages(CHANNEL_ID, { ids: [msgId] });
-        if (msgs.length && msgs[0].media) {
-            const buffer = await client.downloadMedia(msgs[0].media, { thumb: true });
-            if (buffer) {
-                res.setHeader('Content-Type', 'image/jpeg');
-                res.setHeader('Cache-Control', 'public, max-age=86400');
-                posterCache.set(msgId, buffer);
-                return res.send(buffer);
-            }
-        }
-        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=NO+IMAGE');
-    } catch (e) { res.status(500).send(e.message); }
+        const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
+        const buffer = await client.downloadMedia(msgs[0], { thumb: true });
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.send(buffer);
+    } catch (e) { res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=TV'); }
 });
 
 app.get("/api/stream/:id", async (req, res) => {
@@ -117,4 +113,4 @@ app.get("/api/stream/:id", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Motor Turbo V11 Online`));
+app.listen(PORT, () => console.log("🚀 Motor V12 Online"));
