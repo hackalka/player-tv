@@ -16,36 +16,40 @@ const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRet
 const CHANNEL_ID = "-1003749684388";
 const TOPICS = { PELICULAS: 3185, SERIES: 1663, DEPORTES: 10583 };
 
-// Caché de imágenes para velocidad extrema
 const posterCache = new Map();
 
 (async () => {
     if (process.env.SESSION) {
         await client.connect();
-        console.log("🚀 Motor de Alta Velocidad Activo");
+        console.log("✅ Motor de Streaming Pro v6 Activo");
     }
 })();
 
 function parseMessage(m) {
+    if (!m.message && !m.media) return null;
+
     const lines = m.message ? m.message.split('\n') : ["Sin título"];
     const titleLine = lines[0].trim();
     const links = [];
-    const urlRegex = /https?:\/\/t\.me\/[^\s]+/g;
-    const matches = m.message ? m.message.match(urlRegex) : [];
 
+    // Extraer links de Telegram del texto
+    const matches = m.message ? m.message.match(/https?:\/\/t\.me\/[^\s]+/g) : [];
     if (matches) {
-        matches.forEach((url, index) => {
+        matches.forEach((url, i) => {
             const parts = url.split('/');
-            const msgId = parts[parts.length - 1];
-            links.push({ id: msgId, label: `OPCIÓN ${index + 1}` });
+            links.push({ id: parts[parts.length - 1], label: `OPCIÓN ${i + 1}` });
         });
     }
 
-    if (m.media && !links.length) links.push({ id: m.id, label: "REPRODUCIR" });
+    // Si el mensaje es un video y no tiene links, él mismo es el video
+    if (m.media && (m.media.document || m.media.video) && !links.length) {
+        links.push({ id: m.id, label: "REPRODUCIR" });
+    }
 
     const sinopsis = lines.slice(1).filter(l => !l.includes('t.me/')).join(' ').trim();
-    const hasPhoto = m.media && (m.media.photo || (m.media.document && m.media.document.thumbs));
-    const posterUrl = hasPhoto ? `/api/poster/${m.id}` : null;
+
+    // Si tiene media, generamos URL de poster
+    const posterUrl = m.media ? `/api/poster/${m.id}` : null;
 
     return { id: m.id, titulo: titleLine, sinopsis: sinopsis || "Disfruta del contenido.", portada: posterUrl, links };
 }
@@ -53,61 +57,56 @@ function parseMessage(m) {
 app.get("/api/catalogo", async (req, res) => {
     try {
         const catalogo = { peliculas: [], series: [], deportes: [] };
-
-        // CARGA EN PARALELO (Promise.all): Mucho más rápido
-        await Promise.all(Object.entries(TOPICS).map(async ([key, topicId]) => {
-            const messages = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 50 });
-            messages.forEach(m => {
-                if (!m.message && !m.media) return;
-                const data = parseMessage(m);
-                if (data.portada || data.links.length > 0) {
-                    catalogo[key.toLowerCase()].push(data);
-                }
-            });
+        const results = await Promise.all(Object.entries(TOPICS).map(async ([key, topicId]) => {
+            const msgs = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 60 });
+            return { key: key.toLowerCase(), data: msgs.map(m => parseMessage(m)).filter(m => m !== null) };
         }));
 
+        results.forEach(res => { catalogo[res.key] = res.data; });
         res.json(catalogo);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get("/api/poster/:id", async (req, res) => {
-    const msgId = req.params.id;
+    const msgId = parseInt(req.params.id);
     if (posterCache.has(msgId)) return res.send(posterCache.get(msgId));
 
     try {
-        const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(msgId)] });
+        const msgs = await client.getMessages(CHANNEL_ID, { ids: [msgId] });
         if (msgs.length && msgs[0].media) {
+            // Descarga optimizada: intentamos miniatura primero para velocidad
             const buffer = await client.downloadMedia(msgs[0].media, { thumb: true });
             if (buffer) {
                 res.setHeader('Content-Type', 'image/jpeg');
-                posterCache.set(msgId, buffer); // Guardar en caché
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                posterCache.set(msgId, buffer);
                 return res.send(buffer);
             }
         }
-        res.redirect('https://via.placeholder.com/200x300?text=TV');
-    } catch (e) { res.status(500).send(e.message); }
+        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=PLAYER+TV');
+    } catch (e) {
+        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=ERROR');
+    }
 });
 
 app.get("/api/stream/:id", async (req, res) => {
     try {
-        const messages = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
-        if (!messages.length || !messages[0].media) return res.status(404).send("No video");
+        const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
+        if (!msgs.length || !msgs[0].media) return res.status(404).send("No media");
 
-        const media = messages[0].media;
-        const size = media.document ? media.document.size : (media.video ? media.video.size : 0);
+        const media = msgs[0].media;
+        const size = media.document ? media.document.size : (media.video ? media.video.size : (media.document?.size || 0));
 
-        // SOPORTE DE RANGO (Range): Permite saltar en el video y carga instantánea
         const range = req.headers.range;
         if (range && size) {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
-            const chunksize = (end - start) + 1;
 
             res.writeHead(206, {
                 'Content-Range': `bytes ${start}-${end}/${size}`,
                 'Accept-Ranges': 'bytes',
-                'Content-Length': chunksize,
+                'Content-Length': (end - start) + 1,
                 'Content-Type': 'video/mp4',
             });
 
@@ -115,15 +114,15 @@ app.get("/api/stream/:id", async (req, res) => {
                 outputFile: res,
                 start: BigInt(start),
                 end: BigInt(end),
-                workers: 4
+                workers: 8 // Aumentamos workers para máxima velocidad
             });
         } else {
             res.setHeader('Content-Type', 'video/mp4');
             res.setHeader('Content-Length', size);
-            await client.downloadMedia(media, { outputFile: res, workers: 4 });
+            await client.downloadMedia(media, { outputFile: res, workers: 8 });
         }
     } catch (e) { res.status(500).send(e.message); }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Motor Turbo V5 Listo`));
+app.listen(PORT, () => console.log(`🚀 Motor v6 Pro Online`));
