@@ -2,48 +2,31 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Universal Edition</title>
+    <title>PLAYER TV - Universal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --red: #E50914; --bg: #000000; --gold: #f5c518; }
-        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', Helvetica, sans-serif; margin: 0; overflow-x: hidden; }
+        :root { --red: #E50914; --bg: #000; --gold: #f5c518; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; overflow-x: hidden; }
         .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; }
-        .logo { color: var(--red); font-size: 28px; font-weight: 900; text-decoration: none; letter-spacing: 2px; }
-
-        .hero { height: 80vh; position: relative; display: flex; align-items: flex-end; padding: 0 5% 80px; background-size: cover; background-position: center; transition: background 0.5s ease; }
-        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg) 0%, transparent 60%), linear-gradient(to right, rgba(0,0,0,0.8) 0%, transparent 100%); }
-        .hero-content { position: relative; z-index: 10; max-width: 700px; }
-        .hero-title { font-size: 4rem; margin: 0; font-weight: 900; }
-        .hero-desc { font-size: 1.1rem; color: #ccc; margin: 20px 0; line-height: 1.4; max-height: 4.2em; overflow: hidden; }
-
-        .row { margin: 40px 0; padding-left: 5%; }
-        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; color: #fff; }
+        .logo { color: var(--red); font-size: 28px; font-weight: 900; text-decoration: none; }
+        .hero { height: 75vh; position: relative; display: flex; align-items: flex-end; padding: 0 5% 80px; background-size: cover; background-position: center; }
+        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg), transparent 70%), linear-gradient(to right, rgba(0,0,0,0.7), transparent); }
+        .hero-content { position: relative; z-index: 10; max-width: 600px; }
+        .row { margin: 30px 0; padding-left: 5%; }
+        .row-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; }
         .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 10px 0; }
         .carousel::-webkit-scrollbar { display: none; }
-
-        .card { flex: 0 0 170px; height: 250px; background: #111; border-radius: 6px; transition: transform 0.3s, outline 0.2s; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #222; }
-        .card:hover { transform: scale(1.1); z-index: 10; outline: 3px solid white; }
+        .card { flex: 0 0 160px; height: 240px; background: #111; border-radius: 6px; cursor: pointer; border: 1px solid #222; position: relative; overflow: hidden; transition: transform 0.3s; }
+        .card:hover { transform: scale(1.08); border-color: #fff; }
         .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: linear-gradient(to top, #000, transparent); font-size: 11px; text-align: center; }
-
-        /* FICHA DETALLE */
+        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.8); font-size: 11px; text-align: center; }
         .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.98); z-index:50000; padding: 60px 5%; overflow-y: auto; }
-        .modal-grid { display: flex; gap: 50px; flex-wrap: wrap; justify-content: center; }
-        .modal-poster { width: 300px; height: 450px; border-radius: 12px; object-fit: cover; border: 1px solid #333; }
-        .modal-info { flex: 1; min-width: 320px; max-width: 800px; }
-
-        .btn-play { background: white; color: black; border: none; padding: 15px 40px; border-radius: 6px; font-weight: 900; cursor: pointer; display: flex; align-items: center; gap: 12px; margin: 15px 0; font-size: 1.1rem; width: fit-content; }
-        .btn-external { background: var(--gold); color: black; border: none; padding: 15px 30px; border-radius: 6px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 10px 0; width: fit-content; }
-        .btn-close { position: absolute; top: 30px; right: 30px; background: rgba(255,255,255,0.1); border: none; color: white; width: 50px; height: 50px; border-radius: 50%; font-size: 25px; cursor: pointer; }
-
+        .modal-grid { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+        .modal-poster { width: 250px; height: 380px; border-radius: 12px; object-fit: cover; border: 1px solid #333; }
+        .btn-play { background: white; color: black; border: none; padding: 15px 40px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 1rem; }
+        .btn-ext { background: var(--gold); color: black; border: none; padding: 15px 30px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px; margin: 10px 0; }
         #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
-        #main-video { width: 100%; max-height: 100vh; background: #000; }
-
-        @media (max-width: 768px) {
-            .hero-title { font-size: 2.5rem; }
-            .modal-poster { width: 200px; height: 300px; }
-        }
     </style>
 </head>
 <body>
@@ -53,31 +36,29 @@
     <div id="hero" class="hero">
         <div class="hero-overlay"></div>
         <div class="hero-content">
-            <h1 id="hero-title" class="hero-title">Sincronizando...</h1>
-            <p id="hero-desc" class="hero-desc"></p>
+            <h1 id="hero-title" style="font-size: 3rem; margin: 0;">Iniciando...</h1>
+            <p id="hero-desc" style="color:#ccc; margin: 20px 0;"></p>
             <div id="hero-actions"></div>
         </div>
     </div>
 
     <div id="catalog"></div>
 
-    <!-- MODAL DETALLE -->
     <div id="detail-modal" class="modal">
-        <button class="btn-close" onclick="cerrarModal()">✕</button>
+        <button onclick="cerrarModal()" style="position:absolute; top:30px; right:30px; background:none; border:none; color:white; font-size:30px; cursor:pointer;">✕</button>
         <div class="modal-grid">
-            <img id="modal-img" class="modal-poster" src="">
-            <div class="modal-info">
-                <h1 id="modal-title" style="font-size: 3.5rem; margin-top: 0; color: #fff;"></h1>
-                <p id="modal-desc" style="font-size: 1.3rem; color: #aaa; margin-bottom: 40px; line-height: 1.6;"></p>
+            <img id="modal-img" class="modal-poster">
+            <div class="modal-info" style="flex:1; min-width:300px;">
+                <h1 id="modal-title" style="margin-top:0;"></h1>
+                <p id="modal-desc" style="color:#aaa; line-height:1.6;"></p>
                 <div id="modal-links"></div>
             </div>
         </div>
     </div>
 
-    <!-- REPRODUCTOR -->
     <div id="player-layer">
-        <button onclick="cerrarPlayer()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:15px 30px; border-radius:6px; font-weight:bold; cursor:pointer; z-index:10;">← VOLVER</button>
-        <video id="main-video" controls autoplay></video>
+        <button onclick="cerrarPlayer()" style="position:absolute; top:20px; left:20px; background:var(--red); color:white; border:none; padding:12px 25px; border-radius:8px; font-weight:bold; cursor:pointer;">← VOLVER</button>
+        <video id="main-video" controls autoplay style="width:100%; max-height:100vh;"></video>
     </div>
 
     <script>
@@ -85,21 +66,19 @@
 
         async function init() {
             try {
-                document.getElementById('catalog').innerHTML = '<div style="text-align:center; padding:100px; color:#f5c518;"><i class="fa fa-circle-notch fa-spin"></i> CONECTANDO CON TELEGRAM...</div>';
                 const res = await fetch(`${API_URL}/api/catalogo`);
                 const data = await res.json();
-                document.getElementById('catalog').innerHTML = '';
 
-                const first = data.peliculas[0] || data.series[0];
-                if (first) {
-                    document.getElementById('hero-title').innerText = first.titulo;
-                    document.getElementById('hero-desc').innerText = first.sinopsis;
-                    document.getElementById('hero').style.backgroundImage = `url('${API_URL}${first.portada}')`;
-                    renderButtons(document.getElementById('hero-actions'), first.links, first.titulo);
+                const top = data.peliculas[0] || data.series[0];
+                if (top) {
+                    document.getElementById('hero-title').innerText = top.titulo;
+                    document.getElementById('hero-desc').innerText = top.sinopsis.substring(0, 150) + "...";
+                    document.getElementById('hero').style.backgroundImage = `url('${API_URL}${top.portada}')`;
+                    renderButtons(document.getElementById('hero-actions'), top.links, top.titulo);
                 }
 
                 renderRow("PELÍCULAS", data.peliculas);
-                renderRow("SERIES", data.series);
+                renderRow("SERIES UNIFICADAS", data.series);
                 renderRow("DEPORTES", data.deportes);
             } catch (e) { console.error(e); }
         }
@@ -111,11 +90,10 @@
             row.className = 'row';
             row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
             const carousel = row.querySelector('.carousel');
-
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'card';
-                const img = item.portada ? API_URL + item.portada : 'https://via.placeholder.com/170x250/111/f5c518?text=NO+COVER';
+                const img = item.portada ? API_URL + item.portada : 'https://via.placeholder.com/160x240/111/f5c518?text=NO+IMAGE';
                 card.innerHTML = `<img src="${img}"><div class="card-label">${item.titulo}</div>`;
                 card.onclick = () => showDetail(item);
                 carousel.appendChild(card);
@@ -126,48 +104,41 @@
         function showDetail(item) {
             document.getElementById('modal-title').innerText = item.titulo;
             document.getElementById('modal-desc').innerText = item.sinopsis;
-            document.getElementById('modal-img').src = item.portada ? API_URL + item.portada : 'https://via.placeholder.com/300x450/111/f5c518?text=TV';
+            document.getElementById('modal-img').src = item.portada ? API_URL + item.portada : '';
             renderButtons(document.getElementById('modal-links'), item.links, item.titulo);
             document.getElementById('detail-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
         }
 
         function renderButtons(container, links, titulo) {
             container.innerHTML = '';
             links.forEach(l => {
-                // Botón Nativo (Si es compatible)
-                if (l.isBrowserNative || l.type === 'direct') {
+                const streamUrl = (l.type === 'tg_file' || l.type === 'tg_ref') ? `${API_URL}/api/stream/${l.id}` : l.url;
+
+                if (l.isNative) {
                     const b = document.createElement('button');
                     b.className = 'btn-play';
-                    b.innerHTML = `<i class="fa fa-play"></i> REPRODUCIR AHORA`;
-                    b.onclick = (e) => { e.stopPropagation(); play(l.id || l.url, l.type); };
+                    b.innerHTML = `<i class="fa fa-play"></i> REPRODUCIR`;
+                    b.onclick = () => play(streamUrl);
                     container.appendChild(b);
                 }
 
-                // Botón Reproductor Externo (Para MKV, AVI, etc)
                 const ext = document.createElement('button');
-                ext.className = 'btn-external';
-                const streamUrl = l.type === 'tg_file' ? `${API_URL}/api/stream/${l.id}` : (l.url || '');
-                ext.innerHTML = `<i class="fa fa-external-link-alt"></i> ABRIR EN VLC / EXTERNO`;
-                ext.onclick = (e) => {
-                    e.stopPropagation();
-                    if (l.type === 'acestream') window.location.href = l.url;
-                    else window.open(`vlc://${streamUrl}`, '_blank');
+                ext.className = 'btn-ext';
+                ext.innerHTML = `<i class="fa fa-external-link-alt"></i> REPRODUCTOR EXTERNO`;
+                ext.onclick = () => {
+                    const intent = `intent:${streamUrl}#Intent;type=video/*;S.title=${encodeURIComponent(titulo)};end`;
+                    window.location.href = intent;
                 };
                 container.appendChild(ext);
             });
         }
 
-        function play(source, type) {
-            const video = document.getElementById('main-video');
+        function play(url) {
             document.getElementById('player-layer').style.display = 'flex';
-            video.src = type === 'tg_file' || type === 'tg_ref' ? `${API_URL}/api/stream/${source}` : source;
+            document.getElementById('main-video').src = url;
         }
 
-        function cerrarModal() {
-            document.getElementById('detail-modal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
+        function cerrarModal() { document.getElementById('detail-modal').style.display = 'none'; }
         function cerrarPlayer() {
             const v = document.getElementById('main-video');
             v.pause(); v.src = "";
