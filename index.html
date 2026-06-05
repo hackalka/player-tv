@@ -6,54 +6,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --red: #E50914; --bg: #141414; --gold: #f5c518; }
-        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; overflow-x: hidden; }
+        :root { --accent: #f5c518; --bg: #0a0a0a; --surface: #1a1a1a; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; overflow-x: hidden; }
 
-        /* Cabecera */
-        .header { position: fixed; top: 0; width: 100%; padding: 20px 4%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 1000; display: flex; align-items: center; box-sizing: border-box; }
-        .logo { color: var(--red); font-size: 32px; font-weight: 900; letter-spacing: 1px; text-decoration: none; }
+        .header { position: fixed; top: 0; width: 100%; padding: 20px 5%; background: rgba(0,0,0,0.9); z-index: 1000; border-bottom: 1px solid #222; }
+        .logo { color: var(--accent); font-size: 26px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
 
-        /* Secciones de Catálogo */
         .catalog { padding-top: 100px; }
-        .row { margin: 2vw 0; padding-left: 4%; }
-        .row-title { font-size: 1.4vw; font-weight: bold; margin-bottom: 10px; color: #e5e5e5; }
-        .carousel { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; padding: 15px 0; }
-        .carousel::-webkit-scrollbar { display: none; }
+        .row { margin: 30px 0; padding-left: 5%; }
+        .row-title { font-size: 1.2rem; font-weight: 800; margin-bottom: 15px; color: #ddd; letter-spacing: 1px; }
+        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 10px 0; }
 
-        .card { flex: 0 0 180px; height: 260px; background: #222; border-radius: 4px; transition: transform 0.3s; cursor: pointer; position: relative; border: 1px solid #333; }
-        .card:hover { transform: scale(1.1); z-index: 10; border-color: #fff; }
-        .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-        .card-title { position: absolute; bottom: 0; width: 100%; padding: 10px; background: linear-gradient(to top, #000, transparent); font-size: 11px; text-align: center; }
+        .card { flex: 0 0 160px; height: 240px; background: var(--surface); border-radius: 8px; cursor: pointer; border: 1px solid #333; position: relative; overflow: hidden; transition: 0.3s; }
+        .card:hover { transform: scale(1.05); border-color: var(--accent); }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card-title { position: absolute; bottom: 0; width: 100%; padding: 10px; background: linear-gradient(to top, #000, transparent); font-size: 10px; text-align: center; }
 
-        /* MODAL NETFLIX STYLE */
-        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50000; padding: 4% 10%; overflow-y: auto; }
-        .modal-content { display: flex; gap: 40px; flex-wrap: wrap; position: relative; background: #181818; padding: 40px; border-radius: 12px; border: 1px solid #333; }
-        .modal-poster { width: 280px; height: 420px; border-radius: 8px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:50000; padding: 5%; overflow-y: auto; }
+        .modal-content { max-width: 900px; margin: 0 auto; display: flex; gap: 40px; flex-wrap: wrap; }
+        .modal-poster { width: 250px; height: 380px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.5); border: 1px solid #333; }
         .modal-info { flex: 1; min-width: 300px; }
-        .modal-title { font-size: 3.5rem; margin: 0 0 10px; font-weight: 800; }
-        .modal-synopsis { font-size: 1.2rem; color: #ccc; line-height: 1.5; margin-bottom: 30px; }
 
-        /* Lista de Episodios / Links */
-        .ep-list { margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; }
-        .ep-item { background: #262626; padding: 15px 25px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; border: 1px solid transparent; transition: 0.2s; }
-        .ep-item:hover { background: #333; border-color: #555; }
-        .ep-name { font-weight: bold; font-size: 14px; }
-        .ep-btns { display: flex; gap: 10px; }
-        .btn-web { background: white; color: black; border: none; padding: 8px 20px; border-radius: 4px; font-weight: 800; cursor: pointer; }
-        .btn-vlc { background: var(--gold); color: black; border: none; padding: 8px 20px; border-radius: 4px; font-weight: 800; cursor: pointer; }
-
-        .btn-close { position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 30px; cursor: pointer; opacity: 0.5; }
-        .btn-close:hover { opacity: 1; }
+        .btn-play { background: white; color: black; border: none; padding: 15px 30px; border-radius: 6px; font-weight: 800; cursor: pointer; width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .btn-open-with { background: var(--accent); color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: 900; cursor: pointer; font-size: 11px; }
 
         #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
-
-        @media (max-width: 768px) {
-            .modal-content { padding: 20px; }
-            .modal-title { font-size: 2rem; }
-            .modal-poster { width: 100%; height: auto; }
-            .ep-item { flex-direction: column; gap: 10px; align-items: flex-start; }
-            .ep-btns { width: 100%; justify-content: space-between; }
-        }
+        .btn-back { position: absolute; top: 20px; left: 20px; background: #f44336; color: white; border: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -61,30 +39,24 @@
     <header class="header"><a href="#" class="logo">PLAYER TV</a></header>
 
     <div id="catalog" class="catalog">
-        <div style="text-align:center; padding:100px; color:#f5c518; font-size:20px;"><i class="fa fa-spinner fa-spin"></i> CARGANDO NETFLIX PRO...</div>
+        <div style="text-align:center; padding:100px; color:var(--accent);">Sincronizando con Telegram...</div>
     </div>
 
-    <!-- MODAL DETALLE -->
     <div id="detail-modal" class="modal">
         <div class="modal-content">
-            <button class="btn-close" onclick="cerrarModal()">✕</button>
+            <button onclick="cerrarModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:white; font-size:30px; cursor:pointer;">✕</button>
             <img id="modal-img" class="modal-poster">
             <div class="modal-info">
-                <h1 id="modal-title" class="modal-title"></h1>
-                <p id="modal-desc" class="modal-synopsis"></p>
-
-                <div class="ep-list">
-                    <h3 style="margin-bottom: 20px;">EPISODIOS / ENLACES</h3>
-                    <div id="modal-links"></div>
-                </div>
+                <h1 id="modal-title" style="margin-top:0;"></h1>
+                <p id="modal-desc" style="color:#aaa; line-height:1.6; margin-bottom:30px;"></p>
+                <div id="modal-links"></div>
             </div>
         </div>
     </div>
 
-    <!-- REPRODUCTOR -->
     <div id="player-layer">
-        <button onclick="cerrarPlayer()" style="position:absolute; top:30px; left:30px; background:var(--red); color:white; border:none; padding:12px 25px; border-radius:4px; font-weight:bold; cursor:pointer; z-index:10;">← VOLVER</button>
-        <video id="main-video" controls autoplay style="width:100%; height:100%;"></video>
+        <button class="btn-back" onclick="cerrarPlayer()">VOLVER</button>
+        <video id="main-video" controls autoplay style="width:100%; max-height:100vh;"></video>
     </div>
 
     <script>
@@ -101,7 +73,6 @@
         function renderCatalog(data) {
             const container = document.getElementById('catalog');
             container.innerHTML = '';
-
             const sections = [
                 { id: 'peliculas', label: 'PELÍCULAS' },
                 { id: 'series', label: 'SERIES' },
@@ -115,7 +86,6 @@
                     row.className = 'row';
                     row.innerHTML = `<div class="row-title">${sec.label}</div><div class="carousel"></div>`;
                     const carousel = row.querySelector('.carousel');
-
                     items.forEach(item => {
                         const card = document.createElement('div');
                         card.className = 'card';
@@ -130,27 +100,29 @@
 
         function showDetail(item) {
             document.getElementById('modal-title').innerText = item.titulo;
-            document.getElementById('modal-desc').innerText = item.sinopsis || "Sin descripción.";
+            document.getElementById('modal-desc').innerText = item.sinopsis;
             document.getElementById('modal-img').src = API_URL + item.portada;
 
             const box = document.getElementById('modal-links');
             box.innerHTML = '';
-
             item.links.forEach(l => {
                 const streamUrl = `${API_URL}/api/stream/${l.id}`;
                 const div = document.createElement('div');
-                div.className = 'ep-item';
-                div.innerHTML = `
-                    <span class="ep-name">${l.label}</span>
-                    <div class="ep-btns">
-                        <button class="btn-web" onclick="play('${streamUrl}')">▶ REPRODUCIR</button>
-                        <button class="btn-vlc" onclick="vlc('${streamUrl}')">VLC / EXTERNO</button>
+                div.className = 'btn-play';
+                div.innerHTML = `<span>${l.label}</span>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="play('${streamUrl}')" style="background:none; border:none; color:blue; font-weight:bold; cursor:pointer;">REPRODUCIR</button>
+                        <button class="btn-open-with" onclick="openWith('${streamUrl}', '${item.titulo}')">ABRIR CON...</button>
                     </div>`;
                 box.appendChild(div);
             });
-
             document.getElementById('detail-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
+        }
+
+        function openWith(url, title) {
+            // Intent universal de Android para abrir el diálogo "¿Con qué aplicación?"
+            const intent = `intent:${url}#Intent;type=video/*;S.title=${encodeURIComponent(title)};end`;
+            window.location.href = intent;
         }
 
         function play(url) {
@@ -158,19 +130,8 @@
             document.getElementById('main-video').src = url;
         }
 
-        function vlc(url) {
-            window.location.href = `intent:${url}#Intent;type=video/*;package=org.videolan.vlc;S.title=Reproduciendo;end`;
-        }
-
-        function cerrarModal() {
-            document.getElementById('detail-modal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        function cerrarPlayer() {
-            document.getElementById('main-video').pause();
-            document.getElementById('player-layer').style.display = 'none';
-        }
+        function cerrarModal() { document.getElementById('detail-modal').style.display = 'none'; }
+        function cerrarPlayer() { document.getElementById('main-video').pause(); document.getElementById('player-layer').style.display = 'none'; }
 
         init();
     </script>
