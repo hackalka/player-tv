@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generador de Sesión - PLAYER TV</title>
+
+    <!-- 1. BASE DE SEGURIDAD (Buffer) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
+    <script>
+        window.Buffer = window.buffer.Buffer;
+        window.process = { env: {} };
+    </script>
+
+    <!-- 2. MOTOR TELEGRAM -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #111; border: 2px solid #f5c518; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; width: 90%; }
+        input { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 15px; background: #f5c518; border: none; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 10px; color: #000; }
+        #output { background: #000; padding: 15px; border: 1px dashed #555; margin-top: 20px; word-break: break-all; font-family: monospace; display: none; color: #22c55e; font-size: 12px; }
+        #status-msg { color: #888; font-size: 14px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2 style="color: #f5c518; margin-top:0;">LOGIN TELEGRAM</h2>
+        <p id="status-msg">Introduce tu teléfono para recibir el código</p>
+
+        <input type="text" id="phone" placeholder="+34 600 000 000">
+        <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
+        <input type="password" id="password" placeholder="Contraseña 2FA (si tienes)" style="display:none;">
+
+        <button id="btn-main" onclick="handleAction()">ENVIAR TELÉFONO</button>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const apiId = 8952741;
+        const apiHash = "693fb2da124662dad85b2b337c53a386";
+        let client = null;
+        let step = 'phone';
+        let resolver = null;
+
+        async function init() {
+            if (!window.telegram || !window.Buffer) {
+                setTimeout(init, 500);
+                return;
+            }
+            const { TelegramClient } = window.telegram;
+            const { StringSession } = window.telegram.sessions;
+            client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
+            console.log("✅ Motor listo");
+        }
+
+        async function handleAction() {
+            const btn = document.getElementById('btn-main');
+            const output = document.getElementById('output');
+            const status = document.getElementById('status-msg');
+
+            if (step === 'phone') {
+                const phone = document.getElementById('phone').value;
+                if (!phone) return alert("Pon tu teléfono");
+
+                btn.innerText = "CONECTANDO...";
+                btn.disabled = true;
+
+                try {
+                    await client.start({
+                        phoneNumber: async () => phone,
+                        phoneCode: async () => {
+                            step = 'code';
+                            document.getElementById('code').style.display = 'block';
+                            document.getElementById('phone').style.display = 'none';
+                            btn.innerText = "VERIFICAR CÓDIGO";
+                            btn.disabled = false;
+                            status.innerText = "Introduce el código recibido en Telegram";
+                            return new Promise(r => resolver = r);
+                        },
+                        password: async () => {
+                            document.getElementById('password').style.display = 'block';
+                            document.getElementById('code').style.display = 'none';
+                            btn.innerText = "ENTRAR";
+                            btn.disabled = false;
+                            status.innerText = "Introduce tu contraseña 2FA";
+                            return new Promise(r => resolver = r);
+                        },
+                        onError: (err) => {
+                            alert("Error: " + err.message);
+                            location.reload();
+                        }
+                    });
+
+                    output.innerText = client.session.save();
+                    output.style.display = 'block';
+                    btn.style.display = 'none';
+                    status.style.color = "#f5c518";
+                    status.innerText = "✅ COPIA ESTE CÓDIGO Y PÉGALO EN RENDER (SESSION)";
+                    document.querySelector('h2').innerText = "¡SESIÓN LISTA!";
+                } catch (e) {
+                    alert("Error crítico: " + e.message);
+                    location.reload();
+                }
+            } else {
+                const val = step === 'code' ? document.getElementById('code').value : document.getElementById('password').value;
+                if (resolver) resolver(val);
+            }
+        }
+        init();
+    </script>
+</body>
+</html>
