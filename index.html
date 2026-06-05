@@ -76,8 +76,10 @@
 
         async function init() {
             try {
+                document.getElementById('catalog').innerHTML = '<div style="text-align:center; padding:100px; color:#f5c518; font-size:20px;"><i class="fa fa-circle-notch fa-spin"></i> PREPARANDO CATÁLOGO...</div>';
                 const res = await fetch(`${API_URL}/api/catalogo`);
                 const data = await res.json();
+                document.getElementById('catalog').innerHTML = '';
 
                 // Hero dinámico
                 const top = data.peliculas[0] || data.series[0];
