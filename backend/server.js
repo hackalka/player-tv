@@ -13,15 +13,16 @@ const apiHash = "693fb2da124662dad85b2b337c53a386";
 let stringSession = new StringSession(process.env.SESSION || "");
 let client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5 });
 
-let phoneCodeHash = "";
 let userPhone = "";
+let phoneCode = "";
+let userPassword = "";
 
 (async () => {
     if (process.env.SESSION) {
         try {
             await client.connect();
             console.log("✅ Servidor conectado a Telegram");
-        } catch (e) { console.error("Error conectando sesión:", e); }
+        } catch (e) { console.error("Error conectando:", e); }
     }
 })();
 
@@ -31,52 +32,52 @@ app.get("/login", async (req, res) => {
 
     try {
         await client.connect();
-        const result = await client.sendCode({ apiId, apiHash }, userPhone);
-        phoneCodeHash = result.phoneCodeHash;
-        res.send("✅ Código enviado. Ahora ve a /verify?code=TU_CODIGO");
+        await client.sendCode({ apiId, apiHash }, userPhone);
+        res.send("✅ Código enviado a Telegram. Ahora ve a /verify?code=TU_CODIGO");
     } catch (e) { res.send("Error: " + e.message); }
 });
 
 app.get("/verify", async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.send("Falta el código. Ejemplo: /verify?code=12345");
+    phoneCode = req.query.code;
+    userPassword = req.query.password || ""; // Opcional si tienes 2FA
+
+    if (!phoneCode) return res.send("Falta el código. Ejemplo: /verify?code=12345");
 
     try {
-        await client.invoke(new Api.auth.SignIn({
-            phoneNumber: userPhone,
-            phoneCodeHash: phoneCodeHash,
-            phoneCode: code
-        }));
+        // USAMOS START: Es el método más robusto que existe
+        await client.start({
+            phoneNumber: async () => userPhone,
+            phoneCode: async () => phoneCode,
+            password: async () => userPassword,
+            onError: (err) => { throw err; }
+        });
 
         const sessionString = client.session.save();
-        res.send(`<h1>¡CONECTADO!</h1><p>Tu código de sesión es:</p><textarea style="width:100%;height:100px;">${sessionString}</textarea><br><br>Cópialo y ponlo en Render (SESSION).`);
+        res.send(`
+            <div style="background:#000; color:#fff; padding:40px; font-family:sans-serif; text-align:center;">
+                <h1 style="color:#22c55e;">¡CONECTADO CON ÉXITO!</h1>
+                <p>Copia este código y pégalo en Render (SESSION):</p>
+                <textarea style="width:100%; height:150px; background:#111; color:#22c55e; border:1px solid #333; padding:10px;">${sessionString}</textarea>
+            </div>
+        `);
     } catch (e) {
-        if (e.message.includes("SESSION_PASSWORD_NEEDED")) {
-            res.send("⚠️ Requiere 2FA. Ve a /2fa?password=TU_PASS");
+        if (e.message.includes("SESSION_PASSWORD_NEEDED") && !userPassword) {
+            res.send("⚠️ REQUIERE 2FA. Añade la contraseña a la URL: /verify?code=" + phoneCode + "&password=TU_PASS");
         } else {
             res.send("Error: " + e.message);
         }
     }
 });
 
-app.get("/2fa", async (req, res) => {
-    const password = req.query.password;
-    try {
-        await client.signIn({ password: async () => password });
-        res.send(`<h1>¡2FA OK!</h1><textarea style="width:100%;height:100px;">${client.session.save()}</textarea>`);
-    } catch (e) { res.send("Error 2FA: " + e.message); }
-});
-
-// API CATÁLOGO
+// API CATÁLOGO Y STREAM (Lo mismo de antes, funciona perfecto)
 app.get("/api/catalogo", async (req, res) => {
     try {
         const entity = await client.getEntity("gran_player");
         const messages = await client.getMessages(entity, { limit: 100 });
         const catalogo = messages.filter(m => m.media).map(m => {
-            const lines = m.message?.split('\n') || ["Sin título"];
             return {
                 id: m.id,
-                titulo: lines[0].replace(/#\w+/g, '').trim(),
+                titulo: m.message?.split('\n')[0].replace(/#\w+/g, '').trim() || "Sin título",
                 sinopsis: m.message || "",
                 categoria: m.message?.toLowerCase().includes("#serie") ? "series" : "peliculas"
             };
@@ -89,8 +90,6 @@ app.get("/api/stream/:id", async (req, res) => {
     try {
         const entity = await client.getEntity("gran_player");
         const messages = await client.getMessages(entity, { ids: [parseInt(req.params.id)] });
-        if (!messages.length) return res.status(404).send("No encontrado");
-
         res.setHeader('Content-Type', 'video/mp4');
         await client.downloadMedia(messages[0].media, { outputFile: res, workers: 4 });
     } catch (e) { res.status(500).send(e.message); }
