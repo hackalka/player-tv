@@ -21,37 +21,56 @@ const posterCache = new Map();
 (async () => {
     if (process.env.SESSION) {
         await client.connect();
-        console.log("✅ Motor de Streaming Pro v6 Activo");
+        console.log("🚀 Motor Universal Pro V7 Online");
     }
 })();
 
 function parseMessage(m) {
     if (!m.message && !m.media) return null;
 
-    const lines = m.message ? m.message.split('\n') : ["Sin título"];
+    const texto = m.message || "";
+    const lines = texto.split('\n');
     const titleLine = lines[0].trim();
     const links = [];
 
-    // Extraer links de Telegram del texto
-    const matches = m.message ? m.message.match(/https?:\/\/t\.me\/[^\s]+/g) : [];
+    // 1. Buscar enlaces Acestream
+    const aceMatch = texto.match(/acestream:\/\/[a-f0-9]{40}/i);
+    if (aceMatch) {
+        links.push({ url: aceMatch[0], label: "ACESTREAM", type: 'acestream' });
+    }
+
+    // 2. Buscar enlaces de Telegram o HTTP directos
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    const matches = texto.match(urlRegex);
     if (matches) {
         matches.forEach((url, i) => {
-            const parts = url.split('/');
-            links.push({ id: parts[parts.length - 1], label: `OPCIÓN ${i + 1}` });
+            if (url.includes('t.me/')) {
+                const parts = url.split('/');
+                links.push({ id: parts[parts.length - 1], label: `LINK TELEGRAM ${i + 1}`, type: 'tg_ref' });
+            } else {
+                links.push({ url: url, label: `LINK WEB ${i + 1}`, type: 'direct' });
+            }
         });
     }
 
-    // Si el mensaje es un video y no tiene links, él mismo es el video
-    if (m.media && (m.media.document || m.media.video) && !links.length) {
-        links.push({ id: m.id, label: "REPRODUCIR" });
+    // 3. Si el mensaje es un video/documento, es el video principal
+    if (m.media && (m.media.document || m.media.video)) {
+        const doc = m.media.document || m.media.video;
+        const fileName = doc.attributes?.find(a => a.fileName)?.fileName || "video.mp4";
+        const ext = fileName.split('.').pop().toLowerCase();
+        links.push({
+            id: m.id,
+            label: "ARCHIVO DIRECTO",
+            type: 'tg_file',
+            ext: ext,
+            isBrowserNative: ['mp4', 'webm', 'mov'].includes(ext)
+        });
     }
 
-    const sinopsis = lines.slice(1).filter(l => !l.includes('t.me/')).join(' ').trim();
-
-    // Si tiene media, generamos URL de poster
+    const sinopsis = lines.slice(1).filter(l => !l.includes('http') && !l.includes('acestream')).join(' ').trim();
     const posterUrl = m.media ? `/api/poster/${m.id}` : null;
 
-    return { id: m.id, titulo: titleLine, sinopsis: sinopsis || "Disfruta del contenido.", portada: posterUrl, links };
+    return { id: m.id, titulo: titleLine, sinopsis: sinopsis || "Sin descripción.", portada: posterUrl, links };
 }
 
 app.get("/api/catalogo", async (req, res) => {
@@ -59,10 +78,9 @@ app.get("/api/catalogo", async (req, res) => {
         const catalogo = { peliculas: [], series: [], deportes: [] };
         const results = await Promise.all(Object.entries(TOPICS).map(async ([key, topicId]) => {
             const msgs = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 60 });
-            return { key: key.toLowerCase(), data: msgs.map(m => parseMessage(m)).filter(m => m !== null) };
+            return { key: key.toLowerCase(), data: msgs.map(m => parseMessage(m)).filter(m => m !== null && (m.portada || m.links.length)) };
         }));
-
-        results.forEach(res => { catalogo[res.key] = res.data; });
+        results.forEach(r => { catalogo[r.key] = r.data; });
         res.json(catalogo);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -74,55 +92,48 @@ app.get("/api/poster/:id", async (req, res) => {
     try {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [msgId] });
         if (msgs.length && msgs[0].media) {
-            // Descarga optimizada: intentamos miniatura primero para velocidad
-            const buffer = await client.downloadMedia(msgs[0].media, { thumb: true });
+            const media = msgs[0].media;
+            // Intentar descargar la mejor imagen posible (foto completa o miniatura)
+            const photo = media.photo || media.document?.thumbs?.[0] || media;
+            const buffer = await client.downloadMedia(photo, {});
             if (buffer) {
                 res.setHeader('Content-Type', 'image/jpeg');
-                res.setHeader('Cache-Control', 'public, max-age=86400');
                 posterCache.set(msgId, buffer);
                 return res.send(buffer);
             }
         }
-        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=PLAYER+TV');
-    } catch (e) {
-        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=ERROR');
-    }
+        res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=PREVIEW');
+    } catch (e) { res.redirect('https://via.placeholder.com/200x300/111/f5c518?text=TV'); }
 });
 
 app.get("/api/stream/:id", async (req, res) => {
     try {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
         if (!msgs.length || !msgs[0].media) return res.status(404).send("No media");
-
         const media = msgs[0].media;
-        const size = media.document ? media.document.size : (media.video ? media.video.size : (media.document?.size || 0));
+        const doc = media.document || media.video;
+        const size = doc.size;
 
+        res.setHeader('Accept-Ranges', 'bytes');
         const range = req.headers.range;
-        if (range && size) {
+
+        if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
-
             res.writeHead(206, {
                 'Content-Range': `bytes ${start}-${end}/${size}`,
-                'Accept-Ranges': 'bytes',
                 'Content-Length': (end - start) + 1,
                 'Content-Type': 'video/mp4',
             });
-
-            await client.downloadMedia(media, {
-                outputFile: res,
-                start: BigInt(start),
-                end: BigInt(end),
-                workers: 8 // Aumentamos workers para máxima velocidad
-            });
+            await client.downloadMedia(media, { outputFile: res, start: BigInt(start), end: BigInt(end), workers: 8 });
         } else {
-            res.setHeader('Content-Type', 'video/mp4');
             res.setHeader('Content-Length', size);
+            res.setHeader('Content-Type', 'video/mp4');
             await client.downloadMedia(media, { outputFile: res, workers: 8 });
         }
     } catch (e) { res.status(500).send(e.message); }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Motor v6 Pro Online`));
+app.listen(PORT, () => console.log(`🚀 Servidor Universal Pro v7`));
