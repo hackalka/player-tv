@@ -4,42 +4,39 @@
     <meta charset="UTF-8">
     <title>Generador de Sesión - PLAYER TV</title>
 
-    <!-- 1. BASE DE SEGURIDAD (Buffer) - Cargado con redundancia -->
+    <!-- Cargamos Buffer para el navegador -->
     <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
     <script>
-        // Función de seguridad para inyectar Buffer sin errores
-        function checkDependencies() {
-            if (typeof window.buffer !== 'undefined') {
-                window.Buffer = window.buffer.Buffer;
-            }
-            window.process = { env: {} };
-        }
-        checkDependencies();
+        // Polyfill de Buffer para que GramJS funcione en la web
+        window.Buffer = buffer.Buffer;
+        window.process = { env: {} };
     </script>
 
-    <!-- 2. MOTOR TELEGRAM -->
+    <!-- Cargamos GramJS (versión para navegador) -->
     <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
 
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { background: #111; border: 2px solid #f5c518; padding: 40px; border-radius: 20px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 0 30px rgba(245,197,24,0.2); }
-        input { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 15px; background: #f5c518; border: none; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 10px; color: #000; }
+        .card { background: #111; border: 2px solid #f5c518; padding: 40px; border-radius: 20px; text-align: center; max-width: 450px; width: 90%; box-shadow: 0 0 30px rgba(245,197,24,0.2); }
+        input { width: 100%; padding: 15px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: #f5c518; }
+        button { width: 100%; padding: 15px; background: #f5c518; border: none; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 10px; color: #000; font-size: 16px; }
         button:disabled { background: #555; cursor: not-allowed; }
-        #output { background: #000; padding: 15px; border: 1px dashed #555; margin-top: 20px; word-break: break-all; font-family: monospace; display: none; color: #22c55e; font-size: 12px; max-height: 150px; overflow-y: auto; }
-        #status-msg { color: #888; font-size: 14px; margin-bottom: 20px; }
+        #output { background: #000; padding: 15px; border: 1px dashed #555; margin-top: 20px; word-break: break-all; font-family: monospace; display: none; color: #22c55e; font-size: 12px; max-height: 200px; overflow-y: auto; text-align: left; }
+        #status-msg { color: #888; font-size: 14px; margin-bottom: 20px; min-height: 40px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 style="color: #f5c518; margin-top:0;">CONECTAR TELEGRAM</h2>
-        <p id="status-msg">Cargando componentes...</p>
+        <h2 style="color: #f5c518; margin-top:0;">TELEGRAM SESSION</h2>
+        <p id="status-msg">Cargando motor de conexión...</p>
 
-        <input type="text" id="phone" placeholder="+34 600 000 000">
-        <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
-        <input type="password" id="password" placeholder="Contraseña 2FA (si tienes)" style="display:none;">
-
-        <button id="btn-main" onclick="handleAction()" disabled>ESPERE...</button>
+        <div id="form-container">
+            <input type="text" id="phone" placeholder="+34 600 000 000">
+            <input type="text" id="code" placeholder="Código de Telegram" style="display:none;">
+            <input type="password" id="password" placeholder="Contraseña 2FA (si tienes)" style="display:none;">
+            <button id="btn-main" onclick="handleAction()" disabled>ESPERE...</button>
+        </div>
 
         <div id="output"></div>
     </div>
@@ -53,11 +50,7 @@
 
         async function init() {
             try {
-                // Re-verificar Buffer antes de iniciar
-                if (typeof window.Buffer === 'undefined' && typeof window.buffer !== 'undefined') {
-                    window.Buffer = window.buffer.Buffer;
-                }
-
+                // Esperar a que las librerías se registren en window
                 if (!window.telegram || !window.Buffer) {
                     setTimeout(init, 500);
                     return;
@@ -65,11 +58,12 @@
 
                 const { TelegramClient } = window.telegram;
                 const { StringSession } = window.telegram.sessions;
+
                 client = new TelegramClient(new StringSession(""), apiId, apiHash, { connectionRetries: 5 });
 
                 document.getElementById('btn-main').disabled = false;
                 document.getElementById('btn-main').innerText = "ENVIAR TELÉFONO";
-                document.getElementById('status-msg').innerText = "Motor listo. Introduce tu número.";
+                document.getElementById('status-msg').innerText = "Introduce tu teléfono para recibir el código de Telegram.";
             } catch (e) {
                 document.getElementById('status-msg').innerText = "Error: " + e.message;
             }
@@ -81,8 +75,8 @@
             const status = document.getElementById('status-msg');
 
             if (step === 'phone') {
-                const phone = document.getElementById('phone').value;
-                if (!phone) return alert("Pon tu teléfono");
+                const phone = document.getElementById('phone').value.trim();
+                if (!phone) return alert("Escribe tu teléfono con el prefijo (+34...)");
 
                 btn.innerText = "CONECTANDO...";
                 btn.disabled = true;
@@ -96,7 +90,7 @@
                             document.getElementById('phone').style.display = 'none';
                             btn.innerText = "VERIFICAR CÓDIGO";
                             btn.disabled = false;
-                            status.innerText = "Introduce el código recibido en Telegram";
+                            status.innerText = "Telegram te ha enviado un código. Escríbelo abajo.";
                             return new Promise(r => resolver = r);
                         },
                         password: async () => {
@@ -104,7 +98,7 @@
                             document.getElementById('code').style.display = 'none';
                             btn.innerText = "ENTRAR";
                             btn.disabled = false;
-                            status.innerText = "Introduce tu contraseña 2FA";
+                            status.innerText = "Tu cuenta tiene Verificación en 2 pasos. Pon tu contraseña.";
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
@@ -113,21 +107,23 @@
                         }
                     });
 
-                    output.innerText = client.session.save();
+                    const session = client.session.save();
+                    output.innerText = session;
                     output.style.display = 'block';
-                    btn.style.display = 'none';
+                    document.getElementById('form-container').style.display = 'none';
                     status.style.color = "#f5c518";
-                    status.innerText = "✅ COPIA EL CÓDIGO VERDE DE ABAJO Y PÉGALO EN RENDER";
-                    document.querySelector('h2').innerText = "¡LISTO!";
+                    status.innerText = "✅ COPIA ESTE CÓDIGO Y PÉGALO EN RENDER (SESSION)";
+                    document.querySelector('h2').innerText = "¡SESIÓN GENERADA!";
                 } catch (e) {
-                    alert("Fallo: " + e.message);
+                    alert("Fallo al iniciar: " + e.message);
                     location.reload();
                 }
             } else {
-                const val = (step === 'code') ? document.getElementById('code').value : document.getElementById('password').value;
+                const val = (step === 'code') ? document.getElementById('code').value.trim() : document.getElementById('password').value.trim();
                 if (resolver) resolver(val);
             }
         }
+
         init();
     </script>
 </body>
