@@ -13,74 +13,117 @@ const apiHash = "693fb2da124662dad85b2b337c53a386";
 const stringSession = new StringSession(process.env.SESSION || "");
 const client = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5 });
 
-const CHANNEL_ID = "-1003749684388";
-const TOPICS = { PELICULAS: 3185, SERIES: 1663, DEPORTES: 10583 };
+// NUEVO CANAL Y TOPICS
+const CHANNEL_ID = "-1003924237464";
+const TOPICS = {
+    PELICULAS: 2,
+    SERIES: 4,
+    DEPORTES: 6
+};
 
 const posterCache = new Map();
 
 (async () => {
     if (process.env.SESSION) {
         await client.connect();
-        console.log("🚀 Motor Universal Pro V7 Online");
+        console.log("✅ Motor Pro V8 Online - Canal: " + CHANNEL_ID);
     }
 })();
+
+// Función Maestra de Detección de Títulos y Agrupación
+function getRootTitle(text) {
+    if (!text) return "Sin título";
+    const firstLine = text.split('\n')[0].trim();
+    // Regex para detectar: 1x02, S01E01, T1, Temporada 1, Capítulo 5, etc.
+    // Cortamos el título justo antes de que empiecen estos patrones
+    const cleanTitle = firstLine.split(/(\s\d+[xX]\d+|\s[sS]\d+|\s[tT]\d+|\sTEMPORADA|\sCAPITULO)/i)[0].trim();
+    return { full: firstLine, root: cleanTitle };
+}
 
 function parseMessage(m) {
     if (!m.message && !m.media) return null;
 
     const texto = m.message || "";
-    const lines = texto.split('\n');
-    const titleLine = lines[0].trim();
+    const { full, root } = getRootTitle(texto);
     const links = [];
 
-    // 1. Buscar enlaces Acestream
-    const aceMatch = texto.match(/acestream:\/\/[a-f0-9]{40}/i);
-    if (aceMatch) {
-        links.push({ url: aceMatch[0], label: "ACESTREAM", type: 'acestream' });
-    }
-
-    // 2. Buscar enlaces de Telegram o HTTP directos
-    const urlRegex = /https?:\/\/[^\s]+/g;
+    // Buscar links de Telegram
+    const urlRegex = /https?:\/\/t\.me\/[^\s]+/g;
     const matches = texto.match(urlRegex);
     if (matches) {
         matches.forEach((url, i) => {
-            if (url.includes('t.me/')) {
-                const parts = url.split('/');
-                links.push({ id: parts[parts.length - 1], label: `LINK TELEGRAM ${i + 1}`, type: 'tg_ref' });
-            } else {
-                links.push({ url: url, label: `LINK WEB ${i + 1}`, type: 'direct' });
-            }
+            const parts = url.split('/');
+            links.push({ id: parts[parts.length - 1], label: `OPCIÓN ${i + 1}`, type: 'tg_ref' });
         });
     }
 
-    // 3. Si el mensaje es un video/documento, es el video principal
+    // Si el mensaje es un video, es el video principal
     if (m.media && (m.media.document || m.media.video)) {
         const doc = m.media.document || m.media.video;
         const fileName = doc.attributes?.find(a => a.fileName)?.fileName || "video.mp4";
         const ext = fileName.split('.').pop().toLowerCase();
         links.push({
             id: m.id,
-            label: "ARCHIVO DIRECTO",
+            label: full,
             type: 'tg_file',
             ext: ext,
             isBrowserNative: ['mp4', 'webm', 'mov'].includes(ext)
         });
     }
 
-    const sinopsis = lines.slice(1).filter(l => !l.includes('http') && !l.includes('acestream')).join(' ').trim();
+    const sinopsis = texto.split('\n').slice(1).filter(l => !l.includes('http')).join(' ').trim();
     const posterUrl = m.media ? `/api/poster/${m.id}` : null;
 
-    return { id: m.id, titulo: titleLine, sinopsis: sinopsis || "Sin descripción.", portada: posterUrl, links };
+    return { id: m.id, titulo: full, rootTitle: root, sinopsis: sinopsis || "Sin descripción.", portada: posterUrl, links };
 }
 
 app.get("/api/catalogo", async (req, res) => {
     try {
-        const catalogo = { peliculas: [], series: [], deportes: [] };
+        const catalogo = { peliculas: [], series: {}, deportes: [] };
+
         const results = await Promise.all(Object.entries(TOPICS).map(async ([key, topicId]) => {
-            const msgs = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 60 });
-            return { key: key.toLowerCase(), data: msgs.map(m => parseMessage(m)).filter(m => m !== null && (m.portada || m.links.length)) };
+            const msgs = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 100 });
+            return { key: key.toLowerCase(), msgs: msgs };
         }));
-        results.forEach(r => { catalogo[r.key] = r.data; });
+
+        results.forEach(resObj => {
+            resObj.msgs.forEach(m => {
+                const data = parseMessage(m);
+                if (!data) return;
+
+                // Ignorar si no tiene ni portada ni enlaces
+                if (!data.portada && !data.links.length) return;
+
+                if (resObj.key === 'series') {
+                    // AGRUPACIÓN INTELIGENTE DE SERIES
+                    if (!catalogo.series[data.rootTitle]) {
+                        catalogo.series[data.rootTitle] = {
+                            titulo: data.rootTitle,
+                            portada: data.portada,
+                            sinopsis: data.sinopsis,
+                            links: [] // Aquí meteremos todos los capítulos
+                        };
+                    }
+                    // Si el mensaje actual tiene portada, la usamos como portada principal de la serie
+                    if (data.portada) catalogo.series[data.rootTitle].portada = data.portada;
+
+                    // Añadimos todos los links encontrados en este mensaje al contenedor de la serie
+                    data.links.forEach(l => {
+                        catalogo.series[data.rootTitle].links.push({
+                            id: l.id,
+                            label: l.label === "ARCHIVO DIRECTO" ? data.titulo : l.label,
+                            type: l.type,
+                            isBrowserNative: l.isBrowserNative
+                        });
+                    });
+                } else {
+                    catalogo[resObj.key].push(data);
+                }
+            });
+        });
+
+        // Convertir series de objeto a lista
+        catalogo.series = Object.values(catalogo.series);
         res.json(catalogo);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -88,12 +131,10 @@ app.get("/api/catalogo", async (req, res) => {
 app.get("/api/poster/:id", async (req, res) => {
     const msgId = parseInt(req.params.id);
     if (posterCache.has(msgId)) return res.send(posterCache.get(msgId));
-
     try {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [msgId] });
         if (msgs.length && msgs[0].media) {
             const media = msgs[0].media;
-            // Intentar descargar la mejor imagen posible (foto completa o miniatura)
             const photo = media.photo || media.document?.thumbs?.[0] || media;
             const buffer = await client.downloadMedia(photo, {});
             if (buffer) {
@@ -111,18 +152,15 @@ app.get("/api/stream/:id", async (req, res) => {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
         if (!msgs.length || !msgs[0].media) return res.status(404).send("No media");
         const media = msgs[0].media;
-        const doc = media.document || media.video;
-        const size = doc.size;
-
-        res.setHeader('Accept-Ranges', 'bytes');
+        const size = (media.document || media.video).size;
         const range = req.headers.range;
-
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
             res.writeHead(206, {
                 'Content-Range': `bytes ${start}-${end}/${size}`,
+                'Accept-Ranges': 'bytes',
                 'Content-Length': (end - start) + 1,
                 'Content-Type': 'video/mp4',
             });
@@ -136,4 +174,4 @@ app.get("/api/stream/:id", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Servidor Universal Pro v7`));
+app.listen(PORT, () => console.log(`🚀 Motor V8: Multi-Grupo & Series Unificadas`));
