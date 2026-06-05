@@ -5,43 +5,36 @@
     <title>Generador de Sesión - PLAYER TV</title>
 
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 15px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.8); }
-        h2 { color: #f5c518; letter-spacing: 2px; margin-bottom: 5px; }
-        p { color: #888; font-size: 13px; margin-bottom: 30px; min-height: 40px; }
-        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; border: 1px solid transparent; }
+        body { background: #000; color: #fff; font-family: -apple-system, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #111; border: 1px solid #333; padding: 40px; border-radius: 15px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.9); }
+        h2 { color: #f5c518; letter-spacing: 1px; margin-bottom: 5px; }
+        p { color: #888; font-size: 13px; margin-bottom: 30px; min-height: 40px; line-height: 1.5; }
+        input { width: 100%; padding: 16px; margin: 10px 0; background: #222; border: 1px solid #333; color: #fff; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.3s; }
         input:focus { border-color: #f5c518; }
         button { width: 100%; padding: 16px; background: #f5c518; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 16px; color: #000; }
-        button:disabled { background: #333; color: #555; cursor: wait; }
-        #session-res { background: #000; color: #22c55e; padding: 15px; border: 1px dashed #22c55e; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; max-height: 150px; overflow-y: auto; text-align: left; display: none; margin-top: 20px; }
-        .error-hint { color: #ff4436; font-size: 12px; margin-top: 10px; display: none; }
+        button:disabled { background: #333; color: #666; cursor: wait; }
+        #session-res { background: #000; color: #22c55e; padding: 20px; border: 1px dashed #22c55e; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; word-break: break-all; max-height: 200px; overflow-y: auto; text-align: left; display: none; margin-top: 25px; line-height: 1.4; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>TELEGRAM SETUP</h2>
-        <p id="info">Iniciando motores de seguridad...</p>
+        <h2>TELEGRAM LOGIN</h2>
+        <p id="info">Estableciendo entorno seguro...</p>
 
         <div id="login-form">
-            <input type="tel" id="phone" placeholder="+34 600 000 000">
-            <input type="text" id="code" placeholder="Código de 5 dígitos" style="display:none;">
-            <input type="password" id="2fa" placeholder="Contraseña Cloud" style="display:none;">
-            <button id="btn-main" onclick="handleLogin()" disabled>CONECTANDO...</button>
+            <input type="tel" id="phone" placeholder="+34 600 000 000" autocomplete="tel">
+            <input type="text" id="code" placeholder="Código de 5 dígitos" style="display:none;" autocomplete="one-time-code">
+            <input type="password" id="2fa" placeholder="Contraseña Cloud" style="display:none;" autocomplete="current-password">
+            <button id="btn-main" onclick="handleLogin()" disabled>CARGANDO...</button>
         </div>
 
         <div id="session-res"></div>
-        <div id="error-hint" class="error-hint">
-            ⚠️ Tu navegador está bloqueando la conexión. <br>
-            <b>Prueba desde Chrome en el móvil o desactiva "Protección contra rastreo".</b>
-        </div>
     </div>
 
-    <!-- 1. CARGA ROBUSTA DE BUFFER -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js" crossorigin="anonymous"></script>
-
-    <!-- 2. CARGA ROBUSTA DE TELEGRAM (GramJS) -->
-    <script src="https://unpkg.com/telegram/browser/telegram.js" crossorigin="anonymous"></script>
+    <!-- CARGA LOCAL PARA EVITAR BLOQUEOS DE RASTREO -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js"></script>
 
     <script>
         const apiId = 8952741;
@@ -54,37 +47,36 @@
             const info = document.getElementById('info');
             const btn = document.getElementById('btn-main');
 
-            // Polyfill para Buffer (A veces el navegador lo bloquea si es global)
-            window.process = { env: {} };
-            if (typeof window.Buffer === 'undefined') {
-                if (typeof window.buffer !== 'undefined') window.Buffer = window.buffer.Buffer;
+            // Polyfill para Buffer (Asegurando compatibilidad total)
+            if (typeof window.Buffer === 'undefined' && window.buffer) {
+                window.Buffer = window.buffer.Buffer;
             }
+            window.process = { env: {} };
 
+            // Detectar motor de Telegram
             const lib = window.telegram || window.gramjs;
 
             if (!lib || !window.Buffer) {
-                info.innerText = "⏳ Esperando librerías (Tracking Prevention detectado)...";
-                document.getElementById('error-hint').style.display = 'block';
-                setTimeout(init, 1000);
+                info.innerHTML = "⏳ Esperando librerías... <br><span style='font-size:11px; color:#555;'>Si no avanza, refresca la página (F5)</span>";
+                setTimeout(init, 500);
                 return;
             }
 
             try {
-                document.getElementById('error-hint').style.display = 'none';
                 const { TelegramClient } = lib;
                 const { StringSession } = lib.sessions;
 
-                // Usamos sesión en memoria para evitar que Tracking Prevention bloquee localStorage
+                // Cliente configurado para máxima compatibilidad web
                 client = new TelegramClient(new StringSession(""), apiId, apiHash, {
                     connectionRetries: 5,
                     useWSS: true
                 });
 
-                info.innerText = "✅ ¡Listo! Introduce tu teléfono con +34...";
+                info.innerText = "✅ Motor listo. Escribe tu teléfono con el prefijo (ej: +34).";
                 btn.disabled = false;
                 btn.innerText = "ENVIAR TELÉFONO";
             } catch (e) {
-                info.innerText = "❌ Error: " + e.message;
+                info.innerText = "❌ Fallo al iniciar: " + e.message;
             }
         }
 
@@ -94,7 +86,7 @@
 
             if (step === 'phone') {
                 const phone = document.getElementById('phone').value.trim();
-                if (!phone) return alert("Escribe tu número");
+                if (!phone) return alert("Pon tu número de teléfono");
 
                 btn.disabled = true;
                 btn.innerText = "SOLICITANDO CÓDIGO...";
@@ -108,7 +100,7 @@
                             document.getElementById('code').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR CÓDIGO";
-                            info.innerText = "Revisa tu Telegram y pon el código abajo.";
+                            info.innerText = "Escribe el código que has recibido por Telegram.";
                             return new Promise(r => resolver = r);
                         },
                         password: async () => {
@@ -116,22 +108,22 @@
                             document.getElementById('2fa').style.display = 'block';
                             btn.disabled = false;
                             btn.innerText = "VERIFICAR 2FA";
-                            info.innerText = "Escribe tu contraseña de Verificación en 2 pasos.";
+                            info.innerText = "Tu cuenta tiene contraseña. Introdúcela abajo.";
                             return new Promise(r => resolver = r);
                         },
                         onError: (err) => {
-                            alert("Telegram dice: " + err.message);
+                            alert("Error: " + err.message);
                             location.reload();
                         }
                     });
 
-                    // GENERAR SESIÓN
+                    // ÉXITO: Generar el código final
                     document.getElementById('login-form').style.display = 'none';
                     const resBox = document.getElementById('session-res');
                     resBox.innerText = client.session.save();
                     resBox.style.display = 'block';
-                    info.innerHTML = "<b style='color:#f5c518'>✅ CÓDIGO GENERADO.</b><br>Cópialo y ponlo en Render.";
-                    document.querySelector('h2').innerText = "¡CONSEGUIDO!";
+                    info.innerHTML = "<b style='color:#f5c518'>🎉 ¡CONSEGUIDO!</b><br>Copia este código y pégalo en Render (SESSION).";
+                    document.querySelector('h2').innerText = "SESIÓN LISTA";
 
                 } catch (e) {
                     alert("Fallo crítico: " + e.message);
