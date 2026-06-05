@@ -39,11 +39,16 @@ app.get("/api/catalogo", async (req, res) => {
             const messages = await client.getMessages(CHANNEL_ID, { replyTo: topicId, limit: 100 });
 
             messages.forEach(m => {
-                if (!m.message) return;
-                const { full, root } = parseTitle(m.message);
-                const sinopsis = m.message.split('\n').slice(1).join(' ').trim() || "Sin descripción disponible.";
-                const hasPhoto = m.media && m.media.photo;
-                const posterUrl = hasPhoto ? `/api/poster/${m.id}` : (m.message.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || null);
+                if (!m.message && !m.media) return;
+
+                const texto = m.message || "";
+                const { full, root } = parseTitle(texto);
+                const sinopsis = texto.split('\n').slice(1).join(' ').trim() || "Sin descripción disponible.";
+
+                // DETECCIÓN INTELIGENTE DE PORTADA
+                // 1. Si hay foto 2. Si hay miniatura de video 3. Si hay link de imagen en el texto
+                const hasPhoto = m.media && (m.media.photo || (m.media.document && m.media.document.thumbs));
+                const posterUrl = hasPhoto ? `/api/poster/${m.id}` : (texto.match(/https?:\/\/.*\.(?:png|jpg|jpeg|webp)/i)?.[0] || null);
 
                 const item = { id: m.id, titulo: full, sinopsis, portada: posterUrl };
 
@@ -67,11 +72,18 @@ app.get("/api/catalogo", async (req, res) => {
 app.get("/api/poster/:id", async (req, res) => {
     try {
         const msgs = await client.getMessages(CHANNEL_ID, { ids: [parseInt(req.params.id)] });
-        if (msgs.length && msgs[0].media && msgs[0].media.photo) {
-            const buffer = await client.downloadMedia(msgs[0].media.photo, {});
-            res.setHeader('Content-Type', 'image/jpeg');
-            res.send(buffer);
-        } else { res.redirect('https://via.placeholder.com/200x300?text=NO+POSTER'); }
+        if (msgs.length && msgs[0].media) {
+            const media = msgs[0].media;
+            // Intentar descargar foto o miniatura de video/documento
+            const buffer = await client.downloadMedia(media, {
+                thumb: true // Esto descarga la miniatura si es un video
+            });
+            if (buffer) {
+                res.setHeader('Content-Type', 'image/jpeg');
+                return res.send(buffer);
+            }
+        }
+        res.redirect('https://via.placeholder.com/200x300?text=NO+POSTER');
     } catch (e) { res.status(500).send(e.message); }
 });
 
