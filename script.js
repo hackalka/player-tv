@@ -1,3 +1,36 @@
+// ===== SAFE STORAGE (handles Firefox Tracking Prevention) =====
+const SafeStorage = (() => {
+    let memoryStore = {};
+    let storageAvailable = false;
+
+    try {
+        const test = '__storage_test__';
+        localStorage.setItem(test, test);
+        localStorage.removeItem(test);
+        storageAvailable = true;
+    } catch (e) {
+        console.warn('localStorage bloqueado (posiblemente por Firefox Tracking Prevention). Usando memoria.');
+    }
+
+    return {
+        getItem(key) {
+            try {
+                return storageAvailable ? localStorage.getItem(key) : memoryStore[key] || null;
+            } catch {
+                return memoryStore[key] || null;
+            }
+        },
+        setItem(key, value) {
+            try {
+                if (storageAvailable) localStorage.setItem(key, value);
+            } catch {
+                // Silently fail, use memory
+            }
+            memoryStore[key] = value;
+        }
+    };
+})();
+
 // ===== CONFIG & STATE =====
 const state = {
     channels: [],
@@ -48,42 +81,54 @@ class TelegramEngine {
     }
 
     async init() {
-        if (!window.telegram || !window.Buffer) {
-            console.error("Librerías de Telegram no cargadas.");
+        // Esperar a que telegram esté listo (con reintentos)
+        let attempts = 0;
+        while ((!window.telegram || typeof window.telegram !== 'object') && attempts < 20) {
+            await new Promise(r => setTimeout(r, 500));
+            attempts++;
+        }
+
+        if (!window.telegram || !window.telegram.TelegramClient) {
+            console.error("❌ Librería de Telegram no se cargó. Verifica tu conexión a internet.");
+            if (elements.bootStatus) elements.bootStatus.innerText = "Error: No se pudo cargar Telegram";
             return false;
         }
 
-        const { TelegramClient, sessions } = window.telegram;
-        const session = new sessions.StringSession(localStorage.getItem('tg_session') || "");
-
-        this.client = new TelegramClient(session, this.apiId, this.apiHash, {
-            connectionRetries: 5,
-            useWSS: true
-        });
-
         try {
-            elements.bootStatus.innerText = "Conectando con Telegram...";
+            const { TelegramClient, sessions } = window.telegram;
+            const sessionString = SafeStorage.getItem('tg_session') || '';
+            const session = new sessions.StringSession(sessionString);
+
+            this.client = new TelegramClient(session, this.apiId, this.apiHash, {
+                connectionRetries: 5,
+                useWSS: true
+            });
+
+            if (elements.bootStatus) elements.bootStatus.innerText = "Conectando con Telegram...";
             await this.client.connect();
 
             if (!await this.client.checkAuthorization()) {
+                if (elements.bootStatus) elements.bootStatus.innerText = "Escanea el código QR";
                 await this.showLogin();
                 return false;
             }
 
-            localStorage.setItem('tg_session', this.client.session.save());
-            elements.loginModal.hidden = true;
+            SafeStorage.setItem('tg_session', this.client.session.save());
+            if (elements.loginModal) elements.loginModal.hidden = true;
             return true;
         } catch (e) {
-            console.error("Error init:", e);
-            elements.bootStatus.innerText = "Error de conexión. Reintentando...";
+            console.error("Error en init:", e);
+            if (elements.bootStatus) elements.bootStatus.innerText = "Error: " + e.message;
             return false;
         }
     }
 
     async showLogin() {
+        if (!elements.loginModal) return;
+        
         elements.loginModal.hidden = false;
-        elements.qrLoading.style.display = 'block';
-        elements.qrCode.innerHTML = '';
+        if (elements.qrLoading) elements.qrLoading.style.display = 'block';
+        if (elements.qrCode) elements.qrCode.innerHTML = '';
 
         try {
             await this.client.signInUserWithQrCode({ apiId: this.apiId, apiHash: this.apiHash }, {
@@ -93,14 +138,15 @@ class TelegramEngine {
                         const qr = qrcode(0, 'M');
                         qr.addData(url);
                         qr.make();
-                        elements.qrLoading.style.display = 'none';
-                        elements.qrCode.innerHTML = qr.createSvgTag({ cellSize: 4 });
+                        if (elements.qrLoading) elements.qrLoading.style.display = 'none';
+                        if (elements.qrCode) elements.qrCode.innerHTML = qr.createSvgTag({ cellSize: 4 });
                     }
                 }
             });
             location.reload();
         } catch (e) {
             console.error("QR Error:", e);
+            if (elements.bootStatus) elements.bootStatus.innerText = "Error: " + e.message;
         }
     }
 
@@ -248,14 +294,31 @@ const UI = {
 
 // ===== APP CORE =====
 async function init() {
-    const engine = new TelegramEngine(window.CONFIG);
-    const connected = await engine.init();
-
-    if (!connected) return;
-
     try {
+        console.log('Inicializando app con CONFIG:', window.CONFIG);
+        
+        if (!window.CONFIG) {
+            throw new Error('CONFIG no está definido');
+        }
+
+        const engine = new TelegramEngine(window.CONFIG);
+        const connected = await engine.init();
+
+        if (!connected) {
+            console.warn('No conectado a Telegram');
+            return;
+        }
+
+        console.log('✅ Conectado a Telegram');
+        
         const content = await engine.fetchContent();
         state.channels = content;
+
+        if (!Array.isArray(content) || content.length === 0) {
+            console.warn('No hay contenido disponible');
+            if (elements.bootStatus) elements.bootStatus.innerText = "No hay contenido disponible";
+            return;
+        }
 
         // Categorizar
         const cats = content.reduce((acc, item) => {
@@ -264,32 +327,57 @@ async function init() {
             return acc;
         }, {});
 
-        elements.rowsContainer.innerHTML = '';
+        if (elements.rowsContainer) elements.rowsContainer.innerHTML = '';
 
         // Hero
         if (content.length > 0) UI.updateHero(content[0]);
 
         // Render rows
         Object.entries(cats).forEach(([name, items]) => {
-            elements.rowsContainer.appendChild(UI.createRow(name, items));
+            if (elements.rowsContainer) {
+                elements.rowsContainer.appendChild(UI.createRow(name, items));
+            }
         });
 
     } catch (e) {
         console.error("App init error:", e);
+        if (elements.bootStatus) elements.bootStatus.innerText = "Error: " + e.message;
     } finally {
-        elements.loadingScreen.classList.add('hidden');
+        if (elements.loadingScreen) elements.loadingScreen.classList.add('hidden');
     }
 }
 
 // Event Listeners
+if (elements.playerModal && elements.playerModal.querySelector('.modal-close')) {
+    elements.playerModal.querySelector('.modal-close').onclick = () => UI.closePlayer();
+}
+if (elements.playerModal && elements.playerModal.querySelector('.modal-overlay')) {
+    elements.playerModal.querySelector('.modal-overlay').onclick = () => UI.closePlayer();
+}
+
 window.addEventListener('scroll', () => {
-    if (window.scrollY > 50) elements.navbar.classList.add('scrolled');
-    else elements.navbar.classList.remove('scrolled');
+    if (elements.navbar) {
+        if (window.scrollY > 50) elements.navbar.classList.add('scrolled');
+        else elements.navbar.classList.remove('scrolled');
+    }
 });
 
-elements.playerModal.querySelector('.modal-close').onclick = () => UI.closePlayer();
-elements.playerModal.querySelector('.modal-overlay').onclick = () => UI.closePlayer();
-
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(init, 1000); // Pequeño delay para asegurar carga de libs
+    // Esperar a que las librerías se carguen
+    let readyCheck = setInterval(() => {
+        if (window.telegram && window.telegram.TelegramClient) {
+            clearInterval(readyCheck);
+            console.log('✅ Librerías cargadas, iniciando app...');
+            setTimeout(init, 500);
+        }
+    }, 500);
+
+    // Timeout después de 15 segundos
+    setTimeout(() => {
+        clearInterval(readyCheck);
+        if (!window.telegram) {
+            console.error('Timeout: Telegram no se cargó en 15 segundos');
+            if (elements.bootStatus) elements.bootStatus.innerText = "Timeout cargando librerías";
+        }
+    }, 15000);
 });
