@@ -1,36 +1,3 @@
-// ===== SAFE STORAGE (handles Firefox Tracking Prevention) =====
-const SafeStorage = (() => {
-    let memoryStore = {};
-    let storageAvailable = false;
-
-    try {
-        const test = '__storage_test__';
-        localStorage.setItem(test, test);
-        localStorage.removeItem(test);
-        storageAvailable = true;
-    } catch (e) {
-        console.warn('localStorage bloqueado (posiblemente por Firefox Tracking Prevention). Usando memoria.');
-    }
-
-    return {
-        getItem(key) {
-            try {
-                return storageAvailable ? localStorage.getItem(key) : memoryStore[key] || null;
-            } catch {
-                return memoryStore[key] || null;
-            }
-        },
-        setItem(key, value) {
-            try {
-                if (storageAvailable) localStorage.setItem(key, value);
-            } catch {
-                // Silently fail, use memory
-            }
-            memoryStore[key] = value;
-        }
-    };
-})();
-
 // ===== CONFIG & STATE =====
 const state = {
     channels: [],
