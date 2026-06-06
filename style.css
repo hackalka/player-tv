@@ -539,8 +539,50 @@ body {
 .search-results {
     padding: 2rem 4%;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
+}
+.search-card {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 1rem;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast);
+}
+.search-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255,255,255,0.1);
+}
+.search-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.search-meta {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.search-meta h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.search-meta p {
+    color: var(--netflix-light-gray);
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+.search-empty {
+    color: var(--netflix-light-gray);
+    font-size: 1rem;
+    text-align: center;
+    padding: 4rem 0;
 }
 /* ===== LOADING ===== */
 .loading-screen {

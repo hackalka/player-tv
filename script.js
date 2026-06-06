@@ -217,9 +217,9 @@ const UI = {
         row.innerHTML = `
             <div class="row-header"><h2 class="row-title">${title}</h2></div>
             <div class="row-slider">
-                <button class="slider-arrow prev"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg></button>
+                <button class="slider-arrow prev" aria-label="Desplazar a la izquierda"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg></button>
                 <div class="slider-track"></div>
-                <button class="slider-arrow next"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg></button>
+                <button class="slider-arrow next" aria-label="Desplazar a la derecha"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg></button>
             </div>
         `;
 
@@ -236,9 +236,12 @@ const UI = {
     },
 
     openPlayer(item) {
+        if (!item.embedUrl) return;
         elements.playerIframe.src = item.embedUrl;
         elements.modalTitle.innerText = item.title;
         elements.modalDescription.innerText = item.description;
+        elements.modalYear.innerText = item.year || 'Desconocido';
+        elements.modalDuration.innerText = item.duration || 'N/A';
         elements.playerModal.hidden = false;
         document.body.style.overflow = 'hidden';
     },
@@ -256,6 +259,61 @@ const UI = {
         elements.heroDescription.innerText = item.description;
         elements.heroPlay.onclick = () => this.openPlayer(item);
         elements.heroInfo.onclick = () => this.openPlayer(item);
+    },
+
+    startHeroRotation(items) {
+        if (!window.CONFIG.heroAutoRotate || !items.length) return;
+        let currentIndex = 0;
+        setInterval(() => {
+            currentIndex = (currentIndex + 1) % items.length;
+            this.updateHero(items[currentIndex]);
+        }, window.CONFIG.heroRotateInterval || 10000);
+    },
+
+    renderSearchResults(results) {
+        if (!elements.searchResults) return;
+        if (!results.length) {
+            elements.searchResults.innerHTML = '<div class="search-empty">No se encontraron resultados para tu búsqueda.</div>';
+            return;
+        }
+
+        elements.searchResults.innerHTML = '';
+        results.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'search-card';
+            card.innerHTML = `
+                <img class="search-image" src="${item.thumbnail}" alt="${item.title}" loading="lazy">
+                <div class="search-meta">
+                    <h3>${item.title}</h3>
+                    <p>${item.description}</p>
+                </div>
+            `;
+            card.onclick = () => this.openPlayer(item);
+            elements.searchResults.appendChild(card);
+        });
+    },
+
+    openSearch() {
+        if (!elements.searchOverlay) return;
+        elements.searchOverlay.hidden = false;
+        elements.searchInput.focus();
+        document.body.style.overflow = 'hidden';
+    },
+
+    closeSearch() {
+        if (!elements.searchOverlay) return;
+        elements.searchOverlay.hidden = true;
+        elements.searchInput.value = '';
+        elements.searchResults.innerHTML = '';
+        document.body.style.overflow = '';
+    },
+
+    searchContent(query) {
+        const normalized = query.trim().toLowerCase();
+        if (!normalized) return [];
+        return state.channels.filter(item => {
+            return item.title.toLowerCase().includes(normalized) || item.description.toLowerCase().includes(normalized) || item.category.toLowerCase().includes(normalized);
+        });
     }
 };
 
@@ -297,7 +355,10 @@ async function init() {
         if (elements.rowsContainer) elements.rowsContainer.innerHTML = '';
 
         // Hero
-        if (content.length > 0) UI.updateHero(content[0]);
+        if (content.length > 0) {
+            UI.updateHero(content[0]);
+            UI.startHeroRotation(content);
+        }
 
         // Render rows
         Object.entries(cats).forEach(([name, items]) => {
@@ -321,6 +382,26 @@ if (elements.playerModal && elements.playerModal.querySelector('.modal-close')) 
 if (elements.playerModal && elements.playerModal.querySelector('.modal-overlay')) {
     elements.playerModal.querySelector('.modal-overlay').onclick = () => UI.closePlayer();
 }
+
+if (elements.searchBtn) {
+    elements.searchBtn.onclick = () => UI.openSearch();
+}
+if (elements.searchOverlay && elements.searchOverlay.querySelector('.search-close')) {
+    elements.searchOverlay.querySelector('.search-close').onclick = () => UI.closeSearch();
+}
+if (elements.searchInput) {
+    elements.searchInput.addEventListener('input', (event) => {
+        const query = event.target.value;
+        const results = UI.searchContent(query);
+        UI.renderSearchResults(results);
+    });
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && elements.searchOverlay && !elements.searchOverlay.hidden) {
+        UI.closeSearch();
+    }
+});
 
 window.addEventListener('scroll', () => {
     if (elements.navbar) {
