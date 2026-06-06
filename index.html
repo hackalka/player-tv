@@ -2,250 +2,139 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>PLAYER TV - Premium Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Soporte para IPTV/HLS -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <meta name="description" content="Cliente Telegram TV con estilo Netflix">
+    <title>Player TV</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- 1. Cimientos de seguridad (Buffer) -->
+    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
+    <script>
+        window.Buffer = window.Buffer || (window.buffer && window.buffer.Buffer) ? window.buffer.Buffer : undefined;
+        window.process = { env: {} };
+        window.global = window;
+    </script>
+
+    <!-- 2. Motor Telegram & QR -->
+    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Netflix+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Fallback a Helvetica Neue que usa Netflix -->
     <style>
-        :root { --red: #E50914; --bg: #0a0a0a; --surface: #141414; --accent: #f5c518; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow-x: hidden; }
-
-        /* HEADER Y BUSCADOR */
-        .header { position: fixed; top: 0; width: 100%; padding: 15px 5%; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); z-index: 1000; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
-        .logo { color: var(--red); font-size: 28px; font-weight: 900; letter-spacing: 2px; text-decoration: none; }
-        .search-box { background: rgba(255,255,255,0.1); border: 1px solid #333; border-radius: 20px; padding: 8px 20px; display: flex; align-items: center; gap: 10px; width: 250px; }
-        .search-box input { background: none; border: none; color: white; outline: none; width: 100%; font-size: 14px; }
-
-        /* CATALOGO NETFLIX */
-        .catalog { padding-top: 100px; }
-        .row { margin: 30px 0; padding-left: 5%; }
-        .row-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 15px; color: #e5e5e5; display: flex; align-items: center; gap: 10px; }
-        .carousel { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; padding: 15px 0; }
-        .carousel::-webkit-scrollbar { display: none; }
-
-        .card { flex: 0 0 170px; height: 250px; background: var(--surface); border-radius: 6px; cursor: pointer; border: 2px solid transparent; overflow: hidden; position: relative; transition: transform 0.3s; }
-        .card:hover, .card:focus { transform: scale(1.1); border-color: white; outline: none; z-index: 10; }
-        .card img { width: 100%; height: 100%; object-fit: cover; }
-        .card-label { position: absolute; bottom: 0; width: 100%; padding: 10px; background: rgba(0,0,0,0.7); font-size: 11px; text-align: center; }
-
-        /* MODAL DE DETALLES */
-        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:50000; padding: 50px 5%; overflow-y: auto; }
-        .modal-content { max-width: 1000px; margin: 0 auto; display: flex; gap: 40px; flex-wrap: wrap; position: relative; }
-        .modal-poster { width: 280px; height: 420px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
-        .modal-info { flex: 1; min-width: 300px; }
-        .modal-title { font-size: 3.5rem; margin: 0 0 15px; font-weight: 800; }
-        .modal-synopsis { font-size: 1.2rem; color: #ccc; line-height: 1.5; margin-bottom: 30px; }
-
-        /* EPISODIOS */
-        .ep-item { background: #262626; padding: 15px 25px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s; }
-        .ep-item:hover, .ep-item:focus { background: #333; outline: 2px solid var(--accent); }
-        .btn-play-sm { background: white; color: black; border: none; padding: 8px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .btn-open-with { background: var(--accent); color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; margin-left: 10px; }
-
-        #player-layer { display: none; position: fixed; inset: 0; background: #000; z-index: 100000; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-back { position: absolute; top: 30px; left: 30px; background: var(--red); color: white; border: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 100; }
-
-        @media (max-width: 768px) { .modal-poster { width: 100%; height: auto; } .modal-title { font-size: 2.2rem; } }
+        body { font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
     </style>
 </head>
 <body>
-
-    <header class="header">
-        <a href="#" class="logo">PLAYER TV</a>
-        <div class="search-box">
-            <i class="fa fa-search"></i>
-            <input type="text" id="searchInput" placeholder="Buscar películas o series..." onkeyup="ejecutarBuscador()">
+    <!-- Navbar Netflix-style -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <a href="#" class="logo">
+                <img src="assets/logo.svg" alt="Player TV" height="32">
+            </a>
+            <ul class="nav-links">
+                <li><a href="#" class="active">Inicio</a></li>
+                <li><a href="#series">Series</a></li>
+                <li><a href="#peliculas">Películas</a></li>
+                <li><a href="#mi-lista">Mi Lista</a></li>
+            </ul>
         </div>
-    </header>
+        <div class="navbar-right">
+            <button class="search-btn" aria-label="Buscar">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M21.71 20.29L18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a1 1 0 0 0 1.42 0 1 1 0 0 0 0-1.39zM11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7z"/>
+                </svg>
+            </button>
+            <div class="profile-dropdown">
+                <img src="assets/profile.png" alt="Perfil" class="profile-avatar">
+            </div>
+        </div>
+    </nav>
+    <!-- Hero Banner (Billboard) -->
+    <section class="hero" id="hero">
+        <div class="hero-background">
+            <img src="" alt="" class="hero-image" id="hero-image">
+            <div class="hero-gradient"></div>
+        </div>
+        <div class="hero-content">
+            <h1 class="hero-title" id="hero-title"></h1>
+            <p class="hero-description" id="hero-description"></p>
+            <div class="hero-buttons">
+                <button class="btn btn-play" id="hero-play">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="currentColor" d="M8 5v14l11-7z"/>
+                    </svg>
+                    Reproducir
+                </button>
+                <button class="btn btn-info" id="hero-info">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                    Más información
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- Contenido principal con filas -->
+    <main class="main-content">
+        <!-- Las filas se generan dinámicamente -->
+        <div class="rows-container" id="rows-container"></div>
+    </main>
 
-    <div id="catalog" class="catalog">
-        <!-- Contenido personal de usuario -->
-        <div id="user-rows"></div>
-        <!-- Contenido general de Telegram -->
-        <div id="telegram-rows"></div>
+    <!-- Modal de Login Telegram -->
+    <div class="modal" id="login-modal" hidden>
+        <div class="modal-overlay"></div>
+        <div class="modal-content login-box">
+            <h2 class="modal-title">Acceder a Telegram</h2>
+            <p style="color: var(--netflix-light-gray); margin-bottom: 20px;">Escanea el código QR con tu móvil (Ajustes > Dispositivos > Vincular dispositivo)</p>
+            <div id="qr-loading" class="loader" style="margin: 20px auto;"></div>
+            <div id="qr-code" style="background: white; padding: 10px; display: inline-block; border-radius: 4px;"></div>
+            <p id="boot-status" style="margin-top: 20px; font-weight: bold; color: var(--netflix-red);"></p>
+        </div>
     </div>
 
-    <div id="detail-modal" class="modal">
+    <!-- Modal de reproducción -->
+    <div class="modal" id="player-modal" hidden>
+        <div class="modal-overlay"></div>
         <div class="modal-content">
-            <button onclick="cerrarModal()" style="position:absolute; top:0; right:0; background:none; border:none; color:white; font-size:40px; cursor:pointer;">✕</button>
-            <img id="modal-img" class="modal-poster">
-            <div class="modal-info">
-                <h1 id="modal-title" class="modal-title"></h1>
-                <p id="modal-desc" class="modal-synopsis"></p>
-                <div id="modal-links"></div>
+            <button class="modal-close" aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+            <div class="player-wrapper">
+                <iframe id="player-iframe" allowfullscreen></iframe>
+            </div>
+            <div class="modal-details" id="modal-details">
+                <h2 class="modal-title" id="modal-title"></h2>
+                <div class="modal-meta">
+                    <span class="match" id="modal-match">98% coincidencia</span>
+                    <span class="year" id="modal-year"></span>
+                    <span class="duration" id="modal-duration"></span>
+                    <span class="quality">HD</span>
+                </div>
+                <p class="modal-description" id="modal-description"></p>
             </div>
         </div>
     </div>
-
-    <div id="player-layer">
-        <button class="btn-back" onclick="cerrarPlayer()">← VOLVER</button>
-        <h2 id="player-info" style="position:absolute; top:30px; right:50px; margin:0; font-size:16px; color:#666;"></h2>
-        <video id="main-video" controls autoplay style="width: 100%; height: 100%;"></video>
+    <!-- Búsqueda -->
+    <div class="search-overlay" id="search-overlay" hidden>
+        <div class="search-container">
+            <input type="search" id="search-input" placeholder="Títulos, personas, géneros" autocomplete="off">
+            <button class="search-close" aria-label="Cerrar búsqueda">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="search-results" id="search-results"></div>
     </div>
-
-    <script>
-        const API_URL = "https://player-tv-a8f4.onrender.com";
-        let fullCatalog = { peliculas: [], series: [], deportes: [] };
-        let hlsPlayer = null;
-
-        // 1. CARGA INICIAL
-        async function init() {
-            try {
-                // Cargar desde caché para rapidez instantánea
-                const cache = localStorage.getItem('tv_cache');
-                if (cache) render(JSON.parse(cache));
-
-                const res = await fetch(`${API_URL}/api/catalogo`);
-                fullCatalog = await res.json();
-                localStorage.setItem('tv_cache', JSON.stringify(fullCatalog));
-                render(fullCatalog);
-            } catch (e) { console.error("Error cargando catálogo:", e); }
-        }
-
-        function render(data) {
-            renderUserRows();
-            const container = document.getElementById('telegram-rows');
-            container.innerHTML = '';
-
-            renderRow(container, "PELÍCULAS", data.peliculas);
-            renderRow(container, "SERIES", data.series);
-            renderRow(container, "DEPORTES EN VIVO", data.deportes);
-        }
-
-        function renderUserRows() {
-            const container = document.getElementById('user-rows');
-            container.innerHTML = '';
-
-            const favs = JSON.parse(localStorage.getItem('favoritos') || '[]');
-            if (favs.length) renderRow(container, "⭐ MI LISTA", favs);
-
-            const seguir = JSON.parse(localStorage.getItem('seguirViendo') || '[]');
-            if (seguir.length) renderRow(container, "▶️ SEGUIR VIENDO", seguir);
-        }
-
-        function renderRow(container, title, items) {
-            if (!items || !items.length) return;
-            const row = document.createElement('div');
-            row.className = 'row';
-            row.innerHTML = `<div class="row-title">${title}</div><div class="carousel"></div>`;
-            const carousel = row.querySelector('.carousel');
-
-            items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.tabIndex = 0;
-                card.innerHTML = `<img src="${API_URL}${item.portada}"><div class="card-label">${item.titulo}</div>`;
-                card.onclick = () => showDetail(item);
-                carousel.appendChild(card);
-            });
-            container.appendChild(row);
-        }
-
-        function showDetail(item) {
-            document.getElementById('modal-title').innerText = item.titulo;
-            document.getElementById('modal-desc').innerText = item.sinopsis;
-            document.getElementById('modal-img').src = API_URL + item.portada;
-
-            const box = document.getElementById('modal-links');
-            box.innerHTML = '';
-            item.links.forEach(l => {
-                const streamUrl = `${API_URL}/api/stream/${l.id}`;
-                const div = document.createElement('div');
-                div.className = 'ep-item';
-                div.tabIndex = 0;
-                div.innerHTML = `
-                    <span style="font-weight:bold;">${l.label}</span>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn-play-sm" onclick="play('${streamUrl}', '${item.titulo}')">▶ WEB</button>
-                        <button class="btn-open-with" onclick="openWith('${streamUrl}', '${item.titulo}')">ABRIR CON...</button>
-                    </div>`;
-                div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') play(streamUrl, item.titulo); };
-                box.appendChild(div);
-            });
-
-            // Guardar en historial (Seguir Viendo)
-            guardarSeguirViendo(item);
-            document.getElementById('detail-modal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function play(url, title) {
-            const playerLayer = document.getElementById('player-layer');
-            const video = document.getElementById('main-video');
-            document.getElementById('player-info').innerText = title;
-            playerLayer.style.display = 'flex';
-
-            if (hlsPlayer) { hlsPlayer.destroy(); hlsPlayer = null; }
-
-            if (url.includes('.m3u8')) {
-                if (Hls.isSupported()) {
-                    hlsPlayer = new Hls();
-                    hlsPlayer.loadSource(url);
-                    hlsPlayer.attachMedia(video);
-                }
-            } else {
-                video.src = url;
-            }
-            video.play().catch(e => {
-                alert("Este formato requiere reproductor externo. Pulsa el botón dorado.");
-                cerrarPlayer();
-            });
-        }
-
-        function openWith(url, title) {
-            // Intent universal para Android que pregunta qué app usar (VLC, MX, etc)
-            window.location.href = `intent:${url}#Intent;type=video/*;S.title=${encodeURIComponent(title)};end`;
-        }
-
-        function guardarSeguirViendo(item) {
-            let lista = JSON.parse(localStorage.getItem('seguirViendo') || '[]');
-            lista = lista.filter(i => i.id !== item.id);
-            lista.unshift(item);
-            localStorage.setItem('seguirViendo', JSON.stringify(lista.slice(0, 20)));
-        }
-
-        function ejecutarBuscador() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = {
-                peliculas: fullCatalog.peliculas.filter(i => i.titulo.toLowerCase().includes(query)),
-                series: fullCatalog.series.filter(i => i.titulo.toLowerCase().includes(query)),
-                deportes: fullCatalog.deportes.filter(i => i.titulo.toLowerCase().includes(query))
-            };
-            render(filtered);
-        }
-
-        function cerrarModal() {
-            document.getElementById('detail-modal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-        function cerrarPlayer() {
-            const v = document.getElementById('main-video');
-            v.pause(); v.src = "";
-            document.getElementById('player-layer').style.display = 'none';
-        }
-
-        // CONTROL DE MANDO (Flechas y Enter)
-        document.addEventListener('keydown', (e) => {
-            const active = document.activeElement;
-            if (e.key === 'ArrowRight') {
-                if (active.classList.contains('card') || active.classList.contains('ep-item')) {
-                    active.nextElementSibling?.focus();
-                }
-            }
-            if (e.key === 'ArrowLeft') {
-                if (active.classList.contains('card') || active.classList.contains('ep-item')) {
-                    active.previousElementSibling?.focus();
-                }
-            }
-            if (e.key === 'Enter') active.click();
-            if (e.key === 'Backspace' || e.key === 'Escape') {
-                if (document.getElementById('player-layer').style.display === 'flex') cerrarPlayer();
-                else cerrarModal();
-            }
-        });
-
-        init();
-    </script>
+    <!-- Loading -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loader"></div>
+    </div>
+    <script src="config.js"></script>
+    <script src="script.js" type="module"></script>
 </body>
 </html>
