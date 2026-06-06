@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.androidx.media3.common)
+    implementation(libs.coil.compose)
     implementation(libs.okhttp)
     implementation(libs.jsoup)
     testImplementation(libs.junit)
