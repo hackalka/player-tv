@@ -40,6 +40,11 @@ const el = {
     playerIframe: $('#player-iframe'),
     playerVideo: $('#player-video'),
     playerStatus: $('#player-status'),
+    detailHero: $('#detail-hero'),
+    detailBackdrop: $('#detail-backdrop'),
+    detailPlay: $('#detail-play'),
+    episodeList: $('#episode-list'),
+    episodesTrack: $('#episodes-track'),
     modalTitle: $('#modal-title'),
     modalDescription: $('#modal-description'),
     modalYear: $('#modal-year'),
@@ -110,15 +115,15 @@ const Netflix = {
                 <h3 class="card-title">${escapeHtml(item.title)}</h3>
                 <div class="card-meta">
                     ${item.year ? `<span>${escapeHtml(item.year)}</span>` : ''}
-                    ${item.duration ? `<span>${escapeHtml(item.duration)}</span>` : ''}
-                    ${item.isVideo ? '<span class="badge-hd">HD</span>' : ''}
+                    ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.duration ? `<span>${escapeHtml(item.duration)}</span>` : '')}
+                    <span class="badge-hd">HD</span>
                 </div>
             </div>
             <div class="card-actions">
                 <button class="card-action-btn primary play-btn" title="Reproducir"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
             </div>`;
-        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); Player.open(item); };
-        card.onclick = () => Player.open(item);
+        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); Detail.open(item, true); };
+        card.onclick = () => Detail.open(item);
         return card;
     },
 
@@ -129,36 +134,98 @@ const Netflix = {
         el.heroTitle.innerText = item.title;
         el.heroDescription.innerText = item.description || '';
         el.heroBadge.innerText = item.category || '';
-        el.heroPlay.onclick = () => Player.open(item);
-        el.heroInfo.onclick = () => Player.open(item);
+        el.heroPlay.onclick = () => Detail.open(item, true);
+        el.heroInfo.onclick = () => Detail.open(item);
     }
 };
 
-/* ===== REPRODUCTOR ===== */
-const Player = {
-    open(item) {
+/* ===== DETALLE (Netflix) + REPRODUCTOR ===== */
+const Detail = {
+    open(item, autoplay) {
+        const eps = item.episodes || [];
         el.modalTitle.innerText = item.title;
-        el.modalDescription.innerText = item.description || 'Sin descripción.';
         el.modalYear.innerText = item.year || '';
-        el.modalDuration.innerText = item.duration || item.size || '';
+        el.modalDuration.innerText = (eps.length > 1)
+            ? `${eps.length} episodios`
+            : (item.duration || (eps[0] && eps[0].duration) || item.size || '');
+        el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        el.detailBackdrop.src = poster;
+        el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
+
+        this.resetVideo();
         el.playerModal.hidden = false;
         el.body.style.overflow = 'hidden';
-        el.playerStatus.hidden = true;
 
-        if (item.streamUrl) {
+        if (eps.length > 1) {
+            el.episodeList.hidden = false;
+            this.renderEpisodes(eps);
+            el.detailPlay.onclick = () => Player.play(eps[0]);
+        } else {
+            el.episodeList.hidden = true;
+            const playable = eps[0] || item;
+            el.detailPlay.onclick = () => Player.play(playable);
+        }
+        if (autoplay) el.detailPlay.click();
+    },
+
+    renderEpisodes(eps) {
+        el.episodesTrack.innerHTML = '';
+        eps.forEach((ep, i) => {
+            const row = document.createElement('div');
+            row.className = 'episode';
+            const thumb = ep.thumbUrl || placeholderImage(ep.id, ep.title);
+            row.innerHTML = `
+                <div class="episode-index">${i + 1}</div>
+                <img class="episode-thumb" src="${thumb}" alt="" onerror="this.src='${placeholderImage(ep.id, ep.title)}'">
+                <div class="episode-info">
+                    <div class="episode-name">${escapeHtml(ep.title)}</div>
+                    <div class="episode-sub">${escapeHtml(ep.duration || ep.size || '')}</div>
+                </div>
+                <span class="episode-play"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>`;
+            row.onclick = () => Player.play(ep);
+            el.episodesTrack.appendChild(row);
+        });
+    },
+
+    resetVideo() {
+        el.playerVideo.hidden = true;
+        try { el.playerVideo.pause(); } catch {}
+        el.playerVideo.removeAttribute('src'); el.playerVideo.load();
+        el.playerIframe.hidden = true; el.playerIframe.src = '';
+        el.detailBackdrop.hidden = false;
+        el.detailHero.classList.remove('playing');
+        el.playerStatus.hidden = true;
+    },
+
+    close() {
+        el.playerModal.hidden = true;
+        el.body.style.overflow = '';
+        this.resetVideo();
+    }
+};
+
+const Player = {
+    play(p) {
+        if (!p) return;
+        el.detailHero.classList.add('playing');
+        el.detailBackdrop.hidden = true;
+        el.playerStatus.hidden = true;
+        if (p.streamUrl) {
             el.playerIframe.hidden = true; el.playerIframe.src = '';
             el.playerVideo.hidden = false;
-            el.playerVideo.src = item.streamUrl;
+            el.playerVideo.src = p.streamUrl;
             el.playerVideo.play().catch(() => {});
             return;
         }
-        if (item.externalUrl) {
+        if (p.externalUrl) {
             el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src'); el.playerVideo.load();
             el.playerIframe.hidden = false;
-            el.playerIframe.src = this.embed(item.externalUrl);
+            el.playerIframe.src = this.embed(p.externalUrl);
             return;
         }
-        el.playerVideo.hidden = true; el.playerIframe.hidden = true;
+        el.detailHero.classList.remove('playing');
+        el.detailBackdrop.hidden = false;
         el.playerStatus.hidden = false;
         el.playerStatus.innerText = 'Esta publicación no tiene video ni enlace reproducible.';
     },
@@ -171,13 +238,6 @@ const Player = {
             }
         } catch {}
         return url;
-    },
-    close() {
-        el.playerModal.hidden = true;
-        el.body.style.overflow = '';
-        el.playerIframe.src = '';
-        try { el.playerVideo.pause(); } catch {}
-        el.playerVideo.removeAttribute('src'); el.playerVideo.load();
     }
 };
 
@@ -236,7 +296,7 @@ const Chat = {
             if (m.isVideo) {
                 const bub = b.querySelector('.tg-bubble');
                 bub.classList.add('playable');
-                bub.onclick = () => Player.open({ id: m.id, title: (m.text.split('\n')[0] || 'Video'), description: m.text, streamUrl: m.streamUrl });
+                bub.onclick = () => Detail.open({ id: m.id, title: (m.text.split('\n')[0] || 'Video'), description: m.text, thumbUrl: m.thumbUrl, streamUrl: m.streamUrl }, true);
             }
             el.chatMessages.appendChild(b);
         });
@@ -282,7 +342,7 @@ const App = {
                 <div class="search-meta"><h3>${escapeHtml(it.title)}</h3>
                 <p>${escapeHtml((it.description || '').slice(0, 140))}</p>
                 <span class="search-cat">${escapeHtml(it.category || '')}</span></div>`;
-            c.onclick = () => { this.closeSearch(); Player.open(it); };
+            c.onclick = () => { this.closeSearch(); Detail.open(it); };
             el.searchResults.appendChild(c);
         });
     },
@@ -315,8 +375,8 @@ async function boot() {
 function wireUi() {
     el.navNetflix.onclick = (e) => { e.preventDefault(); App.switchView('netflix'); };
     el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
-    $('.modal-close', el.playerModal).onclick = () => Player.close();
-    $('.modal-overlay', el.playerModal).onclick = () => Player.close();
+    $('.modal-close', el.playerModal).onclick = () => Detail.close();
+    $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
     el.searchInput.addEventListener('input', e => App.search(e.target.value));
@@ -332,7 +392,7 @@ function wireUi() {
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         if (!el.searchOverlay.hidden) App.closeSearch();
-        else if (!el.playerModal.hidden) Player.close();
+        else if (!el.playerModal.hidden) Detail.close();
     });
     window.addEventListener('scroll', () => {
         el.navbar.classList.toggle('scrolled', window.scrollY > 50);

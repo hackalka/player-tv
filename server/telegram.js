@@ -173,15 +173,86 @@ class TelegramService {
             let items = [];
             try {
                 const msgs = await this.getTopicMessages(topic.id, this.cfg.messagesPerTopic);
-                items = msgs
-                    .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)))
-                    .map(m => this.buildItem(m, topic));
+                items = this._buildTopicItems(msgs, topic);
             } catch (e) {
                 console.warn(`Tema ${topic.name} falló:`, e.message);
             }
             categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
         }
         return { categories };
+    }
+
+    // Construye los items de un tema. Las SERIES se agrupan en "shows" con episodios.
+    _buildTopicItems(msgs, topic) {
+        const raw = msgs
+            .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)))
+            .map(m => this.buildItem(m, topic));
+
+        if (topic.type !== 'series') return raw;
+
+        const groups = new Map();
+        for (const it of raw) {
+            const ep = this._parseEpisode(it.title);
+            const base = (ep && ep.base) ? ep.base : it.title;
+            const key = this._slug(base);
+            if (!groups.has(key)) groups.set(key, { base, eps: [] });
+            const g = groups.get(key);
+            g.eps.push({ it, ep: ep || { season: 1, ep: g.eps.length + 1, guessed: true } });
+        }
+
+        const shows = [];
+        for (const [key, g] of groups) {
+            const eps = g.eps.sort((a, b) => (a.ep.season - b.ep.season) || (a.ep.ep - b.ep.ep));
+            const poster = (eps.find(e => e.it.hasThumb) || eps[0]).it;
+            const episodes = eps.map(e => ({
+                id: e.it.id,
+                title: this._epLabel(e.ep),
+                epNum: e.ep.ep,
+                season: e.ep.season,
+                streamUrl: e.it.streamUrl,
+                externalUrl: e.it.externalUrl,
+                thumbUrl: e.it.thumbUrl,
+                duration: e.it.duration,
+                size: e.it.size,
+                description: e.it.description
+            }));
+            shows.push({
+                id: 's-' + topic.id + '-' + key,
+                topicId: topic.id,
+                title: g.base || 'Serie',
+                description: (eps.find(e => e.it.description) || eps[0]).it.description || '',
+                year: (eps.find(e => e.it.year) || eps[0]).it.year || '',
+                isSeries: episodes.length > 1,
+                episodeCount: episodes.length,
+                thumbUrl: poster.thumbUrl,
+                episodes
+            });
+        }
+        return shows;
+    }
+
+    // Detecta el número de episodio en un título: S01E02 / T1E02 / 1x02 / Capítulo 3 ...
+    _parseEpisode(title) {
+        const t = String(title || '');
+        let m;
+        m = t.match(/\b[st](\d{1,2})\s*[ex](\d{1,3})\b/i);          // s01e02 / t1e02
+        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
+        m = t.match(/\b(\d{1,2})\s*x\s*(\d{1,3})\b/i);              // 1x02
+        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
+        m = t.match(/(cap[ií]tulo|cap\.?|episodio|epis\.?|ep\.?)\s*\.?\s*(\d{1,3})/i); // capítulo 3
+        if (m) return { season: 1, ep: +m[2], base: t.slice(0, m.index).trim() };
+        return null;
+    }
+
+    _epLabel(ep) {
+        return (ep.season && ep.season > 1)
+            ? `T${ep.season} · Capítulo ${ep.ep}`
+            : `Capítulo ${ep.ep}`;
+    }
+
+    _slug(s) {
+        return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
     }
 
     // ---- miniatura ----

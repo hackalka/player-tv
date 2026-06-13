@@ -761,3 +761,71 @@ body.telegram-mode .nav-links { visibility: hidden; }
     .tg-sidebar { display: none; }
     .logo-text { font-size: 1rem; }
 }
+
+
+/* =====================================================================
+ *  MODAL DE DETALLE (estilo Netflix) + EPISODIOS
+ * ===================================================================== */
+.detail-modal { padding: 0; overflow: hidden; }
+.detail-hero {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
+    display: flex; align-items: flex-end; overflow: hidden;
+}
+.detail-hero .detail-backdrop {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.detail-hero-shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(0deg, #181818 0%, rgba(24,24,24,.5) 40%, rgba(24,24,24,.1) 100%);
+}
+.detail-hero-content {
+    position: relative; z-index: 2; padding: 0 40px 32px; width: 100%;
+}
+.detail-title {
+    font-size: 2rem; font-weight: 800; margin: 0 0 16px; color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,.7); line-height: 1.1;
+}
+.detail-hero #player-video,
+.detail-hero #player-iframe {
+    position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #000; z-index: 3;
+}
+.detail-hero.playing .detail-hero-shade,
+.detail-hero.playing .detail-hero-content { display: none; }
+.detail-hero #player-video[hidden],
+.detail-hero #player-iframe[hidden] { display: none; }
+
+.detail-modal .modal-details { padding: 22px 40px 40px; }
+.detail-modal .modal-title { display: none; } /* el título va en el hero */
+
+/* Lista de episodios */
+.episodes { margin-top: 26px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 18px; }
+.episodes-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 14px; color: #fff; }
+.episodes-track { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow-y: auto; }
+.episode {
+    display: flex; align-items: center; gap: 16px; padding: 12px 10px; border-radius: 8px;
+    cursor: pointer; transition: background var(--transition-fast); border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.episode:hover { background: rgba(255,255,255,.08); }
+.episode-index { width: 26px; text-align: center; font-size: 1.1rem; font-weight: 700; color: var(--netflix-light-gray); flex-shrink: 0; }
+.episode-thumb { width: 130px; height: 73px; object-fit: cover; border-radius: 6px; background: #000; flex-shrink: 0; }
+.episode-info { flex: 1; min-width: 0; }
+.episode-name { color: #fff; font-weight: 600; font-size: .98rem; }
+.episode-sub { color: var(--netflix-light-gray); font-size: .82rem; margin-top: 3px; }
+.episode-play {
+    width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,.6);
+    display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+.episode:hover .episode-play { border-color: #fff; background: rgba(255,255,255,.15); }
+
+/* Indicador de serie en la tarjeta */
+.badge-series {
+    border: 1px solid rgba(255,255,255,.4); border-radius: 3px; padding: 0 4px; font-size: .65rem;
+}
+
+@media (max-width: 640px) {
+    .detail-title { font-size: 1.4rem; }
+    .detail-hero-content { padding: 0 18px 18px; }
+    .detail-modal .modal-details { padding: 18px; }
+    .episode-thumb { width: 92px; height: 52px; }
+}
