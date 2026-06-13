@@ -887,3 +887,18 @@ body.telegram-mode .nav-links { visibility: hidden; }
 @media (min-width: 1280px) {
     .card:focus { box-shadow: 0 0 0 3px #fff, 0 12px 30px rgba(0,0,0,.6); }
 }
+
+
+/* ===== Lista de enlaces dentro de la portada (multi-fuente) ===== */
+.sources { margin: 18px 0 6px; }
+.sources-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 12px; color: #fff; }
+.sources-track { display: flex; flex-wrap: wrap; gap: 10px; }
+.source-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 8px;
+    background: #2a2a2a; color: #fff; border: 1px solid #3a3a3a; cursor: pointer;
+    font-size: .92rem; font-weight: 600; transition: all var(--transition-fast);
+}
+.source-btn:hover { background: #3a3a3a; }
+.source-btn.active { border-color: var(--netflix-red); background: #3a1417; }
+.source-btn.ace .source-ico { color: #4fd07a; }
+.source-ico { font-size: 1rem; line-height: 1; }

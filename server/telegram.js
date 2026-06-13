@@ -126,18 +126,39 @@ class TelegramService {
     // ---- construir un item de catálogo a partir de un mensaje ----
     buildItem(message, topic) {
         const text = message.message || '';
-        const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+        const allLines = text.split('\n').map(s => s.trim());
         const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').trim();
-        const title = clean(lines[0]) || topic.name;
-        const description = clean(lines.slice(1).join(' '));
+        const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:)/i.test(l);
+
+        const firstIdx = allLines.findIndex(l => l);
+        const title = clean(allLines[firstIdx] || '') || topic.name;
+
+        // Parsear enlaces (varios por post) + sinopsis (lo que no es enlace ni etiqueta de enlace)
+        const links = [];
+        const synopsisParts = [];
+        let pendingLabel = '';
+        for (let i = firstIdx + 1; i < allLines.length; i++) {
+            const line = allLines[i];
+            if (!line) continue;
+            if (isUrl(line)) {
+                const kind = /^acestream:/i.test(line) ? 'ace' : 'http';
+                const label = (pendingLabel || ('Enlace ' + (links.length + 1))).replace(/[:：]\s*$/, '').trim();
+                links.push({ label, url: line, kind });
+                pendingLabel = '';
+            } else {
+                // ¿es la etiqueta del siguiente enlace?
+                let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
+                if (j < allLines.length && isUrl(allLines[j])) pendingLabel = line;
+                else synopsisParts.push(line);
+            }
+        }
+        const description = clean(synopsisParts.join(' '));
         const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
-        const urlMatch = text.match(/https?:\/\/\S+/);
+
         const doc = message.media && message.media.document;
         const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
-        const hasThumb = !!(message.media && (message.media.photo ||
-            (doc && doc.thumbs && doc.thumbs.length)));
+        const hasThumb = !!(message.media && (message.media.photo || (doc && doc.thumbs && doc.thumbs.length)));
 
-        // nombre de archivo / extensión
         let filename = '';
         if (doc) {
             const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
@@ -145,18 +166,12 @@ class TelegramService {
         }
         const ext = (filename.match(/\.([a-z0-9]{2,4})$/i) || [])[1]
             || ((doc && (doc.mimeType || '').split('/')[1]) || '').toLowerCase();
-        // formatos que el navegador suele reproducir sin problemas
         const BROWSER_OK = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov', 'quicktime'];
         const playableInBrowser = isVideo && BROWSER_OK.includes((ext || '').toLowerCase());
 
-        // AceStream (acestream://<40hex> o id de 40 hex citando acestream)
-        let aceUrl = '';
-        const aceDirect = text.match(/acestream:\/\/[0-9a-fA-F]{40}/i);
-        if (aceDirect) aceUrl = aceDirect[0];
-        else {
-            const idm = text.match(/\b([0-9a-fA-F]{40})\b/);
-            if (idm && /ace\s*stream|acestream|ace\b/i.test(text)) aceUrl = 'acestream://' + idm[1];
-        }
+        // compatibilidad: primer ace / primer http sueltos
+        const firstAce = links.find(l => l.kind === 'ace');
+        const firstHttp = links.find(l => l.kind === 'http');
 
         return {
             id: message.id,
@@ -170,8 +185,9 @@ class TelegramService {
             isVideo,
             ext: (ext || '').toLowerCase(),
             playableInBrowser,
-            aceUrl,
-            externalUrl: urlMatch ? urlMatch[0] : '',
+            links,
+            aceUrl: firstAce ? firstAce.url : '',
+            externalUrl: firstHttp ? firstHttp.url : '',
             hasThumb,
             streamUrl: isVideo ? `/api/stream/${topic.id}/${message.id}` : '',
             thumbUrl: hasThumb ? `/api/thumb/${topic.id}/${message.id}` : ''
@@ -261,6 +277,7 @@ class TelegramService {
                 streamUrl: e.it.streamUrl,
                 externalUrl: e.it.externalUrl,
                 aceUrl: e.it.aceUrl,
+                links: e.it.links,
                 ext: e.it.ext,
                 playableInBrowser: e.it.playableInBrowser,
                 thumbUrl: e.it.thumbUrl,

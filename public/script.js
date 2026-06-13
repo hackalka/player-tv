@@ -103,6 +103,8 @@ const el = {
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
+    sources: $('#sources'),
+    sourcesTrack: $('#sources-track'),
     modalTitle: $('#modal-title'),
     modalDescription: $('#modal-description'),
     modalYear: $('#modal-year'),
@@ -183,7 +185,7 @@ const Netflix = {
                 <h3 class="card-title">${escapeHtml(item.title || '')}</h3>
                 <div class="card-meta">
                     ${item.year ? `<span>${escapeHtml(item.year)}</span>` : ''}
-                    ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.duration && kind !== 'continue' ? `<span>${escapeHtml(item.duration)}</span>` : '')}
+                    ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.links && item.links.length > 1 ? `<span class="badge-series">${item.links.length} ENLACES</span>` : (item.duration && kind !== 'continue' ? `<span>${escapeHtml(item.duration)}</span>` : ''))}
                     <span class="badge-hd">HD</span>
                 </div>
             </div>
@@ -215,53 +217,98 @@ const Netflix = {
 /* ===== DETALLE + favoritos + reproductores externos ===== */
 const Detail = {
     current: null,
+    primary: null,
     open(item, opts = {}) {
         this.current = item;
         const eps = item.episodes || [];
+        const hasLinks = !!(item.links && item.links.length);
         el.modalTitle.innerText = item.title;
         el.modalYear.innerText = item.year || '';
-        el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios` : (item.duration || (eps[0] && eps[0].duration) || item.size || '');
+        el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
+            : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
+            : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
         el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
         const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = poster;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
 
         this.resetVideo();
+        this.resetSources();
         this.updateFav();
         el.playerModal.hidden = false;
         el.body.style.overflow = 'hidden';
 
-        // playable principal (serie: último visto o capítulo 1)
         let primary;
         if (eps.length > 1) {
             el.episodeList.hidden = false;
             this.renderEpisodes(eps, item);
             const lastId = Store.lastEp[item.id];
             primary = eps.find(e => String(e.id) === String(lastId)) || eps[0];
+        } else if (hasLinks) {
+            el.episodeList.hidden = true;
+            primary = this.renderSources(item);
         } else {
             el.episodeList.hidden = true;
             primary = eps[0] || item;
         }
+        this.primary = primary;
         ExternalPlayers.render(primary);
-        el.detailPlay.onclick = () => Player.play(primary, item);
+        el.detailPlay.onclick = () => Player.play(Detail.primary, item);
         el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); };
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
     },
 
+    // Lista de enlaces (Enlace DAZN 1, 2, 3...) dentro de una misma portada
+    renderSources(item) {
+        el.sources.hidden = false;
+        el.sourcesTrack.innerHTML = '';
+        const playables = item.links.map((l, i) => this._linkToPlayable(item, l, i));
+        playables.forEach((pl, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'source-btn focusable' + (pl.aceUrl ? ' ace' : '');
+            btn.tabIndex = 0;
+            btn.innerHTML = `<span class="source-ico">${pl.aceUrl ? '📡' : '▶'}</span> ${escapeHtml(item.links[i].label)}`;
+            btn.onclick = () => {
+                $$('.source-btn', el.sourcesTrack).forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                Detail.primary = pl;
+                ExternalPlayers.render(pl);
+                Player.play(pl, item);
+            };
+            el.sourcesTrack.appendChild(btn);
+        });
+        const first = playables[0];
+        if (first) $$('.source-btn', el.sourcesTrack)[0].classList.add('active');
+        return first;
+    },
+
+    _linkToPlayable(item, link, i) {
+        return {
+            id: item.id + '-l' + i,
+            title: link.label,
+            aceUrl: link.kind === 'ace' ? link.url : '',
+            externalUrl: link.kind === 'http' ? link.url : '',
+            streamUrl: '',
+            playableInBrowser: false,
+            thumbUrl: item.thumbUrl
+        };
+    },
+
+    resetSources() { el.sources.hidden = true; el.sourcesTrack.innerHTML = ''; },
+
     // Reanudar desde una tarjeta de "Continuar viendo"
     resume(record) {
         const parent = state.itemsById[record.parentId];
         if (parent) { this.open(parent, { autoplay: true }); return; }
-        // si ya no está en catálogo, reproducir directo
-        this.current = record;
+        this.current = record; this.primary = record;
         el.modalTitle.innerText = record.title;
         el.modalDescription.innerText = '';
         el.modalYear.innerText = ''; el.modalDuration.innerText = '';
         el.detailBackdrop.src = record.thumbUrl || placeholderImage(record.id, record.title);
         el.episodeList.hidden = true;
-        this.resetVideo(); this.updateFav();
+        this.resetVideo(); this.resetSources(); this.updateFav();
         el.playerModal.hidden = false; el.body.style.overflow = 'hidden';
         ExternalPlayers.render(record);
         el.detailPlay.onclick = () => Player.play(record, record);
@@ -571,7 +618,7 @@ const App = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .btn, .episode, .chat-item, .opt-btn, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
+    SEL: '.card, .btn, .episode, .chat-item, .opt-btn, .source-btn, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (!el.playerModal.hidden) return el.playerModal;

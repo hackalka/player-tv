@@ -108,3 +108,25 @@ etiqueta en el título del tema.
 - **Reproductores externos:** si el vídeo es `mkv`, `avi` u otro formato que el navegador no reproduce, el detalle ofrece abrirlo en **VLC** o **copiar el enlace**. Los enlaces **AceStream** muestran un botón directo (`acestream://`) y un acceso para Android.
 - **Chat solo para administradores:** la pestaña *Chat* está oculta. Pulsa el **candado** (arriba a la derecha) e introduce `ADMIN_PASSWORD` para verla. Desde ahí, un admin puede **editar** o **borrar** mensajes del grupo.
 - **TV Box y mando:** navegación con flechas (↑↓←→), **OK** para abrir/reproducir y **Atrás** para cerrar. Los elementos enfocados se resaltan.
+
+
+## Posts con varios enlaces (deportes en directo, multi-canal)
+
+Puedes poner **título, sinopsis y varios enlaces en un mismo mensaje**. La sinopsis se lee
+en la ficha y los enlaces salen como botones (Enlace 1, 2, 3…). Cada línea de texto que va
+justo **encima** de un enlace se usa como su nombre. Ejemplo:
+
+```
+🇪🇸 Mundial Fútbol 🇪🇸
+Resumen o sinopsis del evento (opcional)
+
+Enlace DAZN 1
+acestream://dda5d2cace9bc4cb0918e62bc50d657d4a10496a
+Enlace DAZN 2
+acestream://3c4185422b04ef24c80e015210339f805d80f9f0
+Enlace TVE La 1
+acestream://9c079e1bbd01814c107e89187b8c24ba0ac306dd
+```
+
+En la ficha aparecerán los botones **Enlace DAZN 1 / DAZN 2 / TVE La 1**, cada uno abre su
+enlace AceStream (o se copia). Sirve igual con enlaces `https://` (se abren / van a VLC).
