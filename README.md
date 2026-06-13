@@ -165,3 +165,14 @@ https://t.me/AprendiendoBoxTv/1249/1753
 Los botones **Cine / Chat** de arriba **no se muestran a los usuarios normales**: solo aparecen
 tras iniciar sesión con el **candado** 🔒 y la `ADMIN_PASSWORD`. Desde ahí, el admin entra al
 **Chat** para **editar, cambiar o borrar** contenido del grupo. El usuario normal solo ve el catálogo.
+
+
+## Mejoras adicionales
+
+- **Quitar de "Continuar viendo":** cada portada de esa fila tiene una **✕** para eliminarla.
+- **Novedades:** fila automática con lo más reciente (por fecha del post).
+- **Buscador con filtros:** por **género** y **año** (además del texto).
+- **Caché de miniaturas en disco:** la segunda carga es mucho más rápida.
+- **Streaming con reintentos:** si Telegram corta un trozo, el servidor reanuda solo.
+- **Cabeceras de seguridad** básicas y `x-powered-by` desactivado.
+- **Admin:** botón **↻ Actualizar** (recarga el catálogo al instante) junto al candado.

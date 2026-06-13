@@ -86,6 +86,9 @@ const el = {
     viewSwitch: $('.view-switch'),
     navLinks: $('#nav-links'),
     adminLock: $('#admin-lock'),
+    adminRefresh: $('#admin-refresh'),
+    filterGenre: $('#filter-genre'),
+    filterYear: $('#filter-year'),
     heroImage: $('#hero-image'),
     heroTitle: $('#hero-title'),
     heroDescription: $('#hero-description'),
@@ -136,6 +139,9 @@ const Netflix = {
         if (cont.length) el.rowsContainer.appendChild(this.row('▶ Continuar viendo', cont, 'continue'));
         const favs = Store.favList();
         if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));
+
+        const novedades = state.allItems.filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
+        if (novedades.length) el.rowsContainer.appendChild(this.row('🆕 Novedades', novedades));
 
         if (!cats.length && !cont.length && !favs.length) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
@@ -191,6 +197,7 @@ const Netflix = {
                 </div>
             </div>
             ${pct ? `<div class="card-progress"><span style="width:${pct}%"></span></div>` : ''}
+            ${kind === 'continue' ? `<button class="card-remove" title="Quitar de Continuar viendo" aria-label="Quitar">✕</button>` : ''}
             <div class="card-actions">
                 <button class="card-action-btn primary play-btn" title="Reproducir"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
             </div>`;
@@ -199,6 +206,8 @@ const Netflix = {
             else Detail.open(item);
         };
         $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : Detail.open(item, { autoplay: true }); };
+        const rm = $('.card-remove', card);
+        if (rm) rm.onclick = (e) => { e.stopPropagation(); Store.clearProgress(item.id); Netflix.render(); };
         card.onclick = onActivate;
         return card;
     },
@@ -501,10 +510,21 @@ const Admin = {
         } catch (e) { alert('No autorizado: ' + e.message); }
     },
     logout() { Store.adminKey = ''; state.isAdmin = false; this.reflect(); App.switchView('netflix'); },
+    async refresh() {
+        try {
+            await api('/api/admin/refresh', { method: 'POST', body: JSON.stringify({}) });
+            const catalog = await api('/api/catalog?refresh=1');
+            state.catalog = catalog; state.allItems = []; state.itemsById = {};
+            catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
+            App.populateFilters(); Netflix.render();
+            alert('Catálogo actualizado.');
+        } catch (e) { alert('Error al actualizar: ' + e.message); }
+    },
     reflect() {
         const show = !!(state.adminEnabled && state.isAdmin);
         el.navTelegram.hidden = !show;
         if (el.viewSwitch) el.viewSwitch.hidden = !show;
+        el.adminRefresh.hidden = !show;
         el.adminLock.classList.toggle('active', state.isAdmin);
     }
 };
@@ -605,13 +625,18 @@ const App = {
         }
         TVNav.refresh();
     },
-    search(q) {
-        q = q.trim().toLowerCase();
-        if (!q) { el.searchResults.innerHTML = ''; return; }
-        const res = state.allItems.filter(it =>
-            (it.title || '').toLowerCase().includes(q) ||
-            (it.description || '').toLowerCase().includes(q) ||
-            (it.category || '').toLowerCase().includes(q));
+    search() {
+        const q = (el.searchInput.value || '').trim().toLowerCase();
+        const genre = (el.filterGenre.value || '').toLowerCase();
+        const year = el.filterYear.value || '';
+        if (!q && !genre && !year) { el.searchResults.innerHTML = ''; return; }
+        const res = state.allItems.filter(it => {
+            const okText = !q || (it.title || '').toLowerCase().includes(q) ||
+                (it.description || '').toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q);
+            const okGenre = !genre || ((it.meta && it.meta.genres) || '').toLowerCase().includes(genre);
+            const okYear = !year || String(it.year) === year;
+            return okText && okGenre && okYear;
+        });
         if (!res.length) { el.searchResults.innerHTML = '<div class="search-empty">Sin resultados.</div>'; return; }
         el.searchResults.innerHTML = '';
         res.forEach(it => {
@@ -627,13 +652,24 @@ const App = {
         });
         TVNav.refresh();
     },
+    populateFilters() {
+        const genres = new Set(), years = new Set();
+        state.allItems.forEach(it => {
+            if (it.meta && it.meta.genres) it.meta.genres.split(/[,/]/).forEach(g => { const t = g.trim(); if (t) genres.add(t); });
+            if (it.year) years.add(String(it.year));
+        });
+        el.filterGenre.innerHTML = '<option value="">Todos los géneros</option>' +
+            [...genres].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+        el.filterYear.innerHTML = '<option value="">Todos los años</option>' +
+            [...years].sort((a, b) => b - a).map(y => `<option value="${y}">${y}</option>`).join('');
+    },
     openSearch() { el.searchOverlay.hidden = false; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
-    closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
+    closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
 };
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .btn, .episode, .chat-item, .opt-btn, .source-btn, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
+    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (!el.playerModal.hidden) return el.playerModal;
@@ -708,6 +744,7 @@ async function boot() {
         catalog.categories.forEach(c => c.items.forEach(it => {
             it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it;
         }));
+        App.populateFilters();
         Netflix.render();
         App.switchView('netflix');
         setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
@@ -728,7 +765,10 @@ function wireUi() {
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
-    el.searchInput.addEventListener('input', e => App.search(e.target.value));
+    el.searchInput.addEventListener('input', () => App.search());
+    el.filterGenre.addEventListener('change', () => App.search());
+    el.filterYear.addEventListener('change', () => App.search());
+    el.adminRefresh.onclick = () => Admin.refresh();
     el.navLinks.addEventListener('click', (e) => {
         const a = e.target.closest('a[data-cat]'); if (!a) return;
         e.preventDefault();

@@ -1,5 +1,8 @@
 'use strict';
 const path = require('path');
+const os = require('os');
+const fs = require('fs');
+const fsp = require('fs/promises');
 const express = require('express');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
@@ -7,11 +10,37 @@ const cfg = require('./config');
 const { TelegramService } = require('./telegram');
 
 const app = express();
+app.disable('x-powered-by');
 app.use(express.json());
+// Cabeceras de seguridad básicas
+app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Referrer-Policy', 'no-referrer');
+    next();
+});
 const tg = new TelegramService(cfg);
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const ALIGN = 4096;
+
+// Caché de miniaturas en disco (rapidez)
+const THUMB_DIR = path.join(os.tmpdir(), 'tvp-thumbs');
+try { fs.mkdirSync(THUMB_DIR, { recursive: true }); } catch {}
+async function serveThumb(res, key, downloader) {
+    const file = path.join(THUMB_DIR, key.replace(/[^\w-]/g, '_') + '.jpg');
+    try {
+        const data = await fsp.readFile(file);
+        res.set('Content-Type', 'image/jpeg'); res.set('Cache-Control', 'public, max-age=604800');
+        return res.send(data);
+    } catch {}
+    let buf;
+    try { buf = await downloader(); } catch (e) { console.warn('thumb dl', e.message); }
+    if (!buf) return res.status(404).end();
+    const b = Buffer.from(buf);
+    fsp.writeFile(file, b).catch(() => {});
+    res.set('Content-Type', 'image/jpeg'); res.set('Cache-Control', 'public, max-age=604800');
+    res.send(b);
+}
 
 // ¿Falta la sesión? -> modo configuración (asistente web en /setup)
 const setupMode = !cfg.session;
@@ -176,33 +205,21 @@ app.get('/api/chat/:topicId', adminOnly, async (req, res) => {
 });
 
 // ---- miniatura ----
-app.get('/api/thumb/:topicId/:msgId', async (req, res) => {
-    try {
-        const buf = await tg.downloadThumb(req.params.topicId, req.params.msgId);
-        if (!buf) return res.status(404).end();
-        res.set('Content-Type', 'image/jpeg');
-        res.set('Cache-Control', 'public, max-age=86400');
-        res.send(Buffer.from(buf));
-    } catch (e) {
-        console.warn('thumb error', e.message);
-        res.status(500).end();
-    }
+app.get('/api/thumb/:topicId/:msgId', (req, res) => {
+    serveThumb(res, 'g-' + req.params.topicId + '-' + req.params.msgId,
+        () => tg.downloadThumb(req.params.topicId, req.params.msgId));
 });
 
 // ---- miniatura de un mensaje de OTRO canal (enlace t.me) ----
-app.get('/api/thumb-link/:channel/:msgId', async (req, res) => {
-    try {
+app.get('/api/thumb-link/:channel/:msgId', (req, res) => {
+    serveThumb(res, 'l-' + req.params.channel + '-' + req.params.msgId, async () => {
         const message = await tg.getMessageByRef(req.params.channel, req.params.msgId);
-        if (!message || !message.media) return res.status(404).end();
-        let buf;
+        if (!message || !message.media) return null;
         const doc = message.media.document;
-        if (message.media.photo) buf = await tg.client.downloadMedia(message, {});
-        else if (doc && doc.thumbs && doc.thumbs.length) buf = await tg.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
-        if (!buf) return res.status(404).end();
-        res.set('Content-Type', 'image/jpeg');
-        res.set('Cache-Control', 'public, max-age=86400');
-        res.send(Buffer.from(buf));
-    } catch (e) { console.warn('thumb-link error', e.message); res.status(500).end(); }
+        if (message.media.photo) return await tg.client.downloadMedia(message, {});
+        if (doc && doc.thumbs && doc.thumbs.length) return await tg.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
+        return null;
+    });
 });
 
 // función reutilizable de streaming por rangos
@@ -231,18 +248,30 @@ async function streamMessage(message, req, res) {
     const alignedStart = Math.floor(start / ALIGN) * ALIGN;
     let skip = start - alignedStart;
     let toWrite = chunkSize;
-    let downloadLimit = Math.ceil((skip + chunkSize) / ALIGN) * ALIGN;
+    let pos = alignedStart;
+    let remaining = Math.ceil((skip + chunkSize) / ALIGN) * ALIGN;
+    let attempts = 0;
 
-    const iterator = tg.streamRange(info, alignedStart, downloadLimit);
-    for await (const chunk of iterator) {
-        if (res.writableEnded) break;
-        let buf = Buffer.from(chunk);
-        if (skip > 0) { if (skip >= buf.length) { skip -= buf.length; continue; } buf = buf.subarray(skip); skip = 0; }
-        if (buf.length > toWrite) buf = buf.subarray(0, toWrite);
-        const ok = res.write(buf);
-        toWrite -= buf.length;
-        if (!ok) await new Promise(r => res.once('drain', r));
-        if (toWrite <= 0) break;
+    while (toWrite > 0 && !res.writableEnded) {
+        try {
+            const iterator = tg.streamRange(info, pos, remaining);
+            for await (const chunk of iterator) {
+                if (res.writableEnded) break;
+                let buf = Buffer.from(chunk);
+                pos += buf.length; remaining -= buf.length;
+                if (skip > 0) { if (skip >= buf.length) { skip -= buf.length; continue; } buf = buf.subarray(skip); skip = 0; }
+                if (buf.length > toWrite) buf = buf.subarray(0, toWrite);
+                const ok = res.write(buf);
+                toWrite -= buf.length;
+                if (!ok) await new Promise(r => res.once('drain', r));
+                if (toWrite <= 0) break;
+            }
+            break;
+        } catch (e) {
+            if (++attempts > 2) throw e;
+            console.warn('reintentando stream (' + attempts + '):', e.message);
+            await new Promise(r => setTimeout(r, 400));
+        }
     }
     res.end();
 }
