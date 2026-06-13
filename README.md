@@ -70,6 +70,7 @@ como `TG_SESSION` en Railway. **No la subas a GitHub.**
    - `TG_GROUP_ID` = `-1003749684388`
    - `APP_NAME` = `Tv Player`
    - `AUTO_TAG` = `playertv:auto` (o varias separadas por coma)
+   - `ADMIN_PASSWORD` = una contraseña tuya (para el chat y editar/borrar). Si la dejas vacía, no hay panel admin.
 3. Railway construye con Nixpacks y arranca con `npm start`. La web queda lista **sin login**.
 
 ### 3) Local (opcional)
@@ -97,3 +98,13 @@ etiqueta en el título del tema.
 - La sesión puede caducar o invalidarse si cierras esa sesión desde Telegram; en ese caso
   vuelve a ejecutar `npm run login` y actualiza `TG_SESSION`.
 - El streaming usa `Range` HTTP nativo, así que el `<video>` del navegador puede adelantar/retroceder.
+
+
+## Funciones de la app
+
+- **Continuar viendo:** recuerda por dónde ibas (guarda el minuto en tu navegador) y muestra una fila arriba. En series recuerda el último capítulo.
+- **Mi lista (favoritos):** botón en el detalle para guardar títulos; aparecen en su propia fila.
+- **Sin duplicados:** en películas/deportes, si hay dos con el mismo nombre o el mismo vídeo, solo se muestra uno. En series no se repiten capítulos.
+- **Reproductores externos:** si el vídeo es `mkv`, `avi` u otro formato que el navegador no reproduce, el detalle ofrece abrirlo en **VLC** o **copiar el enlace**. Los enlaces **AceStream** muestran un botón directo (`acestream://`) y un acceso para Android.
+- **Chat solo para administradores:** la pestaña *Chat* está oculta. Pulsa el **candado** (arriba a la derecha) e introduce `ADMIN_PASSWORD` para verla. Desde ahí, un admin puede **editar** o **borrar** mensajes del grupo.
+- **TV Box y mando:** navegación con flechas (↑↓←→), **OK** para abrir/reproducir y **Atrás** para cerrar. Los elementos enfocados se resaltan.

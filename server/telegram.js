@@ -127,7 +127,7 @@ class TelegramService {
     buildItem(message, topic) {
         const text = message.message || '';
         const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
-        const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').trim();
+        const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').trim();
         const title = clean(lines[0]) || topic.name;
         const description = clean(lines.slice(1).join(' '));
         const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
@@ -136,15 +136,41 @@ class TelegramService {
         const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
         const hasThumb = !!(message.media && (message.media.photo ||
             (doc && doc.thumbs && doc.thumbs.length)));
+
+        // nombre de archivo / extensión
+        let filename = '';
+        if (doc) {
+            const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+            if (fn) filename = fn.fileName || '';
+        }
+        const ext = (filename.match(/\.([a-z0-9]{2,4})$/i) || [])[1]
+            || ((doc && (doc.mimeType || '').split('/')[1]) || '').toLowerCase();
+        // formatos que el navegador suele reproducir sin problemas
+        const BROWSER_OK = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov', 'quicktime'];
+        const playableInBrowser = isVideo && BROWSER_OK.includes((ext || '').toLowerCase());
+
+        // AceStream (acestream://<40hex> o id de 40 hex citando acestream)
+        let aceUrl = '';
+        const aceDirect = text.match(/acestream:\/\/[0-9a-fA-F]{40}/i);
+        if (aceDirect) aceUrl = aceDirect[0];
+        else {
+            const idm = text.match(/\b([0-9a-fA-F]{40})\b/);
+            if (idm && /ace\s*stream|acestream|ace\b/i.test(text)) aceUrl = 'acestream://' + idm[1];
+        }
+
         return {
             id: message.id,
             topicId: topic.id,
+            uid: doc && doc.id ? String(doc.id) : '',
             title,
             description,
             year,
             duration: isVideo ? this._duration(doc) : '',
             size: doc ? this._bytes(doc.size) : '',
             isVideo,
+            ext: (ext || '').toLowerCase(),
+            playableInBrowser,
+            aceUrl,
             externalUrl: urlMatch ? urlMatch[0] : '',
             hasThumb,
             streamUrl: isVideo ? `/api/stream/${topic.id}/${message.id}` : '',
@@ -185,11 +211,24 @@ class TelegramService {
     // Construye los items de un tema. Las SERIES se agrupan en "shows" con episodios.
     _buildTopicItems(msgs, topic) {
         const raw = msgs
-            .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)))
+            .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)) || (m.message && /acestream/i.test(m.message)))
             .map(m => this.buildItem(m, topic));
 
-        if (topic.type !== 'series') return raw;
+        // SIN series -> lista plana SIN duplicados (mismo título o mismo vídeo)
+        if (topic.type !== 'series') {
+            const seen = new Set();
+            const out = [];
+            for (const it of raw) {
+                const kTitle = 't:' + this._slug(it.title);
+                const kUid = it.uid ? 'u:' + it.uid : null;
+                if (seen.has(kTitle) || (kUid && seen.has(kUid))) continue;
+                seen.add(kTitle); if (kUid) seen.add(kUid);
+                out.push(it);
+            }
+            return out;
+        }
 
+        // SERIES -> agrupar por nombre base
         const groups = new Map();
         for (const it of raw) {
             const ep = this._parseEpisode(it.title);
@@ -202,7 +241,17 @@ class TelegramService {
 
         const shows = [];
         for (const [key, g] of groups) {
-            const eps = g.eps.sort((a, b) => (a.ep.season - b.ep.season) || (a.ep.ep - b.ep.ep));
+            // ordenar y quitar capítulos duplicados (mismo nº o mismo vídeo)
+            const sorted = g.eps.sort((a, b) => (a.ep.season - b.ep.season) || (a.ep.ep - b.ep.ep));
+            const seenEp = new Set();
+            const eps = [];
+            for (const e of sorted) {
+                const kNum = `${e.ep.season}-${e.ep.ep}`;
+                const kUid = e.it.uid ? 'u:' + e.it.uid : null;
+                if (seenEp.has(kNum) || (kUid && seenEp.has(kUid))) continue;
+                seenEp.add(kNum); if (kUid) seenEp.add(kUid);
+                eps.push(e);
+            }
             const poster = (eps.find(e => e.it.hasThumb) || eps[0]).it;
             const episodes = eps.map(e => ({
                 id: e.it.id,
@@ -211,6 +260,9 @@ class TelegramService {
                 season: e.ep.season,
                 streamUrl: e.it.streamUrl,
                 externalUrl: e.it.externalUrl,
+                aceUrl: e.it.aceUrl,
+                ext: e.it.ext,
+                playableInBrowser: e.it.playableInBrowser,
                 thumbUrl: e.it.thumbUrl,
                 duration: e.it.duration,
                 size: e.it.size,
@@ -293,6 +345,20 @@ class TelegramService {
             requestSize: 512 * 1024,
             dcId: info.dcId
         });
+    }
+
+    // ---- ADMIN: editar el texto/caption de un mensaje ----
+    async editMessageText(msgId, text) {
+        const entity = await this.resolveGroup();
+        await this.client.editMessage(entity, { message: Number(msgId), text: String(text) });
+        this._msgCache.delete(Number(msgId));
+    }
+
+    // ---- ADMIN: borrar un mensaje ----
+    async deleteMessage(msgId) {
+        const entity = await this.resolveGroup();
+        await this.client.deleteMessages(entity, [Number(msgId)], { revoke: true });
+        this._msgCache.delete(Number(msgId));
     }
 }
 

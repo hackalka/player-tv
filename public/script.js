@@ -1,5 +1,10 @@
 /* =====================================================================
- * Tv Player — frontend (consume la API del servidor; sin login, sin bot)
+ * Tv Player — frontend
+ *  - Catálogo Netflix (películas/series/deportes) desde la API
+ *  - Continuar viendo + Mi lista (favoritos) en localStorage
+ *  - Reproductores externos (VLC / AceStream) para mkv/avi/enlaces
+ *  - Chat solo para administradores (editar / borrar)
+ *  - Navegación con mando de TV Box (flechas + OK + atrás)
  * ===================================================================== */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -15,9 +20,60 @@ function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (h <<
 function escapeXml(s) { return String(s).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
 function escapeHtml(s) { return String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
 function fmtTime(d) { try { return new Date(d * 1000).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; } }
-async function api(p) { const r = await fetch(p); if (!r.ok) throw new Error('API ' + r.status + ' en ' + p); return r.json(); }
+function absUrl(p) { return p ? new URL(p, location.href).href : ''; }
 
-const state = { catalog: { categories: [] }, allItems: [], topics: [], chatCache: {}, activeTopic: null };
+async function api(path, opts = {}) {
+    const headers = Object.assign({}, opts.headers);
+    if (Store.adminKey) headers['x-admin-key'] = Store.adminKey;
+    if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    const r = await fetch(path, Object.assign({}, opts, { headers }));
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
+    return data;
+}
+
+/* ===== Almacenamiento local (progreso / favoritos / admin) ===== */
+const Store = {
+    _get(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } },
+    _set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    get progress() { return this._get('tvp_progress', {}); },
+    set progress(v) { this._set('tvp_progress', v); },
+    get favs() { return this._get('tvp_favs', {}); },
+    set favs(v) { this._set('tvp_favs', v); },
+    get lastEp() { return this._get('tvp_lastep', {}); },
+    set lastEp(v) { this._set('tvp_lastep', v); },
+    get adminKey() { try { return localStorage.getItem('tvp_admin') || ''; } catch { return ''; } },
+    set adminKey(v) { try { v ? localStorage.setItem('tvp_admin', v) : localStorage.removeItem('tvp_admin'); } catch {} },
+
+    saveProgress(playable, parent, time, duration) {
+        if (!playable || !playable.id || !time || time < 8) return;
+        const p = this.progress;
+        p[playable.id] = {
+            id: playable.id, title: (parent && parent.title) || playable.title || 'Video',
+            epTitle: playable.title || '', thumbUrl: playable.thumbUrl || (parent && parent.thumbUrl) || '',
+            streamUrl: playable.streamUrl || '', externalUrl: playable.externalUrl || '',
+            aceUrl: playable.aceUrl || '', ext: playable.ext || '', playableInBrowser: playable.playableInBrowser !== false,
+            parentId: (parent && parent.id) || playable.id, time, duration: duration || 0, updated: Date.now()
+        };
+        this.progress = p;
+    },
+    clearProgress(id) { const p = this.progress; delete p[id]; this.progress = p; },
+    continueList() {
+        return Object.values(this.progress)
+            .filter(r => r.time > 8 && (!r.duration || r.time < r.duration * 0.95))
+            .sort((a, b) => b.updated - a.updated).slice(0, 20);
+    },
+    isFav(id) { return !!this.favs[id]; },
+    toggleFav(item) {
+        const f = this.favs;
+        if (f[item.id]) delete f[item.id]; else f[item.id] = item;
+        this.favs = f; return !!f[item.id];
+    },
+    favList() { return Object.values(this.favs).reverse(); },
+    setLastEp(seriesId, epId) { const l = this.lastEp; l[seriesId] = epId; this.lastEp = l; },
+};
+
+const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
 
 const el = {
     body: document.body,
@@ -28,7 +84,7 @@ const el = {
     navNetflix: $('#nav-netflix'),
     navTelegram: $('#nav-telegram'),
     navLinks: $('#nav-links'),
-    hero: $('#hero'),
+    adminLock: $('#admin-lock'),
     heroImage: $('#hero-image'),
     heroTitle: $('#hero-title'),
     heroDescription: $('#hero-description'),
@@ -43,6 +99,8 @@ const el = {
     detailHero: $('#detail-hero'),
     detailBackdrop: $('#detail-backdrop'),
     detailPlay: $('#detail-play'),
+    favBtn: $('#fav-btn'),
+    playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
     modalTitle: $('#modal-title'),
@@ -66,12 +124,18 @@ const Netflix = {
     render() {
         el.rowsContainer.innerHTML = '';
         const cats = state.catalog.categories.filter(c => c.items && c.items.length);
+
         el.navLinks.innerHTML = '<li><a href="#" class="active" data-cat="">Inicio</a></li>' +
             cats.map(c => `<li><a href="#" data-cat="${escapeHtml(c.name)}">${escapeHtml(c.name)}</a></li>`).join('');
 
-        if (!cats.length) {
-            el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas configurados.<br>
-                Comprueba que el grupo tenga publicaciones en Películas, Series o Deportes.</div>`;
+        // Filas dinámicas: Continuar viendo + Mi lista + categorías
+        const cont = Store.continueList();
+        if (cont.length) el.rowsContainer.appendChild(this.row('▶ Continuar viendo', cont, 'continue'));
+        const favs = Store.favList();
+        if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));
+
+        if (!cats.length && !cont.length && !favs.length) {
+            el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
             return;
         }
         let heroPool = [];
@@ -79,15 +143,17 @@ const Netflix = {
             heroPool = heroPool.concat(c.items.slice(0, 5));
             el.rowsContainer.appendChild(this.row(`${c.icon || ''} ${c.name}`, c.items));
         });
-        this.updateHero(heroPool[0]);
-        if (heroPool.length > 1) {
-            let i = 0;
-            clearInterval(this._t);
-            this._t = setInterval(() => { i = (i + 1) % heroPool.length; this.updateHero(heroPool[i]); }, 10000);
+        if (heroPool.length) {
+            this.updateHero(heroPool[0]);
+            if (heroPool.length > 1) {
+                let i = 0; clearInterval(this._t);
+                this._t = setInterval(() => { i = (i + 1) % heroPool.length; this.updateHero(heroPool[i]); }, 10000);
+            }
         }
+        TVNav.refresh();
     },
 
-    row(title, items) {
+    row(title, items, kind) {
         const row = document.createElement('section');
         row.className = 'content-row';
         row.innerHTML = `
@@ -98,32 +164,39 @@ const Netflix = {
                 <button class="slider-arrow next" aria-label="Derecha"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg></button>
             </div>`;
         const track = $('.slider-track', row);
-        items.forEach(it => track.appendChild(this.card(it)));
+        items.forEach(it => track.appendChild(this.card(it, kind)));
         $('.prev', row).onclick = () => track.scrollBy({ left: -800, behavior: 'smooth' });
         $('.next', row).onclick = () => track.scrollBy({ left: 800, behavior: 'smooth' });
         return row;
     },
 
-    card(item) {
+    card(item, kind) {
         const card = document.createElement('div');
-        card.className = 'card';
-        const img = item.thumbUrl || placeholderImage(item.id, item.title);
+        card.className = 'card focusable';
+        card.tabIndex = 0;
+        const img = item.thumbUrl || placeholderImage(item.id, item.title || item.epTitle);
+        const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
-            <img class="card-image" src="${img}" alt="${escapeHtml(item.title)}" loading="lazy"
+            <img class="card-image" src="${img}" alt="${escapeHtml(item.title || '')}" loading="lazy"
                  onerror="this.src='${placeholderImage(item.id, item.title)}'">
             <div class="card-overlay">
-                <h3 class="card-title">${escapeHtml(item.title)}</h3>
+                <h3 class="card-title">${escapeHtml(item.title || '')}</h3>
                 <div class="card-meta">
                     ${item.year ? `<span>${escapeHtml(item.year)}</span>` : ''}
-                    ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.duration ? `<span>${escapeHtml(item.duration)}</span>` : '')}
+                    ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.duration && kind !== 'continue' ? `<span>${escapeHtml(item.duration)}</span>` : '')}
                     <span class="badge-hd">HD</span>
                 </div>
             </div>
+            ${pct ? `<div class="card-progress"><span style="width:${pct}%"></span></div>` : ''}
             <div class="card-actions">
                 <button class="card-action-btn primary play-btn" title="Reproducir"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
             </div>`;
-        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); Detail.open(item, true); };
-        card.onclick = () => Detail.open(item);
+        const onActivate = () => {
+            if (kind === 'continue') Detail.resume(item);
+            else Detail.open(item);
+        };
+        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : Detail.open(item, { autoplay: true }); };
+        card.onclick = onActivate;
         return card;
     },
 
@@ -134,56 +207,91 @@ const Netflix = {
         el.heroTitle.innerText = item.title;
         el.heroDescription.innerText = item.description || '';
         el.heroBadge.innerText = item.category || '';
-        el.heroPlay.onclick = () => Detail.open(item, true);
+        el.heroPlay.onclick = () => Detail.open(item, { autoplay: true });
         el.heroInfo.onclick = () => Detail.open(item);
     }
 };
 
-/* ===== DETALLE (Netflix) + REPRODUCTOR ===== */
+/* ===== DETALLE + favoritos + reproductores externos ===== */
 const Detail = {
-    open(item, autoplay) {
+    current: null,
+    open(item, opts = {}) {
+        this.current = item;
         const eps = item.episodes || [];
         el.modalTitle.innerText = item.title;
         el.modalYear.innerText = item.year || '';
-        el.modalDuration.innerText = (eps.length > 1)
-            ? `${eps.length} episodios`
-            : (item.duration || (eps[0] && eps[0].duration) || item.size || '');
+        el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios` : (item.duration || (eps[0] && eps[0].duration) || item.size || '');
         el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
         const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = poster;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
 
         this.resetVideo();
+        this.updateFav();
         el.playerModal.hidden = false;
         el.body.style.overflow = 'hidden';
 
+        // playable principal (serie: último visto o capítulo 1)
+        let primary;
         if (eps.length > 1) {
             el.episodeList.hidden = false;
-            this.renderEpisodes(eps);
-            el.detailPlay.onclick = () => Player.play(eps[0]);
+            this.renderEpisodes(eps, item);
+            const lastId = Store.lastEp[item.id];
+            primary = eps.find(e => String(e.id) === String(lastId)) || eps[0];
         } else {
             el.episodeList.hidden = true;
-            const playable = eps[0] || item;
-            el.detailPlay.onclick = () => Player.play(playable);
+            primary = eps[0] || item;
         }
-        if (autoplay) el.detailPlay.click();
+        ExternalPlayers.render(primary);
+        el.detailPlay.onclick = () => Player.play(primary, item);
+        el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); };
+        if (opts.autoplay) Player.play(primary, item);
+        TVNav.refresh();
+        setTimeout(() => el.detailPlay.focus(), 50);
     },
 
-    renderEpisodes(eps) {
+    // Reanudar desde una tarjeta de "Continuar viendo"
+    resume(record) {
+        const parent = state.itemsById[record.parentId];
+        if (parent) { this.open(parent, { autoplay: true }); return; }
+        // si ya no está en catálogo, reproducir directo
+        this.current = record;
+        el.modalTitle.innerText = record.title;
+        el.modalDescription.innerText = '';
+        el.modalYear.innerText = ''; el.modalDuration.innerText = '';
+        el.detailBackdrop.src = record.thumbUrl || placeholderImage(record.id, record.title);
+        el.episodeList.hidden = true;
+        this.resetVideo(); this.updateFav();
+        el.playerModal.hidden = false; el.body.style.overflow = 'hidden';
+        ExternalPlayers.render(record);
+        el.detailPlay.onclick = () => Player.play(record, record);
+        Player.play(record, record);
+        TVNav.refresh();
+    },
+
+    updateFav() {
+        const it = this.current;
+        const fav = it && Store.isFav(it.id);
+        el.favBtn.querySelector('.fav-ico').innerText = fav ? '✓' : '＋';
+    },
+
+    renderEpisodes(eps, parent) {
         el.episodesTrack.innerHTML = '';
         eps.forEach((ep, i) => {
             const row = document.createElement('div');
-            row.className = 'episode';
+            row.className = 'episode focusable'; row.tabIndex = 0;
             const thumb = ep.thumbUrl || placeholderImage(ep.id, ep.title);
+            const prog = Store.progress[ep.id];
+            const pct = prog && prog.duration ? Math.min(100, Math.round(prog.time / prog.duration * 100)) : 0;
             row.innerHTML = `
                 <div class="episode-index">${i + 1}</div>
                 <img class="episode-thumb" src="${thumb}" alt="" onerror="this.src='${placeholderImage(ep.id, ep.title)}'">
                 <div class="episode-info">
                     <div class="episode-name">${escapeHtml(ep.title)}</div>
-                    <div class="episode-sub">${escapeHtml(ep.duration || ep.size || '')}</div>
+                    <div class="episode-sub">${escapeHtml(ep.duration || ep.size || '')}${pct ? ` · ${pct}% visto` : ''}</div>
                 </div>
                 <span class="episode-play"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>`;
-            row.onclick = () => Player.play(ep);
+            row.onclick = () => { ExternalPlayers.render(ep); Player.play(ep, parent); };
             el.episodesTrack.appendChild(row);
         });
     },
@@ -199,36 +307,114 @@ const Detail = {
     },
 
     close() {
+        Player.flushProgress();
         el.playerModal.hidden = true;
         el.body.style.overflow = '';
         this.resetVideo();
+        // refrescar filas (continuar viendo / favoritos)
+        if (state.currentView !== 'telegram') Netflix.render();
+        TVNav.refresh();
     }
 };
 
+/* ===== Reproductores externos (VLC / AceStream / copiar) ===== */
+const ExternalPlayers = {
+    render(playable) {
+        const box = el.playerOptions;
+        box.innerHTML = '';
+        if (!playable) { box.hidden = true; return; }
+        const stream = playable.streamUrl ? absUrl(playable.streamUrl) : '';
+        const items = [];
+
+        if (playable.aceUrl) {
+            items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(playable.aceUrl)}">▶ AceStream</a>`);
+            const id = (playable.aceUrl.match(/[0-9a-fA-F]{40}/) || [''])[0];
+            if (id) items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:#Intent;scheme=acestream;package=org.acestream.media;S.content_id=${id};end">AceStream (Android)</a>`);
+        }
+        if (stream) {
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(stream)}">Abrir en VLC</a>`);
+            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(stream)}">Copiar enlace</button>`);
+        } else if (playable.externalUrl) {
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
+            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.externalUrl)}">Copiar enlace</button>`);
+        }
+
+        const notBrowser = playable.streamUrl && playable.playableInBrowser === false;
+        const label = playable.aceUrl
+            ? 'Enlace AceStream: ábrelo con tu reproductor.'
+            : (notBrowser ? `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Ábrelo con un reproductor externo:` : 'Otros reproductores:');
+
+        if (!items.length) { box.hidden = true; return; }
+        box.hidden = false;
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
+        $$('button[data-copy]', box).forEach(b => b.onclick = () => {
+            navigator.clipboard.writeText(b.dataset.copy).then(() => { b.innerText = '¡Copiado!'; setTimeout(() => b.innerText = 'Copiar enlace', 1500); }).catch(() => {});
+        });
+    }
+};
+
+/* ===== Reproductor ===== */
 const Player = {
-    play(p) {
-        if (!p) return;
+    current: null,
+    play(playable, parent) {
+        if (!playable) return;
+        this.flushProgress();
+        this.current = { playable, parent };
+        if (parent && parent.episodes && parent.episodes.length > 1) Store.setLastEp(parent.id, playable.id);
+
+        // AceStream: no se reproduce dentro; mostrar opciones
+        if (playable.aceUrl && !playable.streamUrl) {
+            ExternalPlayers.render(playable);
+            el.playerStatus.hidden = false;
+            el.playerStatus.innerText = 'Este contenido es AceStream. Usa el botón "AceStream" para abrirlo.';
+            return;
+        }
         el.detailHero.classList.add('playing');
         el.detailBackdrop.hidden = true;
         el.playerStatus.hidden = true;
-        if (p.streamUrl) {
+
+        if (playable.streamUrl) {
             el.playerIframe.hidden = true; el.playerIframe.src = '';
             el.playerVideo.hidden = false;
-            el.playerVideo.src = p.streamUrl;
+            el.playerVideo.src = playable.streamUrl;
+            const resume = (Store.progress[playable.id] || {}).time || 0;
+            el.playerVideo.onloadedmetadata = () => { if (resume > 8 && resume < el.playerVideo.duration - 5) el.playerVideo.currentTime = resume; };
+            el.playerVideo.onerror = () => this.onPlayError(playable);
+            el.playerVideo.ontimeupdate = () => this._tick();
+            el.playerVideo.onended = () => Store.clearProgress(playable.id);
             el.playerVideo.play().catch(() => {});
             return;
         }
-        if (p.externalUrl) {
-            el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src'); el.playerVideo.load();
-            el.playerIframe.hidden = false;
-            el.playerIframe.src = this.embed(p.externalUrl);
+        if (playable.externalUrl) {
+            el.playerVideo.hidden = true;
+            el.playerIframe.hidden = false; el.playerIframe.src = this.embed(playable.externalUrl);
             return;
         }
+        this.onPlayError(playable);
+    },
+
+    onPlayError(playable) {
         el.detailHero.classList.remove('playing');
         el.detailBackdrop.hidden = false;
         el.playerStatus.hidden = false;
-        el.playerStatus.innerText = 'Esta publicación no tiene video ni enlace reproducible.';
+        el.playerStatus.innerText = playable.playableInBrowser === false
+            ? `Este formato (${(playable.ext || '').toUpperCase()}) no se puede reproducir aquí. Ábrelo con un reproductor externo (abajo).`
+            : 'No se pudo reproducir. Prueba con un reproductor externo (abajo).';
+        ExternalPlayers.render(playable);
     },
+
+    _lastSave: 0,
+    _tick() {
+        const v = el.playerVideo, c = this.current;
+        if (!c || !v.duration) return;
+        const now = Date.now();
+        if (now - this._lastSave > 5000) { this._lastSave = now; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); }
+    },
+    flushProgress() {
+        const v = el.playerVideo, c = this.current;
+        if (c && !v.hidden && v.currentTime > 8 && v.duration) Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration);
+    },
+
     embed(url) {
         try {
             const u = new URL(url);
@@ -241,33 +427,46 @@ const Player = {
     }
 };
 
-/* ===== VISTA CHAT (Telegram) ===== */
+/* ===== ADMIN ===== */
+const Admin = {
+    async login() {
+        const pwd = prompt('Contraseña de administrador:');
+        if (pwd == null) return;
+        try {
+            await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pwd }) });
+            Store.adminKey = pwd;
+            state.isAdmin = true;
+            this.reflect();
+            alert('Acceso de administrador activado. Ya puedes ver y editar el chat.');
+        } catch (e) { alert('No autorizado: ' + e.message); }
+    },
+    logout() { Store.adminKey = ''; state.isAdmin = false; this.reflect(); App.switchView('netflix'); },
+    reflect() {
+        el.navTelegram.hidden = !(state.adminEnabled && state.isAdmin);
+        el.adminLock.classList.toggle('active', state.isAdmin);
+    }
+};
+
+/* ===== VISTA CHAT (solo admin) ===== */
 const Chat = {
     async load() {
-        if (state.topics.length) return;
         try { const r = await api('/api/topics'); state.topics = r.topics || []; }
-        catch (e) { console.warn(e); }
+        catch (e) { el.chatList.innerHTML = `<div class="chat-empty">${escapeHtml(e.message)}</div>`; return; }
         this.renderList();
     },
     renderList() {
-        const list = state.topics.slice();
         el.chatList.innerHTML = '';
-        if (!list.length) {
-            el.chatList.innerHTML = '<div class="chat-empty" style="padding:2rem 1rem">No hay temas con la etiqueta configurada.</div>';
-            return;
-        }
-        list.forEach(t => {
+        if (!state.topics.length) { el.chatList.innerHTML = '<div class="chat-empty" style="padding:2rem 1rem">No hay temas.</div>'; return; }
+        state.topics.forEach(t => {
             const item = document.createElement('div');
-            item.className = 'chat-item is-media';
-            item.innerHTML = `
-                <div class="chat-avatar">${t.icon || '#'}</div>
-                <div class="chat-item-body">
-                    <div class="chat-item-top"><span class="chat-item-name">${escapeHtml(t.title)}</span></div>
-                    <div class="chat-item-sub">Tema</div>
-                </div>`;
+            item.className = 'chat-item is-media focusable'; item.tabIndex = 0;
+            item.innerHTML = `<div class="chat-avatar">${t.icon || '#'}</div>
+                <div class="chat-item-body"><div class="chat-item-top"><span class="chat-item-name">${escapeHtml(t.title)}</span></div>
+                <div class="chat-item-sub">Tema</div></div>`;
             item.onclick = () => this.open(t, item);
             el.chatList.appendChild(item);
         });
+        TVNav.refresh();
     },
     async open(topic, node) {
         state.activeTopic = topic.id;
@@ -276,31 +475,50 @@ const Chat = {
         el.chatHeaderTitle.innerText = topic.title;
         el.chatHeaderMeta.innerText = 'cargando...';
         el.chatMessages.innerHTML = '<div class="chat-loading"><div class="loader small"></div></div>';
-        let msgs = state.chatCache[topic.id];
-        if (!msgs) {
-            try { const r = await api('/api/chat/' + topic.id); msgs = r.messages || []; state.chatCache[topic.id] = msgs; }
-            catch (e) { el.chatMessages.innerHTML = '<div class="chat-empty">Error: ' + escapeHtml(e.message) + '</div>'; return; }
-        }
+        let msgs;
+        try { const r = await api('/api/chat/' + topic.id); msgs = r.messages || []; state.chatCache[topic.id] = msgs; }
+        catch (e) { el.chatMessages.innerHTML = '<div class="chat-empty">Error: ' + escapeHtml(e.message) + '</div>'; return; }
         el.chatHeaderMeta.innerText = msgs.length + ' mensajes';
-        this.renderMessages(msgs);
+        this.renderMessages(msgs, topic);
     },
-    renderMessages(msgs) {
+    renderMessages(msgs, topic) {
         el.chatMessages.innerHTML = '';
         const ordered = msgs.slice().reverse();
-        if (!ordered.length) { el.chatMessages.innerHTML = '<div class="chat-empty">No hay mensajes en este tema.</div>'; return; }
+        if (!ordered.length) { el.chatMessages.innerHTML = '<div class="chat-empty">No hay mensajes.</div>'; return; }
         ordered.forEach(m => {
             const b = document.createElement('div');
             b.className = 'tg-message';
             const media = m.hasMedia ? `<div class="tg-media" ${m.thumbUrl ? `style="background-image:url(${m.thumbUrl})"` : ''}><span class="tg-media-icon">${m.isVideo ? '▶' : '🖼'}</span></div>` : '';
-            b.innerHTML = `<div class="tg-bubble">${media}${m.text ? `<div class="tg-text">${this.linkify(escapeHtml(m.text))}</div>` : ''}<div class="tg-time">${fmtTime(m.date)}</div></div>`;
+            b.innerHTML = `<div class="tg-bubble">
+                ${media}
+                ${m.text ? `<div class="tg-text">${this.linkify(escapeHtml(m.text))}</div>` : ''}
+                <div class="tg-actions">
+                    <button class="tg-edit focusable" tabindex="0">✎ Editar</button>
+                    <button class="tg-del focusable" tabindex="0">🗑 Borrar</button>
+                </div>
+                <div class="tg-time">${fmtTime(m.date)}</div>
+            </div>`;
             if (m.isVideo) {
                 const bub = b.querySelector('.tg-bubble');
                 bub.classList.add('playable');
-                bub.onclick = () => Detail.open({ id: m.id, title: (m.text.split('\n')[0] || 'Video'), description: m.text, thumbUrl: m.thumbUrl, streamUrl: m.streamUrl }, true);
             }
+            $('.tg-edit', b).onclick = () => this.edit(topic, m);
+            $('.tg-del', b).onclick = () => this.del(topic, m);
             el.chatMessages.appendChild(b);
         });
         el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
+        TVNav.refresh();
+    },
+    async edit(topic, m) {
+        const text = prompt('Editar mensaje:', m.text || '');
+        if (text == null) return;
+        try { await api('/api/admin/edit', { method: 'POST', body: JSON.stringify({ topicId: topic.id, msgId: m.id, text }) }); this.open(topic); }
+        catch (e) { alert('Error al editar: ' + e.message); }
+    },
+    async del(topic, m) {
+        if (!confirm('¿Borrar este mensaje del grupo? No se puede deshacer.')) return;
+        try { await api('/api/admin/delete', { method: 'POST', body: JSON.stringify({ topicId: topic.id, msgId: m.id }) }); this.open(topic); }
+        catch (e) { alert('Error al borrar: ' + e.message); }
     },
     linkify(t) { return t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 };
@@ -308,6 +526,7 @@ const Chat = {
 /* ===== APP / VISTAS / BÚSQUEDA ===== */
 const App = {
     switchView(view) {
+        state.currentView = view;
         const isNet = view === 'netflix';
         el.netflixView.hidden = !isNet;
         el.telegramView.hidden = isNet;
@@ -316,27 +535,26 @@ const App = {
         el.navTelegram.classList.toggle('active', !isNet);
         if (!isNet) {
             Chat.load().then(() => {
-                if (!state.activeTopic) {
-                    const mediaIds = new Set(state.catalog.categories.map(c => c.id));
-                    const first = state.topics.find(t => !mediaIds.has(t.id)) || state.topics[0];
-                    const node = $$('.chat-item', el.chatList).find(n => n.querySelector('.chat-item-name').innerText === (first && first.title));
-                    if (first) Chat.open(first, node);
+                if (!state.activeTopic && state.topics.length) {
+                    const node = $$('.chat-item', el.chatList)[0];
+                    Chat.open(state.topics[0], node);
                 }
             });
         }
+        TVNav.refresh();
     },
     search(q) {
         q = q.trim().toLowerCase();
         if (!q) { el.searchResults.innerHTML = ''; return; }
         const res = state.allItems.filter(it =>
-            it.title.toLowerCase().includes(q) ||
+            (it.title || '').toLowerCase().includes(q) ||
             (it.description || '').toLowerCase().includes(q) ||
             (it.category || '').toLowerCase().includes(q));
         if (!res.length) { el.searchResults.innerHTML = '<div class="search-empty">Sin resultados.</div>'; return; }
         el.searchResults.innerHTML = '';
         res.forEach(it => {
             const c = document.createElement('div');
-            c.className = 'search-card';
+            c.className = 'search-card focusable'; c.tabIndex = 0;
             c.innerHTML = `<img class="search-image" src="${it.thumbUrl || placeholderImage(it.id, it.title)}" alt=""
                 onerror="this.src='${placeholderImage(it.id, it.title)}'">
                 <div class="search-meta"><h3>${escapeHtml(it.title)}</h3>
@@ -345,24 +563,92 @@ const App = {
             c.onclick = () => { this.closeSearch(); Detail.open(it); };
             el.searchResults.appendChild(c);
         });
+        TVNav.refresh();
     },
     openSearch() { el.searchOverlay.hidden = false; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
     closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
+};
+
+/* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
+const TVNav = {
+    SEL: '.card, .btn, .episode, .chat-item, .opt-btn, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
+    refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
+    scope() {
+        if (!el.playerModal.hidden) return el.playerModal;
+        if (!el.searchOverlay.hidden) return el.searchOverlay;
+        return document;
+    },
+    focusables() {
+        const root = this.scope();
+        return $$(this.SEL, root === document ? document : root)
+            .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.disabled; });
+    },
+    move(dir) {
+        const list = this.focusables();
+        if (!list.length) return;
+        const cur = document.activeElement;
+        if (!cur || !list.includes(cur)) { list[0].focus(); return; }
+        const r = cur.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        let best = null, score = Infinity;
+        for (const e of list) {
+            if (e === cur) continue;
+            const b = e.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2;
+            const dx = bx - cx, dy = by - cy;
+            let ok, primary, secondary;
+            if (dir === 'right') { ok = dx > 8; primary = dx; secondary = Math.abs(dy); }
+            else if (dir === 'left') { ok = dx < -8; primary = -dx; secondary = Math.abs(dy); }
+            else if (dir === 'down') { ok = dy > 8; primary = dy; secondary = Math.abs(dx); }
+            else { ok = dy < -8; primary = -dy; secondary = Math.abs(dx); }
+            if (!ok) continue;
+            const s = primary + secondary * 2.2;
+            if (s < score) { score = s; best = e; }
+        }
+        if (best) { best.focus(); best.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
+    },
+    init() {
+        document.addEventListener('keydown', (e) => {
+            const k = e.key;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) {
+                if (k === 'ArrowLeft' || k === 'ArrowRight') {
+                    if (document.activeElement === el.searchInput) return; // dejar mover el cursor en el buscador
+                }
+                e.preventDefault();
+                this.move(k.replace('Arrow', '').toLowerCase());
+            } else if (k === 'Enter') {
+                const a = document.activeElement;
+                if (a && a !== el.searchInput && a.click) { e.preventDefault(); a.click(); }
+            } else if (k === 'Backspace' || k === 'GoBack' || k === 'BrowserBack') {
+                if (document.activeElement === el.searchInput) return;
+                if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
+                else if (!el.searchOverlay.hidden) { e.preventDefault(); App.closeSearch(); }
+            }
+        });
+    }
 };
 
 /* ===== ARRANQUE ===== */
 async function boot() {
     try {
         const info = await api('/api/app').catch(() => null);
-        if (info && info.appName) { el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
+        if (info) {
+            if (info.appName) { el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
+            state.adminEnabled = !!info.adminEnabled;
+        }
+        // estado admin
+        state.isAdmin = !!(state.adminEnabled && Store.adminKey);
+        if (state.isAdmin) { try { await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: Store.adminKey }) }); } catch { Store.adminKey = ''; state.isAdmin = false; } }
+        Admin.reflect();
+        el.adminLock.hidden = !state.adminEnabled;
 
         el.loadingText.innerText = 'Cargando catálogo...';
         const catalog = await api('/api/catalog');
         state.catalog = catalog;
-        // anexar categoría a cada item para búsqueda/hero
-        catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); }));
+        catalog.categories.forEach(c => c.items.forEach(it => {
+            it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it;
+        }));
         Netflix.render();
         App.switchView('netflix');
+        setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
     } catch (e) {
         console.error(e);
         el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el contenido.<br>${escapeHtml(e.message)}<br><br>
@@ -375,6 +661,7 @@ async function boot() {
 function wireUi() {
     el.navNetflix.onclick = (e) => { e.preventDefault(); App.switchView('netflix'); };
     el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
+    el.adminLock.onclick = () => { state.isAdmin ? (confirm('¿Cerrar sesión de administrador?') && Admin.logout()) : Admin.login(); };
     $('.modal-close', el.playerModal).onclick = () => Detail.close();
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
@@ -394,9 +681,10 @@ function wireUi() {
         if (!el.searchOverlay.hidden) App.closeSearch();
         else if (!el.playerModal.hidden) Detail.close();
     });
-    window.addEventListener('scroll', () => {
-        el.navbar.classList.toggle('scrolled', window.scrollY > 50);
-    });
+    window.addEventListener('scroll', () => { el.navbar.classList.toggle('scrolled', window.scrollY > 50); });
+    // ocultar Chat hasta que haya admin
+    el.navTelegram.hidden = true;
+    TVNav.init();
 }
 
 document.addEventListener('DOMContentLoaded', () => { wireUi(); boot(); });

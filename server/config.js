@@ -20,6 +20,10 @@ module.exports = {
     // Marca de la app
     appName: process.env.APP_NAME || 'Tv Player',
 
+    // Contraseña de administrador para ver el chat y editar/borrar contenido desde la web.
+    // Si está vacía, el chat y la edición quedan DESACTIVADOS para todos.
+    adminPassword: process.env.ADMIN_PASSWORD || '',
+
     // Puerto (Railway lo inyecta en PORT)
     port: parseInt(process.env.PORT || '3000', 10),
 

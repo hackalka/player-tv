@@ -829,3 +829,61 @@ body.telegram-mode .nav-links { visibility: hidden; }
     .detail-modal .modal-details { padding: 18px; }
     .episode-thumb { width: 92px; height: 52px; }
 }
+
+
+/* =====================================================================
+ *  Continuar viendo, favoritos, reproductores externos, admin y TV
+ * ===================================================================== */
+
+/* Botón de icono (candado admin) */
+.icon-btn { background: none; border: none; color: #fff; cursor: pointer; padding: 6px; opacity: .8; }
+.icon-btn:hover, .icon-btn.active { opacity: 1; color: var(--netflix-red); }
+
+/* Barra de progreso en tarjetas (continuar viendo) */
+.card-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.25); }
+.card-progress span { display: block; height: 100%; background: var(--netflix-red); }
+
+/* Acciones del detalle: Ver + Mi lista */
+.detail-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-fav { background: rgba(80,80,80,.7); color: #fff; }
+.btn-fav:hover { background: rgba(110,110,110,.85); }
+.fav-ico { font-size: 1.2rem; line-height: 1; }
+
+/* Opciones de reproductor externo */
+.player-options { margin: 18px 0 4px; }
+.opt-label { color: var(--netflix-light-gray); font-size: .9rem; margin-bottom: 10px; }
+.opt-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.opt-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 6px;
+    background: #2a2a2a; color: #fff; border: 1px solid #3a3a3a; cursor: pointer;
+    font-size: .9rem; font-weight: 600; text-decoration: none; transition: background var(--transition-fast);
+}
+.opt-btn:hover { background: #3a3a3a; }
+.opt-btn.ace { background: #1d7a3a; border-color: #1d7a3a; }
+.opt-btn.ace:hover { background: #229046; }
+
+/* Acciones de chat (admin) */
+.tg-actions { display: flex; gap: 8px; margin-top: 6px; }
+.tg-actions button {
+    background: rgba(255,255,255,.08); border: none; color: #cfe3f5; font-size: .75rem;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer;
+}
+.tg-actions .tg-del { color: #ff8a8a; }
+.tg-actions button:hover { background: rgba(255,255,255,.18); }
+
+/* ===== Foco para mando de TV Box ===== */
+.card:focus, .btn:focus, .episode:focus, .chat-item:focus, .opt-btn:focus,
+.nav-links a:focus, .view-btn:focus, .icon-btn:focus, .search-btn:focus,
+.slider-arrow:focus, .search-card:focus, .tg-edit:focus, .tg-del:focus, .modal-close:focus {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+.card:focus { transform: scale(1.06); z-index: 5; }
+.card { outline-offset: 0; }
+#search-input:focus { outline: 2px solid var(--netflix-red); }
+
+/* Para TV: aumentar un poco el tamaño de foco táctil */
+@media (min-width: 1280px) {
+    .card:focus { box-shadow: 0 0 0 3px #fff, 0 12px 30px rgba(0,0,0,.6); }
+}

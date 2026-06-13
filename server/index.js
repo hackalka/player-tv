@@ -24,8 +24,44 @@ app.get('/api/health', (req, res) => {
 
 // ---- info de la app (marca) ----
 app.get('/api/app', (req, res) => {
-    res.json({ appName: cfg.appName, setupMode });
+    res.json({ appName: cfg.appName, setupMode, adminEnabled: !!cfg.adminPassword });
 });
+
+// ---- autenticación de administrador ----
+function isAdmin(req) {
+    return !!cfg.adminPassword && (req.headers['x-admin-key'] === cfg.adminPassword
+        || (req.body && req.body.password === cfg.adminPassword));
+}
+function adminOnly(req, res, next) {
+    if (!cfg.adminPassword) return res.status(403).json({ error: 'Administración desactivada.' });
+    if (!isAdmin(req)) return res.status(401).json({ error: 'No autorizado.' });
+    next();
+}
+
+app.post('/api/admin/login', (req, res) => {
+    if (!cfg.adminPassword) return res.status(403).json({ error: 'Administración desactivada.' });
+    if (!isAdmin(req)) return res.status(401).json({ error: 'Contraseña incorrecta.' });
+    res.json({ ok: true });
+});
+
+app.post('/api/admin/edit', adminOnly, async (req, res) => {
+    try {
+        await tg.editMessageText(req.body.msgId, req.body.text || '');
+        invalidateCatalog();
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
+});
+
+app.post('/api/admin/delete', adminOnly, async (req, res) => {
+    try {
+        await tg.deleteMessage(req.body.msgId);
+        invalidateCatalog();
+        if (req.body.topicId != null) delete chatCache[req.body.topicId];
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
+});
+
+app.post('/api/admin/refresh', adminOnly, (req, res) => { invalidateCatalog(); chatCache = {}; res.json({ ok: true }); });
 
 /* =========================================================
  *  ASISTENTE DE CONFIGURACIÓN (genera TG_SESSION sin PC)
@@ -91,6 +127,9 @@ app.get(['/', '/setup'], (req, res, next) => {
 // ---- catálogo completo estilo Netflix ----
 let catalogCache = null;
 let catalogTime = 0;
+let chatCache = {};
+function invalidateCatalog() { catalogCache = null; catalogTime = 0; }
+
 app.get('/api/catalog', async (req, res) => {
     try {
         const fresh = req.query.refresh === '1';
@@ -105,16 +144,16 @@ app.get('/api/catalog', async (req, res) => {
     }
 });
 
-// ---- temas del foro (solo los etiquetados, vista chat) ----
-app.get('/api/topics', async (req, res) => {
+// ---- temas del foro (solo los etiquetados, vista chat) — SOLO ADMIN ----
+app.get('/api/topics', adminOnly, async (req, res) => {
     try {
         const topics = await tg.getAutoTopics();
         res.json({ topics: topics.map(t => ({ id: t.id, title: t.name, icon: t.icon })) });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ---- mensajes de un tema (vista chat estilo Telegram) ----
-app.get('/api/chat/:topicId', async (req, res) => {
+// ---- mensajes de un tema (vista chat estilo Telegram) — SOLO ADMIN ----
+app.get('/api/chat/:topicId', adminOnly, async (req, res) => {
     try {
         const msgs = await tg.getTopicMessages(req.params.topicId, 60);
         const out = msgs.map(m => {
@@ -131,6 +170,7 @@ app.get('/api/chat/:topicId', async (req, res) => {
                 streamUrl: isVideo ? `/api/stream/${req.params.topicId}/${m.id}` : ''
             };
         });
+        chatCache[req.params.topicId] = out;
         res.json({ messages: out });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
