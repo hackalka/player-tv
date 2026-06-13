@@ -38,16 +38,28 @@ login.js        Script que se ejecuta UNA vez para generar la sesión (TG_SESSIO
 
 ## Puesta en marcha
 
-### 1) Generar la sesión (una sola vez, en tu ordenador)
+### 1) Generar la sesión (TG_SESSION)
+
+Tienes **dos formas**. La A es la más fácil (sin instalar nada).
+
+#### A) Asistente web (recomendado, sin PC ni terminal)
+
+1. Despliega primero en Railway con `TG_API_ID`, `TG_API_HASH`, `TG_GROUP_ID`, etc.
+   (puedes dejar `TG_SESSION` vacío de momento).
+2. Abre la URL de tu app: al no haber sesión, aparece el **asistente de configuración**.
+3. Escribe tu **teléfono** → el **código** que te llega por Telegram → tu **2FA** si tienes.
+4. Te muestra una **clave**. Cópiala y pégala en Railway como variable **`TG_SESSION`**.
+5. Railway se reinicia solo y la web ya muestra tu contenido. (El asistente se desactiva solo.)
+
+#### B) Por terminal (en tu ordenador, una vez)
 
 ```bash
 npm install
 npm run login
 ```
 
-Introduce tu teléfono, el código que te llega por Telegram y (si tienes) tu contraseña 2FA.
-Al final te imprime una **cadena larga**: esa es tu `TG_SESSION`.
-**No la subas a GitHub.**
+Introduce tu teléfono, el código y tu 2FA. Copia la cadena larga que imprime y ponla
+como `TG_SESSION` en Railway. **No la subas a GitHub.**
 
 ### 2) Desplegar en Railway
 

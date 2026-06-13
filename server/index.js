@@ -1,23 +1,91 @@
 'use strict';
 const path = require('path');
 const express = require('express');
+const { TelegramClient, Api } = require('telegram');
+const { StringSession } = require('telegram/sessions');
 const cfg = require('./config');
 const { TelegramService } = require('./telegram');
 
 const app = express();
+app.use(express.json());
 const tg = new TelegramService(cfg);
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const ALIGN = 4096;
 
+// ¿Falta la sesión? -> modo configuración (asistente web en /setup)
+const setupMode = !cfg.session;
+let setupClient = null, setupPhone = null, setupHash = null;
+
 // ---- estado / salud ----
 app.get('/api/health', (req, res) => {
-    res.json({ ok: tg.ready, app: cfg.appName });
+    res.json({ ok: tg.ready, app: cfg.appName, setupMode });
 });
 
 // ---- info de la app (marca) ----
 app.get('/api/app', (req, res) => {
-    res.json({ appName: cfg.appName });
+    res.json({ appName: cfg.appName, setupMode });
+});
+
+/* =========================================================
+ *  ASISTENTE DE CONFIGURACIÓN (genera TG_SESSION sin PC)
+ *  Solo activo mientras NO exista TG_SESSION.
+ * ========================================================= */
+function ensureSetup(res) {
+    if (!setupMode) { res.status(403).json({ error: 'La sesión ya está configurada.' }); return false; }
+    return true;
+}
+
+app.post('/api/setup/send-code', async (req, res) => {
+    if (!ensureSetup(res)) return;
+    try {
+        const phone = String(req.body.phone || '').trim();
+        if (!phone) return res.status(400).json({ error: 'Escribe tu número con prefijo (ej: +34...).' });
+        setupClient = new TelegramClient(new StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 5 });
+        await setupClient.connect();
+        const r = await setupClient.sendCode({ apiId: cfg.apiId, apiHash: cfg.apiHash }, phone);
+        setupPhone = phone; setupHash = r.phoneCodeHash;
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
+});
+
+app.post('/api/setup/sign-in', async (req, res) => {
+    if (!ensureSetup(res)) return;
+    try {
+        if (!setupClient) return res.status(400).json({ error: 'Primero pide el código.' });
+        const code = String(req.body.code || '').replace(/\s+/g, '');
+        await setupClient.invoke(new Api.auth.SignIn({
+            phoneNumber: setupPhone, phoneCodeHash: setupHash, phoneCode: code
+        }));
+        res.json({ ok: true, session: setupClient.session.save() });
+    } catch (e) {
+        const msg = e.errorMessage || e.message || '';
+        if (msg.includes('SESSION_PASSWORD_NEEDED')) return res.json({ needPassword: true });
+        res.status(500).json({ error: msg });
+    }
+});
+
+app.post('/api/setup/password', async (req, res) => {
+    if (!ensureSetup(res)) return;
+    try {
+        if (!setupClient) return res.status(400).json({ error: 'Primero pide el código.' });
+        const password = String(req.body.password || '');
+        let used = false;
+        await setupClient.signInWithPassword(
+            { apiId: cfg.apiId, apiHash: cfg.apiHash },
+            {
+                password: async () => { if (used) throw new Error('Contraseña 2FA incorrecta.'); used = true; return password; },
+                onError: (e) => { throw e; }
+            }
+        );
+        res.json({ ok: true, session: setupClient.session.save() });
+    } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
+});
+
+// En modo configuración, la raíz muestra el asistente
+app.get(['/', '/setup'], (req, res, next) => {
+    if (setupMode) return res.sendFile(path.join(PUBLIC_DIR, 'setup.html'));
+    next();
 });
 
 // ---- catálogo completo estilo Netflix ----
@@ -142,15 +210,21 @@ app.get('/api/stream/:topicId/:msgId', async (req, res) => {
 
 // ---- frontend estático ----
 app.use(express.static(PUBLIC_DIR));
-app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, setupMode ? 'setup.html' : 'index.html'));
+});
 
 // ---- arranque ----
 (async () => {
-    try {
-        await tg.start();
-    } catch (e) {
-        console.error('⚠️  No se pudo iniciar Telegram:', e.message);
-        console.error('   El servidor sigue arrancando para mostrar el error en /api/health.');
+    if (setupMode) {
+        console.warn('⚙️  Sin TG_SESSION: modo CONFIGURACIÓN activo. Abre la web y sigue el asistente.');
+    } else {
+        try {
+            await tg.start();
+        } catch (e) {
+            console.error('⚠️  No se pudo iniciar Telegram:', e.message);
+            console.error('   El servidor sigue arrancando para mostrar el error en /api/health.');
+        }
     }
     app.listen(cfg.port, () => {
         console.log(`🚀 ${cfg.appName} escuchando en el puerto ${cfg.port}`);
