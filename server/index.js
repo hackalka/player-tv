@@ -189,63 +189,74 @@ app.get('/api/thumb/:topicId/:msgId', async (req, res) => {
     }
 });
 
-// ---- STREAMING de video por rangos ----
-app.get('/api/stream/:topicId/:msgId', async (req, res) => {
+// ---- miniatura de un mensaje de OTRO canal (enlace t.me) ----
+app.get('/api/thumb-link/:channel/:msgId', async (req, res) => {
     try {
-        const message = await tg.getMessageById(req.params.msgId);
-        if (!message) return res.status(404).end();
-        const info = tg.docInfo(message);
-        if (!info) return res.status(415).end('No es un archivo reproducible');
+        const message = await tg.getMessageByRef(req.params.channel, req.params.msgId);
+        if (!message || !message.media) return res.status(404).end();
+        let buf;
+        const doc = message.media.document;
+        if (message.media.photo) buf = await tg.client.downloadMedia(message, {});
+        else if (doc && doc.thumbs && doc.thumbs.length) buf = await tg.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
+        if (!buf) return res.status(404).end();
+        res.set('Content-Type', 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.send(Buffer.from(buf));
+    } catch (e) { console.warn('thumb-link error', e.message); res.status(500).end(); }
+});
 
-        const size = info.size;
-        const range = req.headers.range;
-        let start = 0, end = size - 1;
-        if (range) {
-            const m = /bytes=(\d+)-(\d*)/.exec(range);
-            if (m) {
-                start = parseInt(m[1], 10);
-                if (m[2]) end = Math.min(parseInt(m[2], 10), size - 1);
-            }
-        }
-        if (start >= size || start < 0) {
-            res.status(416).set('Content-Range', `bytes */${size}`).end();
-            return;
-        }
-        const chunkSize = end - start + 1;
+// función reutilizable de streaming por rangos
+async function streamMessage(message, req, res) {
+    if (!message) return res.status(404).end();
+    const info = tg.docInfo(message);
+    if (!info) return res.status(415).end('No es un archivo reproducible');
 
-        res.writeHead(range ? 206 : 200, {
-            'Content-Type': info.mimeType,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {})
-        });
-
-        // Alineamos la descarga a múltiplos de 4096 (requisito de Telegram)
-        const alignedStart = Math.floor(start / ALIGN) * ALIGN;
-        let skip = start - alignedStart;
-        let toWrite = chunkSize;
-        let downloadLimit = Math.ceil((skip + chunkSize) / ALIGN) * ALIGN;
-
-        const iterator = tg.streamRange(info, alignedStart, downloadLimit);
-        for await (const chunk of iterator) {
-            if (res.writableEnded) break;
-            let buf = Buffer.from(chunk);
-            if (skip > 0) {
-                if (skip >= buf.length) { skip -= buf.length; continue; }
-                buf = buf.subarray(skip); skip = 0;
-            }
-            if (buf.length > toWrite) buf = buf.subarray(0, toWrite);
-            const ok = res.write(buf);
-            toWrite -= buf.length;
-            if (!ok) await new Promise(r => res.once('drain', r));
-            if (toWrite <= 0) break;
-        }
-        res.end();
-    } catch (e) {
-        console.error('stream error', e.message);
-        if (!res.headersSent) res.status(500).end();
-        else res.end();
+    const size = info.size;
+    const range = req.headers.range;
+    let start = 0, end = size - 1;
+    if (range) {
+        const m = /bytes=(\d+)-(\d*)/.exec(range);
+        if (m) { start = parseInt(m[1], 10); if (m[2]) end = Math.min(parseInt(m[2], 10), size - 1); }
     }
+    if (start >= size || start < 0) { res.status(416).set('Content-Range', `bytes */${size}`).end(); return; }
+    const chunkSize = end - start + 1;
+
+    res.writeHead(range ? 206 : 200, {
+        'Content-Type': info.mimeType,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {})
+    });
+
+    const alignedStart = Math.floor(start / ALIGN) * ALIGN;
+    let skip = start - alignedStart;
+    let toWrite = chunkSize;
+    let downloadLimit = Math.ceil((skip + chunkSize) / ALIGN) * ALIGN;
+
+    const iterator = tg.streamRange(info, alignedStart, downloadLimit);
+    for await (const chunk of iterator) {
+        if (res.writableEnded) break;
+        let buf = Buffer.from(chunk);
+        if (skip > 0) { if (skip >= buf.length) { skip -= buf.length; continue; } buf = buf.subarray(skip); skip = 0; }
+        if (buf.length > toWrite) buf = buf.subarray(0, toWrite);
+        const ok = res.write(buf);
+        toWrite -= buf.length;
+        if (!ok) await new Promise(r => res.once('drain', r));
+        if (toWrite <= 0) break;
+    }
+    res.end();
+}
+
+// ---- STREAMING de video por rangos (mensaje del grupo) ----
+app.get('/api/stream/:topicId/:msgId', async (req, res) => {
+    try { await streamMessage(await tg.getMessageById(req.params.msgId), req, res); }
+    catch (e) { console.error('stream error', e.message); if (!res.headersSent) res.status(500).end(); else res.end(); }
+});
+
+// ---- STREAMING de un mensaje de OTRO canal (enlace t.me) ----
+app.get('/api/stream-link/:channel/:msgId', async (req, res) => {
+    try { await streamMessage(await tg.getMessageByRef(req.params.channel, req.params.msgId), req, res); }
+    catch (e) { console.error('stream-link error', e.message); if (!res.headersSent) res.status(500).end(); else res.end(); }
 });
 
 // ---- frontend estático ----

@@ -62,6 +62,31 @@ class TelegramService {
         return m;
     }
 
+    // Resolver un canal por @usuario o id (-100...) para enlaces t.me externos
+    async _resolveChannel(channel) {
+        if (!this._chanCache) this._chanCache = new Map();
+        if (this._chanCache.has(channel)) return this._chanCache.get(channel);
+        const raw = String(channel);
+        const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+        let ent;
+        try { ent = await this.client.getEntity(id); }
+        catch (e) { await this.client.getDialogs({ limit: 50 }); ent = await this.client.getEntity(id); }
+        this._chanCache.set(channel, ent);
+        return ent;
+    }
+
+    // Mensaje de otro canal a partir de un enlace t.me
+    async getMessageByRef(channel, msgId) {
+        if (!this._refCache) this._refCache = new Map();
+        const key = channel + ':' + msgId;
+        if (this._refCache.has(key)) return this._refCache.get(key);
+        const entity = await this._resolveChannel(channel);
+        const res = await this.client.getMessages(entity, { ids: [Number(msgId)] });
+        const m = res && res[0];
+        if (m) this._refCache.set(key, m);
+        return m;
+    }
+
     // ---- temas del foro (crudos) ----
     async getForumTopics() {
         const entity = await this.resolveGroup();
@@ -131,30 +156,68 @@ class TelegramService {
         const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:)/i.test(l);
 
         const firstIdx = allLines.findIndex(l => l);
-        const title = clean(allLines[firstIdx] || '') || topic.name;
+        let title = clean(allLines[firstIdx] || '') || topic.name;
+        // quitar año del título ("BOSTON BLUE 2025" -> "BOSTON BLUE")
+        title = title.replace(/\s*\b(19|20)\d{2}\b\s*$/, '').trim() || title;
 
-        // Parsear enlaces (varios por post) + sinopsis (lo que no es enlace ni etiqueta de enlace)
+        // Enlaces (varios por post) + etiqueta del enlace (línea previa)
         const links = [];
-        const synopsisParts = [];
         let pendingLabel = '';
         for (let i = firstIdx + 1; i < allLines.length; i++) {
             const line = allLines[i];
             if (!line) continue;
             if (isUrl(line)) {
-                const kind = /^acestream:/i.test(line) ? 'ace' : 'http';
-                const label = (pendingLabel || ('Enlace ' + (links.length + 1))).replace(/[:：]\s*$/, '').trim();
-                links.push({ label, url: line, kind });
+                let kind = /^acestream:/i.test(line) ? 'ace' : 'http';
+                const link = { label: (pendingLabel || ('Enlace ' + (links.length + 1))).replace(/[:：]\s*$/, '').trim(), url: line, kind };
+                const tme = this._parseTme(line);
+                if (tme) { link.kind = 'tg'; link.channel = tme.channel; link.msgId = tme.msgId; }
+                links.push(link);
                 pendingLabel = '';
             } else {
-                // ¿es la etiqueta del siguiente enlace?
                 let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
                 if (j < allLines.length && isUrl(allLines[j])) pendingLabel = line;
-                else synopsisParts.push(line);
             }
         }
-        const description = clean(synopsisParts.join(' '));
-        const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
 
+        // Metadatos opcionales
+        const meta = {};
+        const mg = text.match(/g[eé]neros?\s*:\s*([^\n]+)/i); if (mg) meta.genres = mg[1].trim();
+        const mr = text.match(/puntuaci[oó]n\s*:\s*([0-9.]+\s*\/?\s*[0-9]*)/i); if (mr) meta.rating = mr[1].replace(/\s+/g, '');
+        const ms = text.match(/temporadas?\s*:\s*(\d+)/i); if (ms) meta.seasons = ms[1];
+        const me = text.match(/episodios?\s*:\s*(\d+)/i); if (me) meta.episodesCount = me[1];
+        const mst = text.match(/\b(en emisi[oó]n|finalizad[ao]|estreno|pr[oó]ximamente)\b/i); if (mst) meta.status = mst[1];
+
+        // Sinopsis: tras el marcador "Sinopsis", hasta los enlaces
+        let description = '';
+        const sinIdx = allLines.findIndex(l => /sinopsis/i.test(l));
+        if (sinIdx >= 0) {
+            const parts = [];
+            const after = allLines[sinIdx].split(/sinopsis\s*:?/i)[1];
+            if (after && after.trim()) parts.push(after.trim());
+            for (let i = sinIdx + 1; i < allLines.length; i++) {
+                const line = allLines[i]; if (!line) continue;
+                if (isUrl(line)) break;
+                let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
+                if (j < allLines.length && isUrl(allLines[j])) break; // empiezan los episodios
+                if (/^[📅📺🎭🎬🌟⭐📝🎥]|g[eé]neros|temporadas|episodios|puntuaci|estreno/i.test(line)) continue;
+                parts.push(line);
+            }
+            description = clean(parts.join(' '));
+        }
+        if (!description) {
+            // respaldo: líneas que no son metadatos ni enlaces ni etiquetas
+            const parts = [];
+            for (let i = firstIdx + 1; i < allLines.length; i++) {
+                const line = allLines[i]; if (!line || isUrl(line)) continue;
+                let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
+                if (j < allLines.length && isUrl(allLines[j])) continue;
+                if (/^[📅📺🎭🎬🌟⭐📝🎥]|g[eé]neros|temporadas|episodios|puntuaci|estreno|sinopsis|en emisi/i.test(line)) continue;
+                parts.push(line);
+            }
+            description = clean(parts.join(' '));
+        }
+
+        const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
         const doc = message.media && message.media.document;
         const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
         const hasThumb = !!(message.media && (message.media.photo || (doc && doc.thumbs && doc.thumbs.length)));
@@ -169,9 +232,8 @@ class TelegramService {
         const BROWSER_OK = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov', 'quicktime'];
         const playableInBrowser = isVideo && BROWSER_OK.includes((ext || '').toLowerCase());
 
-        // compatibilidad: primer ace / primer http sueltos
         const firstAce = links.find(l => l.kind === 'ace');
-        const firstHttp = links.find(l => l.kind === 'http');
+        const firstHttp = links.find(l => l.kind === 'http' || l.kind === 'tg');
 
         return {
             id: message.id,
@@ -180,6 +242,7 @@ class TelegramService {
             title,
             description,
             year,
+            meta,
             duration: isVideo ? this._duration(doc) : '',
             size: doc ? this._bytes(doc.size) : '',
             isVideo,
@@ -192,6 +255,15 @@ class TelegramService {
             streamUrl: isVideo ? `/api/stream/${topic.id}/${message.id}` : '',
             thumbUrl: hasThumb ? `/api/thumb/${topic.id}/${message.id}` : ''
         };
+    }
+
+    // Parsear enlaces de Telegram: t.me/canal/123, t.me/canal/topic/123, t.me/c/123/45
+    _parseTme(url) {
+        let m = url.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
+        if (m) return { channel: '-100' + m[1], msgId: Number(m[2]) };
+        m = url.match(/t\.me\/([A-Za-z0-9_]+)\/(?:\d+\/)?(\d+)/i);
+        if (m) return { channel: m[1], msgId: Number(m[2]) };
+        return null;
     }
 
     _duration(doc) {
@@ -245,8 +317,18 @@ class TelegramService {
         }
 
         // SERIES -> agrupar por nombre base
+        // Caso A: un post = una serie completa con sus episodios como enlaces
+        // Caso B: cada episodio es un mensaje propio (se agrupan por título base)
         const groups = new Map();
+        const shows = [];
         for (const it of raw) {
+            const epLinks = (it.links || []).filter(l =>
+                /\b\d{1,2}\s*x\s*\d{1,3}\b/i.test(l.label) || /cap[ií]tulo|episodio|\bep\b/i.test(l.label));
+            const isSelfSeries = (it.links && it.links.length) && (it.links.length > 1 || epLinks.length > 0);
+            if (isSelfSeries) {
+                shows.push(this._showFromPost(it, topic));
+                continue;
+            }
             const ep = this._parseEpisode(it.title);
             const base = (ep && ep.base) ? ep.base : it.title;
             const key = this._slug(base);
@@ -255,9 +337,7 @@ class TelegramService {
             g.eps.push({ it, ep: ep || { season: 1, ep: g.eps.length + 1, guessed: true } });
         }
 
-        const shows = [];
         for (const [key, g] of groups) {
-            // ordenar y quitar capítulos duplicados (mismo nº o mismo vídeo)
             const sorted = g.eps.sort((a, b) => (a.ep.season - b.ep.season) || (a.ep.ep - b.ep.ep));
             const seenEp = new Set();
             const eps = [];
@@ -291,6 +371,7 @@ class TelegramService {
                 title: g.base || 'Serie',
                 description: (eps.find(e => e.it.description) || eps[0]).it.description || '',
                 year: (eps.find(e => e.it.year) || eps[0]).it.year || '',
+                meta: (eps.find(e => e.it.meta && Object.keys(e.it.meta).length) || eps[0]).it.meta || {},
                 isSeries: episodes.length > 1,
                 episodeCount: episodes.length,
                 thumbUrl: poster.thumbUrl,
@@ -298,6 +379,46 @@ class TelegramService {
             });
         }
         return shows;
+    }
+
+    // Construye una serie (show) a partir de UN post con varios enlaces de episodios
+    _showFromPost(it, topic) {
+        const episodes = it.links.map((l, i) => {
+            const ep = this._parseEpisode(l.label) || { season: 1, ep: i + 1 };
+            const pl = this._linkPlayable(l);
+            return Object.assign({
+                id: it.id + '-l' + i,
+                title: this._epLabel(ep),
+                epNum: ep.ep,
+                season: ep.season,
+                thumbUrl: pl.thumbUrl || it.thumbUrl,
+                duration: '', size: '', description: ''
+            }, pl);
+        }).sort((a, b) => (a.season - b.season) || (a.epNum - b.epNum));
+        return {
+            id: 's-' + topic.id + '-' + this._slug(it.title),
+            topicId: topic.id,
+            title: it.title,
+            description: it.description,
+            year: it.year,
+            meta: it.meta || {},
+            isSeries: episodes.length > 1,
+            episodeCount: episodes.length,
+            thumbUrl: it.thumbUrl,
+            episodes
+        };
+    }
+
+    // Convierte un enlace en datos reproducibles
+    _linkPlayable(link) {
+        if (link.kind === 'tg') return {
+            streamUrl: `/api/stream-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
+            externalUrl: link.url,
+            thumbUrl: `/api/thumb-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
+            playableInBrowser: true
+        };
+        if (link.kind === 'ace') return { aceUrl: link.url, playableInBrowser: false };
+        return { externalUrl: link.url, playableInBrowser: false };
     }
 
     // Detecta el número de episodio en un título: S01E02 / T1E02 / 1x02 / Capítulo 3 ...

@@ -83,6 +83,7 @@ const el = {
     navbar: $('.navbar'),
     navNetflix: $('#nav-netflix'),
     navTelegram: $('#nav-telegram'),
+    viewSwitch: $('.view-switch'),
     navLinks: $('#nav-links'),
     adminLock: $('#admin-lock'),
     heroImage: $('#hero-image'),
@@ -227,7 +228,7 @@ const Detail = {
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
             : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
-        el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        el.modalDescription.innerText = this._descWithMeta(item);
         const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = poster;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
@@ -297,6 +298,17 @@ const Detail = {
     },
 
     resetSources() { el.sources.hidden = true; el.sourcesTrack.innerHTML = ''; },
+
+    _descWithMeta(item) {
+        let desc = item.description || 'Sin descripción disponible.';
+        const m = item.meta || {};
+        const bits = [];
+        if (m.genres) bits.push(m.genres);
+        if (m.rating) bits.push('★ ' + m.rating);
+        if (m.seasons) bits.push(m.seasons + (m.seasons === '1' ? ' temporada' : ' temporadas'));
+        if (m.status) bits.push(m.status);
+        return bits.length ? bits.join('  ·  ') + '\n\n' + desc : desc;
+    },
 
     // Reanudar desde una tarjeta de "Continuar viendo"
     resume(record) {
@@ -489,7 +501,9 @@ const Admin = {
     },
     logout() { Store.adminKey = ''; state.isAdmin = false; this.reflect(); App.switchView('netflix'); },
     reflect() {
-        el.navTelegram.hidden = !(state.adminEnabled && state.isAdmin);
+        const show = !!(state.adminEnabled && state.isAdmin);
+        el.navTelegram.hidden = !show;
+        if (el.viewSwitch) el.viewSwitch.hidden = !show;
         el.adminLock.classList.toggle('active', state.isAdmin);
     }
 };

@@ -130,3 +130,38 @@ acestream://9c079e1bbd01814c107e89187b8c24ba0ac306dd
 
 En la ficha aparecerán los botones **Enlace DAZN 1 / DAZN 2 / TVE La 1**, cada uno abre su
 enlace AceStream (o se copia). Sirve igual con enlaces `https://` (se abren / van a VLC).
+
+
+## Series en un solo post (con enlaces de episodios)
+
+También puedes definir una serie completa en **un único mensaje**: título, metadatos
+(géneros, puntuación, temporadas…), sinopsis y la lista de episodios como enlaces de Telegram.
+La app la agrupa en una sola portada con su lista de capítulos. Ejemplo:
+
+```
+BOSTON BLUE 2025
+📺 Serie
+🎭 Géneros: Crimen, Drama
+📅 Temporadas: 1
+🌟 Puntuación: 8/10
+En emisión
+
+📝 Sinopsis:
+Danny Reagan se une a la policía de Boston...
+
+Episodio 1x01
+https://t.me/AprendiendoBoxTv/1249/1752
+Episodio 1x02
+https://t.me/AprendiendoBoxTv/1249/1753
+```
+
+- El **año** se quita del título y se muestra aparte.
+- La **sinopsis** se toma tras el marcador `Sinopsis:` (los metadatos no la ensucian).
+- Cada `Episodio 1x01` + enlace `t.me/...` se convierte en un capítulo reproducible
+  (se transmite el vídeo de ese mensaje, aunque esté en otro canal público).
+
+## Controles de administrador (solo dueño/admins)
+
+Los botones **Cine / Chat** de arriba **no se muestran a los usuarios normales**: solo aparecen
+tras iniciar sesión con el **candado** 🔒 y la `ADMIN_PASSWORD`. Desde ahí, el admin entra al
+**Chat** para **editar, cambiar o borrar** contenido del grupo. El usuario normal solo ve el catálogo.

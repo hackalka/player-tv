@@ -902,3 +902,7 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .source-btn.active { border-color: var(--netflix-red); background: #3a1417; }
 .source-btn.ace .source-ico { color: #4fd07a; }
 .source-ico { font-size: 1rem; line-height: 1; }
+
+
+/* Metadatos de la ficha en su propia línea */
+.modal-description { white-space: pre-line; }
