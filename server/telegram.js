@@ -62,7 +62,7 @@ class TelegramService {
         return m;
     }
 
-    // ---- temas del foro ----
+    // ---- temas del foro (crudos) ----
     async getForumTopics() {
         const entity = await this.resolveGroup();
         try {
@@ -70,12 +70,47 @@ class TelegramService {
                 channel: entity, limit: 100, offsetDate: 0, offsetId: 0, offsetTopic: 0
             }));
             return (res.topics || [])
-                .filter(t => t.id !== undefined)
+                .filter(t => t.id !== undefined && t.title !== undefined)
                 .map(t => ({ id: t.id, title: t.title || ('Tema ' + t.id) }));
         } catch (e) {
             console.warn('GetForumTopics falló:', e.message);
             return [];
         }
+    }
+
+    // ---- SOLO los temas etiquetados con alguna autoTag, con el nombre ya "limpio" ----
+    async getAutoTopics() {
+        const tags = (this.cfg.autoTags || []).map(t => t.toLowerCase()).filter(Boolean);
+        const all = await this.getForumTopics();
+        const matched = all.filter(t => {
+            const low = (t.title || '').toLowerCase();
+            return tags.some(tag => low.includes(tag));
+        });
+        return matched.map(t => {
+            const info = this._displayInfo(t.title, tags);
+            return { id: t.id, rawTitle: t.title, name: info.name, icon: info.icon, type: info.type };
+        });
+    }
+
+    // Quita las etiquetas del título y deduce un icono según el nombre.
+    _displayInfo(title, tags) {
+        let name = String(title || '');
+        for (const tag of (tags || [])) {
+            if (!tag) continue;
+            const re = new RegExp(tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+            name = name.replace(re, '');
+        }
+        name = name.replace(/[\-|·•:]+\s*$/g, '').replace(/^\s*[\-|·•:]+/g, '').replace(/\s{2,}/g, ' ').trim();
+        if (!name) name = 'Sin nombre';
+        const low = name.toLowerCase();
+        let icon = '📁', type = 'other';
+        if (/pel[ií]cul|movie|cine|film/.test(low)) { icon = '🎬'; type = 'movie'; }
+        else if (/serie|series|temporada|tv\b/.test(low)) { icon = '📺'; type = 'series'; }
+        else if (/deporte|sport|f[uú]tbol|liga|nba|ufc|box/.test(low)) { icon = '⚽'; type = 'sports'; }
+        else if (/doc(u|s)|documental/.test(low)) { icon = '🎥'; type = 'docs'; }
+        else if (/anime|manga/.test(low)) { icon = '🌸'; type = 'anime'; }
+        else if (/infantil|kids|niñ/.test(low)) { icon = '🧸'; type = 'kids'; }
+        return { name, icon, type };
     }
 
     // ---- mensajes de un tema ----
@@ -130,10 +165,11 @@ class TelegramService {
         return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
     }
 
-    // ---- catálogo completo (todas las categorías Netflix) ----
+    // ---- catálogo completo: una categoría por cada tema etiquetado ----
     async getCatalog() {
+        const topics = await this.getAutoTopics();
         const categories = [];
-        for (const topic of this.cfg.topics) {
+        for (const topic of topics) {
             let items = [];
             try {
                 const msgs = await this.getTopicMessages(topic.id, this.cfg.messagesPerTopic);

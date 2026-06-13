@@ -55,8 +55,9 @@ Al final te imprime una **cadena larga**: esa es tu `TG_SESSION`.
 2. En **Variables**, añade:
    - `TG_API_ID` y `TG_API_HASH` (de https://my.telegram.org)
    - `TG_SESSION` = la cadena del paso 1
-   - `TG_GROUP_ID` = `-1003924237464`
+   - `TG_GROUP_ID` = `-1003749684388`
    - `APP_NAME` = `Tv Player`
+   - `AUTO_TAG` = `playertv:auto` (o varias separadas por coma)
 3. Railway construye con Nixpacks y arranca con `npm start`. La web queda lista **sin login**.
 
 ### 3) Local (opcional)
@@ -67,18 +68,16 @@ npm install
 npm start              # http://localhost:3000
 ```
 
-## Configurar los temas
+## Qué temas aparecen (auto-descubrimiento por etiqueta)
 
-Los temas se mapean en `server/config.js`. El `id` es el número que aparece tras el `_`
-en la URL de Telegram Web, por ejemplo `https://web.telegram.org/a/#-1003924237464_2` → tema **2**.
+La web **descubre los temas sola** y **solo muestra** los que tengan una etiqueta en el título.
+Por defecto acepta `playertv:auto` y `tvplayer:auto` (configurable con `AUTO_TAG`, separadas por coma).
 
-```js
-topics: [
-    { id: 2, name: 'Películas', type: 'movie',  icon: '🎬' },
-    { id: 4, name: 'Series',    type: 'series', icon: '📺' },
-    { id: 6, name: 'Deportes',  type: 'sports', icon: '⚽' }
-]
-```
+- Un tema titulado **"Películas playertv:auto"** se muestra como **"Películas"**.
+- Los temas **sin** la etiqueta **no aparecen** en ninguna parte de la web.
+
+Así controlas desde Telegram qué temas se publican en la web: basta con añadir o quitar la
+etiqueta en el título del tema.
 
 ## Notas
 

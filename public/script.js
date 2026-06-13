@@ -190,20 +190,20 @@ const Chat = {
         this.renderList();
     },
     renderList() {
-        const mediaIds = new Set(state.catalog.categories.map(c => c.id));
-        const mediaIcon = {}; state.catalog.categories.forEach(c => mediaIcon[c.id] = c.icon);
         const list = state.topics.slice();
-        if (!list.some(t => t.id === 1)) list.unshift({ id: 1, title: 'General' });
         el.chatList.innerHTML = '';
+        if (!list.length) {
+            el.chatList.innerHTML = '<div class="chat-empty" style="padding:2rem 1rem">No hay temas con la etiqueta configurada.</div>';
+            return;
+        }
         list.forEach(t => {
-            const isMedia = mediaIds.has(t.id);
             const item = document.createElement('div');
-            item.className = 'chat-item' + (isMedia ? ' is-media' : '');
+            item.className = 'chat-item is-media';
             item.innerHTML = `
-                <div class="chat-avatar">${isMedia ? (mediaIcon[t.id] || '#') : '#'}</div>
+                <div class="chat-avatar">${t.icon || '#'}</div>
                 <div class="chat-item-body">
                     <div class="chat-item-top"><span class="chat-item-name">${escapeHtml(t.title)}</span></div>
-                    <div class="chat-item-sub">${isMedia ? 'Tema multimedia' : 'Tema del grupo'}</div>
+                    <div class="chat-item-sub">Tema</div>
                 </div>`;
             item.onclick = () => this.open(t, item);
             el.chatList.appendChild(item);

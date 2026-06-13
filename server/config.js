@@ -14,8 +14,8 @@ module.exports = {
     // Se pega en Railway como variable de entorno TG_SESSION.
     session: process.env.TG_SESSION || '',
 
-    // Grupo/foro de origen (formato -100xxxxxxxxxx)
-    groupId: process.env.TG_GROUP_ID || '-1003924237464',
+    // Grupo/foro de origen (formato -100xxxxxxxxxx o @usuario si es público)
+    groupId: process.env.TG_GROUP_ID || '-1003749684388',
 
     // Marca de la app
     appName: process.env.APP_NAME || 'Tv Player',
@@ -26,14 +26,12 @@ module.exports = {
     // Cuántos mensajes traer por tema
     messagesPerTopic: parseInt(process.env.MESSAGES_PER_TOPIC || '80', 10),
 
-    // Mapeo de TEMAS del foro -> categorías del catálogo.
-    // El id es el número tras el "_" en la URL de web.telegram.org:
-    //   Películas -> #-1003924237464_2  => 2
-    //   Series    -> #-1003924237464_4  => 4
-    //   Deportes  -> #-1003924237464_6  => 6
-    topics: [
-        { id: 2, name: 'Películas', type: 'movie',  icon: '🎬' },
-        { id: 4, name: 'Series',    type: 'series', icon: '📺' },
-        { id: 6, name: 'Deportes',  type: 'sports', icon: '⚽' }
-    ]
+    // ===== Auto-descubrimiento de temas =====
+    // La web SOLO muestra los temas del foro cuyo título contenga una de estas etiquetas.
+    // En la web se muestra el nombre del tema SIN la etiqueta.
+    // Ej.: un tema titulado "Películas playertv:auto" se ve como "Películas".
+    // Los temas que NO tengan la etiqueta no aparecen en ningún sitio de la web.
+    // Se aceptan varias variantes por compatibilidad; configurable con AUTO_TAG (separadas por coma).
+    autoTags: (process.env.AUTO_TAG || 'playertv:auto,tvplayer:auto')
+        .split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
 };

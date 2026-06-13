@@ -15,12 +15,9 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: tg.ready, app: cfg.appName });
 });
 
-// ---- info de la app (marca + categorías) ----
+// ---- info de la app (marca) ----
 app.get('/api/app', (req, res) => {
-    res.json({
-        appName: cfg.appName,
-        categories: cfg.topics.map(t => ({ name: t.name, icon: t.icon, type: t.type, id: t.id }))
-    });
+    res.json({ appName: cfg.appName });
 });
 
 // ---- catálogo completo estilo Netflix ----
@@ -40,10 +37,12 @@ app.get('/api/catalog', async (req, res) => {
     }
 });
 
-// ---- temas del foro (vista chat) ----
+// ---- temas del foro (solo los etiquetados, vista chat) ----
 app.get('/api/topics', async (req, res) => {
-    try { res.json({ topics: await tg.getForumTopics() }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const topics = await tg.getAutoTopics();
+        res.json({ topics: topics.map(t => ({ id: t.id, title: t.name, icon: t.icon })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ---- mensajes de un tema (vista chat estilo Telegram) ----
