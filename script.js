@@ -170,26 +170,50 @@ class TelegramEngine {
     }
 
     async waitForLib() {
+        const inject = (src) => new Promise(res => {
+            const s = document.createElement('script');
+            s.src = src; s.onload = () => res(true); s.onerror = () => res(false);
+            document.head.appendChild(s);
+        });
+        const ok = () => !!(window.telegram && window.telegram.TelegramClient);
         let n = 0;
-        while ((!window.telegram || !window.telegram.TelegramClient) && n < 30) {
-            await new Promise(r => setTimeout(r, 400)); n++;
+        while (!ok() && n < 20) { await new Promise(r => setTimeout(r, 400)); n++; }
+        if (!ok()) {
+            setBoot('Reintentando cargar Telegram desde un CDN alternativo...');
+            await inject('https://unpkg.com/telegram/browser/telegram.js');
+            n = 0;
+            while (!ok() && n < 25) { await new Promise(r => setTimeout(r, 400)); n++; }
         }
-        return !!(window.telegram && window.telegram.TelegramClient);
+        return ok();
     }
 
     async init() {
-        if (!await this.waitForLib()) { setBoot('Error: no se cargó la librería de Telegram'); return false; }
+        if (!await this.waitForLib()) {
+            setBoot('No se pudo cargar la librería de Telegram. Revisa tu conexión y recarga.');
+            this._hideLoading();
+            return false;
+        }
         const { TelegramClient, sessions } = window.telegram;
         this.Api = window.telegram.Api;
         const sessionStr = SafeStorage.getItem('tg_session') || '';
         const session = new sessions.StringSession(sessionStr);
         this.client = new TelegramClient(session, this.cfg.apiId, this.cfg.apiHash, {
-            connectionRetries: 5, useWSS: true
+            connectionRetries: 3, useWSS: true, timeout: 15
         });
         setBoot('Conectando con Telegram...');
-        await this.client.connect();
-        if (!await this.client.checkAuthorization()) {
-            await this.showLogin();
+        try {
+            await Promise.race([
+                this.client.connect(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Tiempo de conexión agotado')), 20000))
+            ]);
+        } catch (e) {
+            setBoot('Error conectando: ' + e.message + '. Mostrando login...');
+        }
+        let authorized = false;
+        try { authorized = await this.client.checkAuthorization(); } catch {}
+        if (!authorized) {
+            this._hideLoading();
+            this.showLogin();
             return false;
         }
         SafeStorage.setItem('tg_session', this.client.session.save());
@@ -197,33 +221,88 @@ class TelegramEngine {
         return true;
     }
 
-    async showLogin() {
+    _hideLoading() { if (el.loadingScreen) el.loadingScreen.classList.add('hidden'); }
+
+    _saveAndReload() {
+        try { SafeStorage.setItem('tg_session', this.client.session.save()); } catch {}
+        setBoot('¡Sesión iniciada! Cargando contenido...');
+        setTimeout(() => location.reload(), 600);
+    }
+
+    // ---- LOGIN: muestra el modal y conecta los flujos ----
+    showLogin() {
         if (!el.loginModal) return;
         el.loginModal.hidden = false;
-        if (el.qrLoading) el.qrLoading.style.display = 'block';
-        if (el.qrCode) el.qrCode.innerHTML = '';
-        setBoot('Escanea el código QR con tu Telegram (Ajustes → Dispositivos → Vincular dispositivo)');
+        setBoot('Inicia sesión para ver tu contenido.');
+        LoginUI.setup(this);
+    }
+
+    // ---- LOGIN por TELÉFONO ----
+    async sendCode(phone) {
+        const res = await this.client.sendCode(
+            { apiId: this.cfg.apiId, apiHash: this.cfg.apiHash },
+            phone
+        );
+        this._phone = phone;
+        this._phoneCodeHash = res.phoneCodeHash;
+        return res;
+    }
+
+    // Devuelve { ok } o { needPassword: true }
+    async signInWithCode(code) {
+        const Api = this.Api;
+        try {
+            await this.client.invoke(new Api.auth.SignIn({
+                phoneNumber: this._phone,
+                phoneCodeHash: this._phoneCodeHash,
+                phoneCode: String(code).replace(/\s+/g, '')
+            }));
+            return { ok: true };
+        } catch (e) {
+            const msg = e.errorMessage || e.message || '';
+            if (msg.includes('SESSION_PASSWORD_NEEDED')) return { needPassword: true };
+            throw e;
+        }
+    }
+
+    async signInWithPassword(password) {
+        let used = false;
+        await this.client.signInWithPassword(
+            { apiId: this.cfg.apiId, apiHash: this.cfg.apiHash },
+            {
+                password: async () => {
+                    if (used) throw new Error('La contraseña 2FA no es correcta.');
+                    used = true; return password;
+                },
+                onError: (e) => { throw e; }
+            }
+        );
+    }
+
+    // ---- LOGIN por QR ----
+    async startQrLogin() {
         try {
             await this.client.signInUserWithQrCode(
                 { apiId: this.cfg.apiId, apiHash: this.cfg.apiHash },
                 {
                     qrCode: async (code) => {
-                        const token = code.token.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                        const token = code.token.toString('base64')
+                            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                         const url = `tg://login?token=${token}`;
-                        if (window.qrcode) {
+                        if (window.qrcode && el.qrCode) {
                             const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
                             if (el.qrLoading) el.qrLoading.style.display = 'none';
-                            if (el.qrCode) el.qrCode.innerHTML = qr.createSvgTag({ cellSize: 4 });
+                            el.qrCode.innerHTML = qr.createSvgTag({ cellSize: 4 });
                         }
                     },
-                    onError: (e) => { console.error('QR error', e); return true; }
+                    password: async () => { throw new Error('Esta cuenta tiene 2FA: usa el login por teléfono.'); },
+                    onError: (e) => { console.error('QR error', e); setBoot('QR: ' + (e.message || e)); return true; }
                 }
             );
-            SafeStorage.setItem('tg_session', this.client.session.save());
-            location.reload();
+            this._saveAndReload();
         } catch (e) {
             console.error('QR Error:', e);
-            setBoot('Error de login: ' + e.message);
+            setBoot('Error de QR: ' + (e.message || e));
         }
     }
 
@@ -666,6 +745,102 @@ const Telegram = {
 };
 
 /* =====================================================================
+ *  LOGIN UI (teléfono + QR)
+ * ===================================================================== */
+const LoginUI = {
+    engine: null,
+    _wired: false,
+    _qrStarted: false,
+
+    setup(engine) {
+        this.engine = engine;
+        if (this._wired) return;
+        this._wired = true;
+        const modal = el.loginModal;
+        const tabs = $$('.login-tab', modal);
+        const panes = $$('.login-pane', modal);
+        tabs.forEach(tab => tab.onclick = () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            panes.forEach(p => p.hidden = p.dataset.pane !== tab.dataset.tab);
+            if (tab.dataset.tab === 'qr') this.initQr();
+        });
+        this.showStep('phone');
+        $('#btn-send-code', modal).onclick = () => this.onSendCode();
+        $('#btn-verify-code', modal).onclick = () => this.onVerifyCode();
+        $('#btn-verify-password', modal).onclick = () => this.onVerifyPassword();
+        $('#btn-back-phone', modal).onclick = () => this.showStep('phone');
+        $('#login-phone', modal).addEventListener('keydown', e => { if (e.key === 'Enter') this.onSendCode(); });
+        $('#login-code', modal).addEventListener('keydown', e => { if (e.key === 'Enter') this.onVerifyCode(); });
+        $('#login-password', modal).addEventListener('keydown', e => { if (e.key === 'Enter') this.onVerifyPassword(); });
+    },
+
+    showStep(step) {
+        $$('.login-step', el.loginModal).forEach(s => s.hidden = s.dataset.step !== step);
+    },
+
+    busy(btn, on) {
+        if (!btn) return;
+        btn.disabled = on;
+        if (on) { btn._t = btn.innerText; btn.innerText = 'Espera...'; }
+        else if (btn._t) btn.innerText = btn._t;
+    },
+
+    async onSendCode() {
+        const phone = $('#login-phone').value.trim();
+        if (!phone) { setBoot('Escribe tu número con prefijo de país (ej: +34...).'); return; }
+        const btn = $('#btn-send-code');
+        this.busy(btn, true); setBoot('Enviando código...');
+        try {
+            await this.engine.sendCode(phone);
+            setBoot('Te enviamos un código. Revísalo en tu app de Telegram.');
+            this.showStep('code'); $('#login-code').focus();
+        } catch (e) {
+            setBoot('No se pudo enviar el código: ' + (e.errorMessage || e.message || e));
+        } finally { this.busy(btn, false); }
+    },
+
+    async onVerifyCode() {
+        const code = $('#login-code').value.trim();
+        if (!code) { setBoot('Escribe el código que recibiste.'); return; }
+        const btn = $('#btn-verify-code');
+        this.busy(btn, true); setBoot('Verificando código...');
+        try {
+            const r = await this.engine.signInWithCode(code);
+            if (r && r.needPassword) {
+                setBoot('Tu cuenta tiene verificación en dos pasos. Introduce tu contraseña 2FA.');
+                this.showStep('password'); $('#login-password').focus();
+            } else {
+                this.engine._saveAndReload();
+            }
+        } catch (e) {
+            setBoot('Código incorrecto o caducado: ' + (e.errorMessage || e.message || e));
+        } finally { this.busy(btn, false); }
+    },
+
+    async onVerifyPassword() {
+        const pwd = $('#login-password').value;
+        if (!pwd) { setBoot('Escribe tu contraseña 2FA.'); return; }
+        const btn = $('#btn-verify-password');
+        this.busy(btn, true); setBoot('Comprobando contraseña...');
+        try {
+            await this.engine.signInWithPassword(pwd);
+            this.engine._saveAndReload();
+        } catch (e) {
+            setBoot('Contraseña 2FA incorrecta: ' + (e.errorMessage || e.message || e));
+        } finally { this.busy(btn, false); }
+    },
+
+    initQr() {
+        if (this._qrStarted) return;
+        this._qrStarted = true;
+        if (el.qrLoading) el.qrLoading.style.display = 'block';
+        if (el.qrCode) el.qrCode.innerHTML = '';
+        this.engine.startQrLogin();
+    }
+};
+
+/* =====================================================================
  *  CONTROLADOR DE VISTAS / BÚSQUEDA
  * ===================================================================== */
 const App = {
@@ -796,9 +971,6 @@ function wireUi() {
 
 document.addEventListener('DOMContentLoaded', () => {
     wireUi();
-    let tries = 0;
-    const t = setInterval(() => {
-        if (window.telegram && window.telegram.TelegramClient) { clearInterval(t); boot(); }
-        else if (++tries > 40) { clearInterval(t); setBoot('Timeout cargando librerías de Telegram'); if (el.loadingScreen) el.loadingScreen.classList.add('hidden'); }
-    }, 400);
+    // boot() gestiona internamente la espera de la librería y el CDN alternativo
+    boot();
 });

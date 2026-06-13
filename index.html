@@ -107,14 +107,47 @@
         </div>
     </div>
 
-    <!-- ===== LOGIN QR ===== -->
+    <!-- ===== LOGIN (teléfono + QR) ===== -->
     <div class="modal" id="login-modal" hidden>
         <div class="modal-overlay"></div>
         <div class="modal-content login-box">
             <h2 class="modal-title">Acceder a Telegram</h2>
-            <p class="login-help">Escanea el código QR desde tu móvil:<br>Telegram → Ajustes → Dispositivos → Vincular dispositivo</p>
-            <div id="qr-loading" class="loader" style="margin: 20px auto;"></div>
-            <div id="qr-code" class="qr-box"></div>
+
+            <div class="login-tabs">
+                <button class="login-tab active" data-tab="phone" type="button">Teléfono</button>
+                <button class="login-tab" data-tab="qr" type="button">Código QR</button>
+            </div>
+
+            <!-- Pestaña TELÉFONO -->
+            <div class="login-pane" data-pane="phone">
+                <!-- paso 1: número -->
+                <div class="login-step" data-step="phone">
+                    <label class="login-label" for="login-phone">Número de teléfono (con prefijo de país)</label>
+                    <input id="login-phone" class="login-input" type="tel" inputmode="tel" placeholder="+34 600 00 00 00" autocomplete="tel">
+                    <button id="btn-send-code" class="btn btn-play login-action" type="button">Enviar código</button>
+                </div>
+                <!-- paso 2: código -->
+                <div class="login-step" data-step="code" hidden>
+                    <label class="login-label" for="login-code">Código que te llegó por Telegram / SMS</label>
+                    <input id="login-code" class="login-input" type="text" inputmode="numeric" placeholder="1 2 3 4 5" autocomplete="one-time-code">
+                    <button id="btn-verify-code" class="btn btn-play login-action" type="button">Verificar código</button>
+                    <button id="btn-back-phone" class="btn-link" type="button">‹ Cambiar número</button>
+                </div>
+                <!-- paso 3: 2FA -->
+                <div class="login-step" data-step="password" hidden>
+                    <label class="login-label" for="login-password">Contraseña de verificación en dos pasos (2FA)</label>
+                    <input id="login-password" class="login-input" type="password" placeholder="Tu contraseña 2FA" autocomplete="current-password">
+                    <button id="btn-verify-password" class="btn btn-play login-action" type="button">Entrar</button>
+                </div>
+            </div>
+
+            <!-- Pestaña QR -->
+            <div class="login-pane" data-pane="qr" hidden>
+                <p class="login-help">Escanea desde tu móvil:<br>Telegram → Ajustes → Dispositivos → Vincular dispositivo</p>
+                <div id="qr-loading" class="loader" style="margin: 20px auto;"></div>
+                <div id="qr-code" class="qr-box"></div>
+            </div>
+
             <p id="boot-status" class="boot-status"></p>
         </div>
     </div>

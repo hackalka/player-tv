@@ -819,3 +819,36 @@ body.telegram-mode .nav-links { visibility: hidden; }
     .navbar-center.view-switch { position: static; }
     .logo-text { display: none; }
 }
+
+
+/* ===== LOGIN (teléfono + QR) ===== */
+.login-box { max-width: 420px; text-align: center; }
+.login-tabs {
+    display: flex; gap: 6px; background: rgba(255,255,255,.06);
+    padding: 4px; border-radius: 10px; margin: 18px 0 22px;
+}
+.login-tab {
+    flex: 1; border: none; background: transparent; color: var(--netflix-light-gray);
+    padding: 9px 0; border-radius: 8px; cursor: pointer; font-family: inherit;
+    font-weight: 600; font-size: .9rem; transition: all var(--transition-fast);
+}
+.login-tab.active { background: var(--netflix-red); color: #fff; }
+.login-pane[hidden] { display: none; }
+.login-step[hidden] { display: none; }
+.login-label {
+    display: block; text-align: left; color: var(--netflix-light-gray);
+    font-size: .82rem; margin-bottom: 6px;
+}
+.login-input {
+    width: 100%; box-sizing: border-box; padding: 13px 14px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.4); color: #fff;
+    font-size: 1.05rem; margin-bottom: 14px; outline: none; transition: border-color var(--transition-fast);
+}
+.login-input:focus { border-color: var(--netflix-red); }
+.login-action { width: 100%; justify-content: center; }
+.btn-link {
+    display: inline-block; margin-top: 12px; background: none; border: none;
+    color: var(--netflix-light-gray); cursor: pointer; font-size: .85rem; text-decoration: underline;
+}
+.btn-link:hover { color: #fff; }
+.boot-status { white-space: pre-wrap; }
