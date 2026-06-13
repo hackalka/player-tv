@@ -289,11 +289,12 @@ const Detail = {
         return {
             id: item.id + '-l' + i,
             title: link.label,
-            aceUrl: link.kind === 'ace' ? link.url : '',
-            externalUrl: link.kind === 'http' ? link.url : '',
-            streamUrl: '',
-            playableInBrowser: false,
-            thumbUrl: item.thumbUrl
+            streamUrl: link.streamUrl || '',
+            aceUrl: link.aceUrl || '',
+            externalUrl: link.externalUrl || '',
+            playableInBrowser: link.playableInBrowser === true,
+            ext: link.ext || '',
+            thumbUrl: link.thumbUrl || item.thumbUrl
         };
     },
 

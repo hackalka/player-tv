@@ -179,6 +179,9 @@ class TelegramService {
             }
         }
 
+        // Enriquecer cada enlace con datos reproducibles (stream/ace/externo)
+        links.forEach(l => Object.assign(l, this._linkPlayable(l)));
+
         // Metadatos opcionales
         const meta = {};
         const mg = text.match(/g[eé]neros?\s*:\s*([^\n]+)/i); if (mg) meta.genres = mg[1].trim();
@@ -417,8 +420,14 @@ class TelegramService {
             thumbUrl: `/api/thumb-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
             playableInBrowser: true
         };
-        if (link.kind === 'ace') return { aceUrl: link.url, playableInBrowser: false };
-        return { externalUrl: link.url, playableInBrowser: false };
+        if (link.kind === 'ace') return { aceUrl: link.url, externalUrl: '', playableInBrowser: false };
+        // http(s): si es un vídeo directo reproducible, se reproduce en el navegador
+        const url = link.url || '';
+        if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(url)) {
+            return { streamUrl: url, externalUrl: url, playableInBrowser: true };
+        }
+        // m3u8/mkv/avi/ts u otros: reproductor externo (VLC, etc.)
+        return { externalUrl: url, playableInBrowser: false };
     }
 
     // Detecta el número de episodio en un título: S01E02 / T1E02 / 1x02 / Capítulo 3 ...
