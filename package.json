@@ -1,0 +1,22 @@
+{
+  "name": "tv-player",
+  "version": "2.0.0",
+  "description": "Tv Player — catálogo estilo Netflix servido desde un grupo de Telegram (backend con sesión guardada, sin login ni bot en el navegador)",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "login": "node login.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "big-integer": "^1.6.52",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "input": "^1.0.1",
+    "telegram": "^2.26.22"
+  },
+  "license": "MIT"
+}

@@ -1,3 +1,15 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno y sesión (¡nunca subir!)
+.env
+*.session
+
+# Logs / OS
+npm-debug.log*
+.DS_Store
+
+# Restos del proyecto Android original
 *.iml
 .gradle
 /local.properties
@@ -5,11 +17,7 @@
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
