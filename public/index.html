@@ -155,6 +155,33 @@
         <div class="search-results" id="search-results"></div>
     </div>
 
+    <!-- ===== LOGIN POR USUARIO ===== -->
+    <div class="modal" id="login-modal" hidden>
+        <div class="modal-overlay"></div>
+        <div class="modal-content login-box">
+            <h2 class="modal-title">Entra con tu Telegram</h2>
+            <p class="login-help">Inicia sesión con tu cuenta para ver el contenido. Tus datos no se comparten.</p>
+
+            <div class="login-step" data-step="phone">
+                <label class="login-label" for="login-phone">Número de teléfono (con prefijo de país)</label>
+                <input id="login-phone" class="login-input" type="tel" inputmode="tel" placeholder="+34 600 00 00 00" autocomplete="tel">
+                <button id="btn-send-code" class="btn btn-play login-action" type="button">Enviar código</button>
+            </div>
+            <div class="login-step" data-step="code" hidden>
+                <label class="login-label" for="login-code">Código recibido en Telegram</label>
+                <input id="login-code" class="login-input" type="text" inputmode="numeric" placeholder="1 2 3 4 5" autocomplete="one-time-code">
+                <button id="btn-verify-code" class="btn btn-play login-action" type="button">Verificar</button>
+                <button id="btn-back-phone" class="btn-link" type="button">‹ Cambiar número</button>
+            </div>
+            <div class="login-step" data-step="password" hidden>
+                <label class="login-label" for="login-password">Contraseña de verificación en dos pasos (2FA)</label>
+                <input id="login-password" class="login-input" type="password" placeholder="Tu contraseña 2FA" autocomplete="current-password">
+                <button id="btn-verify-password" class="btn btn-play login-action" type="button">Entrar</button>
+            </div>
+            <p id="login-status" class="boot-status"></p>
+        </div>
+    </div>
+
     <!-- ===== LOADING ===== -->
     <div class="loading-screen" id="loading-screen">
         <div class="loading-inner">

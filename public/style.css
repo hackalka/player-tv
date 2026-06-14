@@ -925,3 +925,20 @@ body.telegram-mode .nav-links { visibility: hidden; }
     padding: 10px 14px; font-size: .9rem; min-width: 180px; cursor: pointer;
 }
 .filter-select:focus { outline: 2px solid var(--netflix-red); }
+
+
+/* ===== Login por usuario ===== */
+.login-box { max-width: 430px; text-align: center; }
+.login-help { color: var(--netflix-light-gray); margin: 10px 0 22px; font-size: .9rem; line-height: 1.5; }
+.login-step[hidden] { display: none; }
+.login-label { display: block; text-align: left; color: var(--netflix-light-gray); font-size: .82rem; margin-bottom: 6px; }
+.login-input {
+    width: 100%; box-sizing: border-box; padding: 13px 14px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.4); color: #fff;
+    font-size: 1.05rem; margin-bottom: 14px; outline: none;
+}
+.login-input:focus { border-color: var(--netflix-red); }
+.login-action { width: 100%; justify-content: center; }
+.btn-link { display: inline-block; margin-top: 12px; background: none; border: none; color: var(--netflix-light-gray); cursor: pointer; font-size: .85rem; text-decoration: underline; }
+.btn-link:hover { color: #fff; }
+.boot-status { margin-top: 16px; font-weight: 600; color: var(--netflix-red); font-size: .85rem; min-height: 1.2em; white-space: pre-wrap; }

@@ -24,9 +24,8 @@ function absUrl(p) { return p ? new URL(p, location.href).href : ''; }
 
 async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers);
-    if (Store.adminKey) headers['x-admin-key'] = Store.adminKey;
     if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    const r = await fetch(path, Object.assign({}, opts, { headers }));
+    const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
     return data;
@@ -122,7 +121,8 @@ const el = {
     chatHeaderTitle: $('#chat-header-title'),
     chatHeaderMeta: $('#chat-header-meta'),
     loadingScreen: $('#loading-screen'),
-    loadingText: $('#loading-text')
+    loadingText: $('#loading-text'),
+    loginModal: $('#login-modal')
 };
 
 /* ===== NETFLIX ===== */
@@ -496,23 +496,62 @@ const Player = {
     }
 };
 
-/* ===== ADMIN ===== */
-const Admin = {
-    async login() {
-        const pwd = prompt('Contraseña de administrador:');
-        if (pwd == null) return;
-        try {
-            await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pwd }) });
-            Store.adminKey = pwd;
-            state.isAdmin = true;
-            this.reflect();
-            alert('Acceso de administrador activado. Ya puedes ver y editar el chat.');
-        } catch (e) { alert('No autorizado: ' + e.message); }
+/* ===== LOGIN por usuario ===== */
+const Login = {
+    loginId: null,
+    open() {
+        el.loginModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        this.step('phone');
+        this.msg('');
+        this.start();
     },
-    logout() { Store.adminKey = ''; state.isAdmin = false; this.reflect(); App.switchView('netflix'); },
+    async start() {
+        try { const r = await api('/api/login/start', { method: 'POST', body: '{}' }); this.loginId = r.loginId; }
+        catch (e) { this.msg('No se pudo iniciar el acceso: ' + e.message); }
+    },
+    step(s) { $$('#login-modal .login-step').forEach(x => x.hidden = x.dataset.step !== s); },
+    msg(t) { const n = document.getElementById('login-status'); if (n) n.innerText = t || ''; },
+    async sendCode() {
+        const phone = $('#login-phone').value.trim();
+        if (!phone) return this.msg('Escribe tu número con prefijo (ej: +34...).');
+        if (!this.loginId) await this.start();
+        this.msg('Enviando código...');
+        try {
+            await api('/api/login/send-code', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, phone }) });
+            this.msg('Código enviado. Míralo en tu app de Telegram.');
+            this.step('code'); $('#login-code').focus();
+        } catch (e) { this.msg(e.message); }
+    },
+    async verifyCode() {
+        const code = $('#login-code').value.trim();
+        if (!code) return this.msg('Escribe el código.');
+        this.msg('Verificando...');
+        try {
+            const r = await api('/api/login/sign-in', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, code }) });
+            if (r.needPassword) { this.msg('Tu cuenta tiene verificación en dos pasos.'); this.step('password'); $('#login-password').focus(); }
+            else location.reload();
+        } catch (e) { this.msg(e.message); }
+    },
+    async verifyPassword() {
+        const password = $('#login-password').value;
+        if (!password) return this.msg('Escribe tu contraseña 2FA.');
+        this.msg('Comprobando...');
+        try { await api('/api/login/password', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, password }) }); location.reload(); }
+        catch (e) { this.msg(e.message); }
+    }
+};
+
+/* ===== Cuenta / admin ===== */
+const Admin = {
+    async logout() {
+        if (!confirm('¿Cerrar tu sesión de Telegram en esta web?')) return;
+        try { await api('/api/logout', { method: 'POST', body: '{}' }); } catch {}
+        location.reload();
+    },
     async refresh() {
         try {
-            await api('/api/admin/refresh', { method: 'POST', body: JSON.stringify({}) });
+            await api('/api/admin/refresh', { method: 'POST', body: '{}' });
             const catalog = await api('/api/catalog?refresh=1');
             state.catalog = catalog; state.allItems = []; state.itemsById = {};
             catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
@@ -521,11 +560,11 @@ const Admin = {
         } catch (e) { alert('Error al actualizar: ' + e.message); }
     },
     reflect() {
-        const show = !!(state.adminEnabled && state.isAdmin);
-        el.navTelegram.hidden = !show;
-        if (el.viewSwitch) el.viewSwitch.hidden = !show;
-        el.adminRefresh.hidden = !show;
-        el.adminLock.classList.toggle('active', state.isAdmin);
+        const a = !!state.isAdmin;
+        el.navTelegram.hidden = !a;
+        if (el.viewSwitch) el.viewSwitch.hidden = !a;
+        el.adminRefresh.hidden = !a;
+        el.adminLock.hidden = false; // botón de cerrar sesión, visible al estar logado
     }
 };
 
@@ -728,15 +767,14 @@ const TVNav = {
 async function boot() {
     try {
         const info = await api('/api/app').catch(() => null);
-        if (info) {
-            if (info.appName) { el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
-            state.adminEnabled = !!info.adminEnabled;
-        }
-        // estado admin
-        state.isAdmin = !!(state.adminEnabled && Store.adminKey);
-        if (state.isAdmin) { try { await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: Store.adminKey }) }); } catch { Store.adminKey = ''; state.isAdmin = false; } }
+        if (info && info.appName) { el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
+
+        const me = await api('/api/me').catch(() => ({ loggedIn: false }));
+        if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
+
+        state.isAdmin = !!me.isAdmin;
+        state.userName = me.name || '';
         Admin.reflect();
-        el.adminLock.hidden = !state.adminEnabled;
 
         el.loadingText.innerText = 'Cargando catálogo...';
         const catalog = await api('/api/catalog');
@@ -750,8 +788,7 @@ async function boot() {
         setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
     } catch (e) {
         console.error(e);
-        el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el contenido.<br>${escapeHtml(e.message)}<br><br>
-            Revisa que el servidor tenga una sesión válida (variable <b>TG_SESSION</b>).</div>`;
+        el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el contenido.<br>${escapeHtml(e.message)}</div>`;
     } finally {
         el.loadingScreen.classList.add('hidden');
     }
@@ -760,7 +797,14 @@ async function boot() {
 function wireUi() {
     el.navNetflix.onclick = (e) => { e.preventDefault(); App.switchView('netflix'); };
     el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
-    el.adminLock.onclick = () => { state.isAdmin ? (confirm('¿Cerrar sesión de administrador?') && Admin.logout()) : Admin.login(); };
+    el.adminLock.onclick = () => Admin.logout();
+    $('#btn-send-code').onclick = () => Login.sendCode();
+    $('#btn-verify-code').onclick = () => Login.verifyCode();
+    $('#btn-verify-password').onclick = () => Login.verifyPassword();
+    $('#btn-back-phone').onclick = () => Login.step('phone');
+    $('#login-phone').addEventListener('keydown', e => { if (e.key === 'Enter') Login.sendCode(); });
+    $('#login-code').addEventListener('keydown', e => { if (e.key === 'Enter') Login.verifyCode(); });
+    $('#login-password').addEventListener('keydown', e => { if (e.key === 'Enter') Login.verifyPassword(); });
     $('.modal-close', el.playerModal).onclick = () => Detail.close();
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();

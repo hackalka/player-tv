@@ -1,38 +1,20 @@
 'use strict';
-const { TelegramClient, Api } = require('telegram');
-const { StringSession } = require('telegram/sessions');
+const { Api } = require('telegram');
 const bigInt = require('big-integer');
 
 /**
- * Motor de Telegram del lado servidor.
- * Mantiene una única conexión con la sesión guardada y expone helpers
- * para listar temas, traer mensajes, miniaturas y hacer streaming por rangos.
+ * Motor de Telegram ligado al cliente de UN usuario.
+ * Se crea uno por sesión de usuario (ver sessions.js).
  */
 class TelegramService {
-    constructor(cfg) {
+    constructor(client, cfg) {
+        this.client = client;
         this.cfg = cfg;
-        this.client = null;
+        this.Api = Api;
         this.entity = null;
-        this._msgCache = new Map(); // id -> message (para streaming/thumbs)
-        this.ready = false;
-    }
-
-    async start() {
-        if (!this.cfg.session) {
-            throw new Error('Falta TG_SESSION. Genera la sesión con "npm run login" y ponla como variable de entorno.');
-        }
-        const session = new StringSession(this.cfg.session);
-        this.client = new TelegramClient(session, this.cfg.apiId, this.cfg.apiHash, {
-            connectionRetries: 5,
-            useWSS: false,
-            autoReconnect: true
-        });
-        await this.client.connect();
-        const authorized = await this.client.checkAuthorization();
-        if (!authorized) throw new Error('La sesión TG_SESSION no es válida o expiró. Genera una nueva con "npm run login".');
-        this.ready = true;
-        console.log('✅ Conectado a Telegram');
-        await this.resolveGroup();
+        this._msgCache = new Map();
+        this._refCache = new Map();
+        this._chanCache = new Map();
     }
 
     async resolveGroup() {
@@ -42,16 +24,23 @@ class TelegramService {
         try {
             this.entity = await this.client.getEntity(id);
         } catch (e) {
-            // poblar caché con diálogos y reintentar
             await this.client.getDialogs({ limit: 200 });
             this.entity = await this.client.getEntity(id);
         }
         return this.entity;
     }
 
-    _cache(messages) {
-        for (const m of messages) if (m && m.id != null) this._msgCache.set(m.id, m);
+    // ¿La cuenta del usuario es administrador/creador del grupo?
+    async isGroupAdmin() {
+        try {
+            const entity = await this.resolveGroup();
+            const p = await this.client.invoke(new Api.channels.GetParticipant({ channel: entity, participant: 'me' }));
+            const cn = p && p.participant && p.participant.className;
+            return cn === 'ChannelParticipantCreator' || cn === 'ChannelParticipantAdmin';
+        } catch (e) { return false; }
     }
+
+    _cache(messages) { for (const m of messages) if (m && m.id != null) this._msgCache.set(m.id, m); }
 
     async getMessageById(id) {
         if (this._msgCache.has(id)) return this._msgCache.get(id);
@@ -62,9 +51,7 @@ class TelegramService {
         return m;
     }
 
-    // Resolver un canal por @usuario o id (-100...) para enlaces t.me externos
     async _resolveChannel(channel) {
-        if (!this._chanCache) this._chanCache = new Map();
         if (this._chanCache.has(channel)) return this._chanCache.get(channel);
         const raw = String(channel);
         const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
@@ -75,9 +62,7 @@ class TelegramService {
         return ent;
     }
 
-    // Mensaje de otro canal a partir de un enlace t.me
     async getMessageByRef(channel, msgId) {
-        if (!this._refCache) this._refCache = new Map();
         const key = channel + ':' + msgId;
         if (this._refCache.has(key)) return this._refCache.get(key);
         const entity = await this._resolveChannel(channel);
@@ -103,7 +88,7 @@ class TelegramService {
         }
     }
 
-    // ---- SOLO los temas etiquetados con alguna autoTag, con el nombre ya "limpio" ----
+    // ---- SOLO los temas etiquetados, con el nombre ya "limpio" ----
     async getAutoTopics() {
         const tags = (this.cfg.autoTags || []).map(t => t.toLowerCase()).filter(Boolean);
         const all = await this.getForumTopics();
@@ -117,7 +102,6 @@ class TelegramService {
         });
     }
 
-    // Quita las etiquetas del título y deduce un icono según el nombre.
     _displayInfo(title, tags) {
         let name = String(title || '');
         for (const tag of (tags || [])) {
@@ -138,7 +122,6 @@ class TelegramService {
         return { name, icon, type };
     }
 
-    // ---- mensajes de un tema ----
     async getTopicMessages(topicId, limit) {
         const entity = await this.resolveGroup();
         const opts = { limit: limit || this.cfg.messagesPerTopic };
@@ -148,7 +131,6 @@ class TelegramService {
         return msgs;
     }
 
-    // ---- construir un item de catálogo a partir de un mensaje ----
     buildItem(message, topic) {
         const text = message.message || '';
         const allLines = text.split('\n').map(s => s.trim());
@@ -157,10 +139,8 @@ class TelegramService {
 
         const firstIdx = allLines.findIndex(l => l);
         let title = clean(allLines[firstIdx] || '') || topic.name;
-        // quitar año del título ("BOSTON BLUE 2025" -> "BOSTON BLUE")
         title = title.replace(/\s*\b(19|20)\d{2}\b\s*$/, '').trim() || title;
 
-        // Enlaces (varios por post) + etiqueta del enlace (línea previa)
         const links = [];
         let pendingLabel = '';
         for (let i = firstIdx + 1; i < allLines.length; i++) {
@@ -178,11 +158,8 @@ class TelegramService {
                 if (j < allLines.length && isUrl(allLines[j])) pendingLabel = line;
             }
         }
-
-        // Enriquecer cada enlace con datos reproducibles (stream/ace/externo)
         links.forEach(l => Object.assign(l, this._linkPlayable(l)));
 
-        // Metadatos opcionales
         const meta = {};
         const mg = text.match(/g[eé]neros?\s*:\s*([^\n]+)/i); if (mg) meta.genres = mg[1].trim();
         const mr = text.match(/puntuaci[oó]n\s*:\s*([0-9.]+\s*\/?\s*[0-9]*)/i); if (mr) meta.rating = mr[1].replace(/\s+/g, '');
@@ -190,7 +167,6 @@ class TelegramService {
         const me = text.match(/episodios?\s*:\s*(\d+)/i); if (me) meta.episodesCount = me[1];
         const mst = text.match(/\b(en emisi[oó]n|finalizad[ao]|estreno|pr[oó]ximamente)\b/i); if (mst) meta.status = mst[1];
 
-        // Sinopsis: tras el marcador "Sinopsis", hasta los enlaces
         let description = '';
         const sinIdx = allLines.findIndex(l => /sinopsis/i.test(l));
         if (sinIdx >= 0) {
@@ -201,14 +177,13 @@ class TelegramService {
                 const line = allLines[i]; if (!line) continue;
                 if (isUrl(line)) break;
                 let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
-                if (j < allLines.length && isUrl(allLines[j])) break; // empiezan los episodios
+                if (j < allLines.length && isUrl(allLines[j])) break;
                 if (/^[📅📺🎭🎬🌟⭐📝🎥]|g[eé]neros|temporadas|episodios|puntuaci|estreno/i.test(line)) continue;
                 parts.push(line);
             }
             description = clean(parts.join(' '));
         }
         if (!description) {
-            // respaldo: líneas que no son metadatos ni enlaces ni etiquetas
             const parts = [];
             for (let i = firstIdx + 1; i < allLines.length; i++) {
                 const line = allLines[i]; if (!line || isUrl(line)) continue;
@@ -242,10 +217,7 @@ class TelegramService {
             id: message.id,
             topicId: topic.id,
             uid: doc && doc.id ? String(doc.id) : '',
-            title,
-            description,
-            year,
-            meta,
+            title, description, year, meta,
             date: Number(message.date) || 0,
             duration: isVideo ? this._duration(doc) : '',
             size: doc ? this._bytes(doc.size) : '',
@@ -261,13 +233,25 @@ class TelegramService {
         };
     }
 
-    // Parsear enlaces de Telegram: t.me/canal/123, t.me/canal/topic/123, t.me/c/123/45
     _parseTme(url) {
         let m = url.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
         if (m) return { channel: '-100' + m[1], msgId: Number(m[2]) };
         m = url.match(/t\.me\/([A-Za-z0-9_]+)\/(?:\d+\/)?(\d+)/i);
         if (m) return { channel: m[1], msgId: Number(m[2]) };
         return null;
+    }
+
+    _linkPlayable(link) {
+        if (link.kind === 'tg') return {
+            streamUrl: `/api/stream-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
+            externalUrl: link.url,
+            thumbUrl: `/api/thumb-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
+            playableInBrowser: true
+        };
+        if (link.kind === 'ace') return { aceUrl: link.url, externalUrl: '', playableInBrowser: false };
+        const url = link.url || '';
+        if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(url)) return { streamUrl: url, externalUrl: url, playableInBrowser: true };
+        return { externalUrl: url, playableInBrowser: false };
     }
 
     _duration(doc) {
@@ -283,7 +267,6 @@ class TelegramService {
         return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
     }
 
-    // ---- catálogo completo: una categoría por cada tema etiquetado ----
     async getCatalog() {
         const topics = await this.getAutoTopics();
         const categories = [];
@@ -292,21 +275,17 @@ class TelegramService {
             try {
                 const msgs = await this.getTopicMessages(topic.id, this.cfg.messagesPerTopic);
                 items = this._buildTopicItems(msgs, topic);
-            } catch (e) {
-                console.warn(`Tema ${topic.name} falló:`, e.message);
-            }
+            } catch (e) { console.warn(`Tema ${topic.name} falló:`, e.message); }
             categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
         }
         return { categories };
     }
 
-    // Construye los items de un tema. Las SERIES se agrupan en "shows" con episodios.
     _buildTopicItems(msgs, topic) {
         const raw = msgs
             .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)) || (m.message && /acestream/i.test(m.message)))
             .map(m => this.buildItem(m, topic));
 
-        // SIN series -> lista plana SIN duplicados (mismo título o mismo vídeo)
         if (topic.type !== 'series') {
             const seen = new Set();
             const out = [];
@@ -320,19 +299,13 @@ class TelegramService {
             return out;
         }
 
-        // SERIES -> agrupar por nombre base
-        // Caso A: un post = una serie completa con sus episodios como enlaces
-        // Caso B: cada episodio es un mensaje propio (se agrupan por título base)
         const groups = new Map();
         const shows = [];
         for (const it of raw) {
             const epLinks = (it.links || []).filter(l =>
                 /\b\d{1,2}\s*x\s*\d{1,3}\b/i.test(l.label) || /cap[ií]tulo|episodio|\bep\b/i.test(l.label));
             const isSelfSeries = (it.links && it.links.length) && (it.links.length > 1 || epLinks.length > 0);
-            if (isSelfSeries) {
-                shows.push(this._showFromPost(it, topic));
-                continue;
-            }
+            if (isSelfSeries) { shows.push(this._showFromPost(it, topic)); continue; }
             const ep = this._parseEpisode(it.title);
             const base = (ep && ep.base) ? ep.base : it.title;
             const key = this._slug(base);
@@ -354,125 +327,66 @@ class TelegramService {
             }
             const poster = (eps.find(e => e.it.hasThumb) || eps[0]).it;
             const episodes = eps.map(e => ({
-                id: e.it.id,
-                title: this._epLabel(e.ep),
-                epNum: e.ep.ep,
-                season: e.ep.season,
-                streamUrl: e.it.streamUrl,
-                externalUrl: e.it.externalUrl,
-                aceUrl: e.it.aceUrl,
-                links: e.it.links,
-                ext: e.it.ext,
-                playableInBrowser: e.it.playableInBrowser,
-                thumbUrl: e.it.thumbUrl,
-                duration: e.it.duration,
-                size: e.it.size,
-                description: e.it.description
+                id: e.it.id, title: this._epLabel(e.ep), epNum: e.ep.ep, season: e.ep.season,
+                streamUrl: e.it.streamUrl, externalUrl: e.it.externalUrl, aceUrl: e.it.aceUrl, links: e.it.links,
+                ext: e.it.ext, playableInBrowser: e.it.playableInBrowser, thumbUrl: e.it.thumbUrl,
+                duration: e.it.duration, size: e.it.size, description: e.it.description
             }));
             shows.push({
-                id: 's-' + topic.id + '-' + key,
-                topicId: topic.id,
-                title: g.base || 'Serie',
+                id: 's-' + topic.id + '-' + key, topicId: topic.id, title: g.base || 'Serie',
                 description: (eps.find(e => e.it.description) || eps[0]).it.description || '',
                 year: (eps.find(e => e.it.year) || eps[0]).it.year || '',
                 meta: (eps.find(e => e.it.meta && Object.keys(e.it.meta).length) || eps[0]).it.meta || {},
                 date: Math.max(...eps.map(e => e.it.date || 0)),
-                isSeries: episodes.length > 1,
-                episodeCount: episodes.length,
-                thumbUrl: poster.thumbUrl,
-                episodes
+                isSeries: episodes.length > 1, episodeCount: episodes.length, thumbUrl: poster.thumbUrl, episodes
             });
         }
         return shows;
     }
 
-    // Construye una serie (show) a partir de UN post con varios enlaces de episodios
     _showFromPost(it, topic) {
         const episodes = it.links.map((l, i) => {
             const ep = this._parseEpisode(l.label) || { season: 1, ep: i + 1 };
             const pl = this._linkPlayable(l);
             return Object.assign({
-                id: it.id + '-l' + i,
-                title: this._epLabel(ep),
-                epNum: ep.ep,
-                season: ep.season,
-                thumbUrl: pl.thumbUrl || it.thumbUrl,
-                duration: '', size: '', description: ''
+                id: it.id + '-l' + i, title: this._epLabel(ep), epNum: ep.ep, season: ep.season,
+                thumbUrl: pl.thumbUrl || it.thumbUrl, duration: '', size: '', description: ''
             }, pl);
         }).sort((a, b) => (a.season - b.season) || (a.epNum - b.epNum));
         return {
-            id: 's-' + topic.id + '-' + this._slug(it.title),
-            topicId: topic.id,
-            title: it.title,
-            description: it.description,
-            year: it.year,
-            meta: it.meta || {},
-            date: it.date || 0,
-            isSeries: episodes.length > 1,
-            episodeCount: episodes.length,
-            thumbUrl: it.thumbUrl,
-            episodes
+            id: 's-' + topic.id + '-' + this._slug(it.title), topicId: topic.id, title: it.title,
+            description: it.description, year: it.year, meta: it.meta || {}, date: it.date || 0,
+            isSeries: episodes.length > 1, episodeCount: episodes.length, thumbUrl: it.thumbUrl, episodes
         };
     }
 
-    // Convierte un enlace en datos reproducibles
-    _linkPlayable(link) {
-        if (link.kind === 'tg') return {
-            streamUrl: `/api/stream-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
-            externalUrl: link.url,
-            thumbUrl: `/api/thumb-link/${encodeURIComponent(link.channel)}/${link.msgId}`,
-            playableInBrowser: true
-        };
-        if (link.kind === 'ace') return { aceUrl: link.url, externalUrl: '', playableInBrowser: false };
-        // http(s): si es un vídeo directo reproducible, se reproduce en el navegador
-        const url = link.url || '';
-        if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(url)) {
-            return { streamUrl: url, externalUrl: url, playableInBrowser: true };
-        }
-        // m3u8/mkv/avi/ts u otros: reproductor externo (VLC, etc.)
-        return { externalUrl: url, playableInBrowser: false };
-    }
-
-    // Detecta el número de episodio en un título: S01E02 / T1E02 / 1x02 / Capítulo 3 ...
     _parseEpisode(title) {
         const t = String(title || '');
         let m;
-        m = t.match(/\b[st](\d{1,2})\s*[ex](\d{1,3})\b/i);          // s01e02 / t1e02
+        m = t.match(/\b[st](\d{1,2})\s*[ex](\d{1,3})\b/i);
         if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
-        m = t.match(/\b(\d{1,2})\s*x\s*(\d{1,3})\b/i);              // 1x02
+        m = t.match(/\b(\d{1,2})\s*x\s*(\d{1,3})\b/i);
         if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
-        m = t.match(/(cap[ií]tulo|cap\.?|episodio|epis\.?|ep\.?)\s*\.?\s*(\d{1,3})/i); // capítulo 3
+        m = t.match(/(cap[ií]tulo|cap\.?|episodio|epis\.?|ep\.?)\s*\.?\s*(\d{1,3})/i);
         if (m) return { season: 1, ep: +m[2], base: t.slice(0, m.index).trim() };
         return null;
     }
-
-    _epLabel(ep) {
-        return (ep.season && ep.season > 1)
-            ? `T${ep.season} · Capítulo ${ep.ep}`
-            : `Capítulo ${ep.ep}`;
-    }
-
+    _epLabel(ep) { return (ep.season && ep.season > 1) ? `T${ep.season} · Capítulo ${ep.ep}` : `Capítulo ${ep.ep}`; }
     _slug(s) {
         return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
     }
 
-    // ---- miniatura ----
     async downloadThumb(topicId, msgId) {
         const message = await this.getMessageById(msgId);
         if (!message || !message.media) return null;
         const media = message.media;
-        if (media.photo) {
-            return await this.client.downloadMedia(message, {});
-        }
+        if (media.photo) return await this.client.downloadMedia(message, {});
         const doc = media.document;
-        if (doc && doc.thumbs && doc.thumbs.length) {
-            return await this.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
-        }
+        if (doc && doc.thumbs && doc.thumbs.length) return await this.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
         return null;
     }
 
-    // ---- info del documento para el streaming ----
     docInfo(message) {
         const doc = message.media && message.media.document;
         if (!doc) return null;
@@ -486,25 +400,17 @@ class TelegramService {
         };
     }
 
-    // ---- iterador de descarga para un rango [start, start+length) ----
     streamRange(info, start, length) {
         return this.client.iterDownload({
-            file: info.location,
-            offset: bigInt(start),
-            limit: length,
-            requestSize: 512 * 1024,
-            dcId: info.dcId
+            file: info.location, offset: bigInt(start), limit: length, requestSize: 512 * 1024, dcId: info.dcId
         });
     }
 
-    // ---- ADMIN: editar el texto/caption de un mensaje ----
     async editMessageText(msgId, text) {
         const entity = await this.resolveGroup();
         await this.client.editMessage(entity, { message: Number(msgId), text: String(text) });
         this._msgCache.delete(Number(msgId));
     }
-
-    // ---- ADMIN: borrar un mensaje ----
     async deleteMessage(msgId) {
         const entity = await this.resolveGroup();
         await this.client.deleteMessages(entity, [Number(msgId)], { revoke: true });
