@@ -257,8 +257,8 @@ const Player = {
         if (src.ext) { el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true; el.playerVideo.hidden = true; el.playerIframe.hidden = false; el.playerIframe.src = this.embed(src.ext); return; }
         el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true;
         el.playerIframe.hidden = true; el.playerIframe.src = '';
-        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Cargando vídeo...';
-        Player._lastError = '';
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando streaming...';
+        Player._lastError = ''; Player._bytes = 0;
         try {
             let url;
             if (src.t === 'url') url = src.url;
@@ -279,14 +279,18 @@ const Player = {
             v.ontimeupdate = () => this._tick();
             v.onended = () => Store.clearProgress(playable.id);
             this._clearWatch();
-            this._watch = setTimeout(() => {
-                if (v.readyState < 2 && !v.error) this.streamFailed(playable);
-            }, 11000);
+            const checkStall = () => {
+                if (v.error || v.readyState >= 2) return;
+                if (!Player._bytes) { this.streamFailed(playable); return; } // no llega nada -> fallo real
+                this._watch = setTimeout(checkStall, 8000); // hay datos: seguir esperando
+            };
+            this._watch = setTimeout(checkStall, 11000);
             v.play().catch(() => {});
         } catch (e) { console.error(e); Player._lastError = e.message || String(e); this.streamFailed(playable); }
     },
-    _watch: null, _lastError: '',
+    _watch: null, _lastError: '', _bytes: 0,
     _clearWatch() { if (this._watch) { clearTimeout(this._watch); this._watch = null; } },
+    _dbg(msg) { const v = el.playerVideo; if (v && !v.error && v.readyState < 3) { el.playerStatus.hidden = false; el.playerStatus.innerText = msg; } },
     streamFailed(playable) {
         this._clearWatch();
         // No descargamos la peli entera (eso causaba "cargando" infinito).
@@ -500,8 +504,14 @@ const SW = {
             try {
                 const { chunk } = await Engine.streamRange(d.streamId, d.start, d.start + d.size - 1);
                 const buf = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
+                Player._bytes = (Player._bytes || 0) + buf.byteLength;
+                Player._dbg('Reproduciendo… (' + (Player._bytes / 1048576).toFixed(1) + ' MB recibidos)');
                 this.port.postMessage({ requestId: d.requestId, chunk: buf }, [buf]);
-            } catch (err) { Player._lastError = err && (err.message || String(err)); this.port.postMessage({ requestId: d.requestId, error: Player._lastError || 'error' }); }
+            } catch (err) {
+                Player._lastError = err && (err.message || String(err));
+                Player._dbg('Error: ' + Player._lastError);
+                this.port.postMessage({ requestId: d.requestId, error: Player._lastError || 'error' });
+            }
         }
     },
     register(streamId, fileSize, mimeType) {
