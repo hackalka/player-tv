@@ -222,13 +222,13 @@ const ExternalPlayers = {
             items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.externalUrl)}">Copiar enlace</button>`);
         }
         const isTgDoc = !!(playable.src && (playable.src.t === 'doc' || playable.src.t === 'l'));
-        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="dl-btn">⬇ Descargar archivo</button>');
+        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">📲 Abrir en otra app</button>');
         if (!items.length) { box.hidden = true; return; }
         const label = playable.aceUrl ? 'Enlace AceStream:'
-            : (isTgDoc && playable.playableInBrowser === false ? 'Este formato (mkv/avi) no se reproduce en el navegador. Descárgalo y ábrelo con tu reproductor:' : 'Más opciones:');
+            : (isTgDoc && playable.playableInBrowser === false ? 'Este formato (mkv/avi) no se reproduce en el navegador. Ábrelo en otra app/reproductor:' : 'Más opciones:');
         box.hidden = false; box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
         $$('button[data-copy]', box).forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.innerText = '¡Copiado!'; setTimeout(() => b.innerText = 'Copiar enlace', 1500); }).catch(() => {}));
-        const dl = $('#dl-btn', box); if (dl) dl.onclick = () => Player.downloadFile(playable);
+        const oe = $('#openext-btn', box); if (oe) oe.onclick = () => Player.openExternalApp(playable);
     }
 };
 
@@ -281,9 +281,21 @@ const Player = {
             el.playerVideo.hidden = false; el.playerVideo.onerror = null; el.playerVideo.src = url; el.playerStatus.hidden = true; el.playerVideo.play().catch(() => {});
         } catch (e) { this.onError(playable); }
     },
-    async downloadFile(playable) {
-        try { const url = await Engine.downloadFull(playable.src); const a = document.createElement('a'); a.href = url; a.download = (playable.title || 'video'); a.click(); }
-        catch (e) { alert('No se pudo descargar: ' + e.message); }
+    async openExternalApp(playable) {
+        el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando para abrir en otra app...';
+        try {
+            const { blob, name, mime } = await Engine.downloadBlob(playable.src, (d, t) => { if (t) el.playerStatus.innerText = 'Cargando ' + Math.round(d / t * 100) + '% ...'; });
+            const file = new File([blob], name, { type: mime });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: playable.title || name });
+                el.playerStatus.hidden = true;
+            } else {
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                el.playerStatus.innerText = 'Abierto en otra pestaña. En el PC, usa el menú del navegador o tu reproductor para abrirlo.';
+            }
+        } catch (e) { el.playerStatus.innerText = 'No se pudo abrir: ' + (e.message || e); }
     },
     _last: 0,
     _tick() { const v = el.playerVideo, c = this.current; if (!c || !v.duration) return; const n = Date.now(); if (n - this._last > 5000) { this._last = n; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); } },

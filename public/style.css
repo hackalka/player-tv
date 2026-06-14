@@ -942,3 +942,57 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .btn-link { display: inline-block; margin-top: 12px; background: none; border: none; color: var(--netflix-light-gray); cursor: pointer; font-size: .85rem; text-decoration: underline; }
 .btn-link:hover { color: #fff; }
 .boot-status { margin-top: 16px; font-weight: 600; color: var(--netflix-red); font-size: .85rem; min-height: 1.2em; white-space: pre-wrap; }
+
+
+/* =====================================================================
+ *  RESPONSIVE — se adapta al dispositivo (móvil, tablet, PC, TV)
+ * ===================================================================== */
+
+/* Imágenes y vídeo nunca desbordan */
+img, video, iframe { max-width: 100%; }
+
+/* Detalle/reproductor: en pantallas pequeñas, casi pantalla completa */
+@media (max-width: 900px) {
+    .modal-content { width: 96vw !important; max-width: 96vw !important; }
+    .detail-modal .modal-details { padding: 16px; }
+    .episodes-track { max-height: 50vh; }
+    .navbar-center.view-switch { padding: 3px; gap: 4px; }
+    .view-btn { padding: 6px 10px; font-size: .8rem; }
+    .nav-links { display: none; } /* en móvil se navega por filas/buscador */
+}
+
+/* Móvil: tarjetas y hero más compactos */
+@media (max-width: 640px) {
+    .hero { height: 60vh; min-height: 360px; }
+    .hero-title, .detail-title { font-size: 1.5rem; }
+    .hero-description { font-size: .9rem; -webkit-line-clamp: 3; }
+    .card { width: 42vw; }
+    .content-row .card { width: 42vw; }
+    .row-title { font-size: 1rem; }
+    .search-filters { flex-direction: column; }
+    .filter-select { width: 100%; }
+    .opt-row, .sources-track { gap: 8px; }
+    .opt-btn, .source-btn { font-size: .85rem; padding: 9px 12px; }
+    .logo-text { font-size: .95rem; }
+    .hero-buttons .btn { padding: 8px 14px; font-size: .9rem; }
+    .episode-thumb { width: 84px; height: 48px; }
+}
+
+/* Tablet */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .card { width: 30vw; }
+}
+
+/* Pantallas/TV grandes: texto un poco mayor para ver de lejos */
+@media (min-width: 1600px) {
+    html { font-size: 18px; }
+    .card { width: 230px; }
+}
+
+/* Orientación apaisada en móvil (TV Box / mando): aprovechar ancho */
+@media (max-height: 480px) and (orientation: landscape) {
+    .hero { height: 90vh; }
+}
+
+/* Evitar zoom raro en inputs de iOS */
+input, select, textarea { font-size: 16px; }

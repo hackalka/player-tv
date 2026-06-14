@@ -327,7 +327,7 @@
             let limit = Math.ceil((skip + need) / ALIGN) * ALIGN;
             const location = new Api.InputDocumentFileLocation({ id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '' });
             const chunks = [];
-            for await (const c of this.client.iterDownload({ file: location, offset: alignedStart, limit, requestSize: 512 * 1024, dcId: doc.dcId })) {
+            for await (const c of this.client.iterDownload({ file: location, offset: alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
                 chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
             }
             let total = 0; chunks.forEach(c => total += c.byteLength);
@@ -335,13 +335,25 @@
             return { chunk: merged.slice(skip, skip + need), size: s.size, mime: s.mime };
         },
 
-        // ---- descarga completa (fallback / "descargar archivo") ----
+        // ---- descarga completa (fallback de reproducción interna) ----
         async downloadFull(src, onProgress) {
             const m = await this._resolveSrcMessage(src);
             if (!m) throw new Error('No se encontró el archivo.');
             const buf = await this.client.downloadMedia(m, { progressCallback: (d, t) => { try { onProgress && onProgress(Number(d), Number(t)); } catch {} } });
             const doc = m.media.document;
             return URL.createObjectURL(new Blob([buf], { type: (doc && doc.mimeType) || 'video/mp4' }));
+        },
+        // ---- blob + nombre (para "abrir en otra app" / compartir) ----
+        async downloadBlob(src, onProgress) {
+            const m = await this._resolveSrcMessage(src);
+            if (!m) throw new Error('No se encontró el archivo.');
+            const buf = await this.client.downloadMedia(m, { progressCallback: (d, t) => { try { onProgress && onProgress(Number(d), Number(t)); } catch {} } });
+            const doc = m.media && m.media.document;
+            const mime = (doc && doc.mimeType) || 'video/mp4';
+            let name = 'video.' + ((mime.split('/')[1] || 'mp4'));
+            const fn = doc && (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+            if (fn && fn.fileName) name = fn.fileName;
+            return { blob: new Blob([buf], { type: mime }), name, mime };
         },
 
         // ---- admin: editar / borrar ----

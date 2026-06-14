@@ -1,6 +1,6 @@
 /* Service Worker: sirve el vídeo de Telegram por rangos pidiéndoselo a la página. */
 const META = new Map(); // streamId -> { size, mime }
-const CHUNK = 1024 * 1024; // 1 MB por petición de rango
+const CHUNK = 2 * 1024 * 1024; // 2 MB por petición de rango (menos viajes = más fluido)
 
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
@@ -32,8 +32,9 @@ async function handle(event, streamId) {
         const m = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
         if (m) { start = parseInt(m[1], 10); if (m[2]) end = Math.min(parseInt(m[2], 10), size - 1); }
     }
-    // limitar el tamaño de cada respuesta para no descargar de golpe
-    end = Math.min(end, start + CHUNK - 1, size - 1);
+    // primer trozo pequeño = arranque rápido; el resto más grande = más fluido
+    const chunkSize = (start === 0) ? (512 * 1024) : CHUNK;
+    end = Math.min(end, start + chunkSize - 1, size - 1);
     if (start >= size) return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + size } });
 
     let data;
