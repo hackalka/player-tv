@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/build-telegram-bundle.yml'
       - 'webpack.config.js'
-      - 'build/entry.js'
+      - 'tg-entry.js'
 
 permissions:
   contents: write

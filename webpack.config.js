@@ -9,7 +9,7 @@ const webpack = require('webpack');
 
 module.exports = {
     mode: 'production',
-    entry: './build/entry.js',
+    entry: './tg-entry.js',
     output: {
         path: path.resolve(__dirname, 'public/vendor'),
         filename: 'telegram.bundle.js',

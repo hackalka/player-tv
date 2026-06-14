@@ -48,7 +48,7 @@ Debe servirse por **HTTPS o localhost** (lo exige el Service Worker del streamin
 
 ```
 server/index.js                       Servidor estático (solo sirve public/)
-webpack.config.js + build/entry.js    Genera el bundle de navegador (lo usa la Action)
+webpack.config.js + tg-entry.js       Genera el bundle de navegador (lo usa la Action)
 .github/workflows/build-telegram-bundle.yml   CI que construye y sube el bundle
 public/
   index.html         UI (carga vendor/telegram.bundle.js)
