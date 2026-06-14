@@ -5,7 +5,8 @@ on:
   push:
     paths:
       - '.github/workflows/build-telegram-bundle.yml'
-      - 'scripts/build-bundle.js'
+      - 'webpack.config.js'
+      - 'build/entry.js'
 
 permissions:
   contents: write
@@ -25,10 +26,16 @@ jobs:
           node-version: '20'
 
       - name: Instalar dependencias de build
-        run: npm install --no-save telegram@2.26.22 esbuild@0.20.2 buffer@6.0.3 esbuild-plugin-polyfill-node@0.3.0
+        run: >
+          npm install --no-save
+          telegram@2.26.22
+          webpack@5.94.0 webpack-cli@5.1.4
+          buffer process stream-browserify crypto-browserify
+          path-browserify os-browserify browserify-zlib vm-browserify
+          assert util constants-browserify events
 
       - name: Generar bundle de navegador
-        run: node scripts/build-bundle.js
+        run: npx webpack --config webpack.config.js
 
       - name: Commit del bundle
         run: |
