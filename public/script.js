@@ -274,28 +274,38 @@ const Detail = {
         setTimeout(() => el.detailPlay.focus(), 50);
     },
 
-    // Lista de enlaces (Enlace DAZN 1, 2, 3...) dentro de una misma portada
+    // Lista de enlaces (Enlace DAZN 1, 2, 3...) — cada uno abre directo de un toque
     renderSources(item) {
         el.sources.hidden = false;
         el.sourcesTrack.innerHTML = '';
         const playables = item.links.map((l, i) => this._linkToPlayable(item, l, i));
         playables.forEach((pl, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'source-btn focusable' + (pl.aceUrl ? ' ace' : '');
-            btn.tabIndex = 0;
-            btn.innerHTML = `<span class="source-ico">${pl.aceUrl ? '📡' : '▶'}</span> ${escapeHtml(item.links[i].label)}`;
-            btn.onclick = () => {
-                $$('.source-btn', el.sourcesTrack).forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                Detail.primary = pl;
-                ExternalPlayers.render(pl);
-                Player.play(pl, item);
-            };
-            el.sourcesTrack.appendChild(btn);
+            const label = `<span class="source-ico">${pl.aceUrl ? '📡' : '▶'}</span> ${escapeHtml(item.links[i].label)}`;
+            let node;
+            if (pl.aceUrl) {
+                // AceStream: abre la app directamente (un toque)
+                node = document.createElement('a');
+                node.href = pl.aceUrl; node.className = 'source-btn ace focusable'; node.tabIndex = 0; node.innerHTML = label;
+                node.onclick = () => { Detail.primary = pl; };
+            } else if (!pl.streamUrl && pl.externalUrl) {
+                // Enlace externo (no reproducible dentro): abrir directo
+                node = document.createElement('a');
+                node.href = pl.externalUrl; node.target = '_blank'; node.rel = 'noopener';
+                node.className = 'source-btn focusable'; node.tabIndex = 0; node.innerHTML = label;
+                node.onclick = () => { Detail.primary = pl; };
+            } else {
+                // Vídeo reproducible dentro de la web (Telegram / mp4 directo)
+                node = document.createElement('button');
+                node.className = 'source-btn focusable'; node.tabIndex = 0; node.innerHTML = label;
+                node.onclick = () => {
+                    $$('.source-btn', el.sourcesTrack).forEach(b => b.classList.remove('active'));
+                    node.classList.add('active');
+                    Detail.primary = pl; ExternalPlayers.render(pl); Player.play(pl, item);
+                };
+            }
+            el.sourcesTrack.appendChild(node);
         });
-        const first = playables[0];
-        if (first) $$('.source-btn', el.sourcesTrack)[0].classList.add('active');
-        return first;
+        return playables[0];
     },
 
     _linkToPlayable(item, link, i) {

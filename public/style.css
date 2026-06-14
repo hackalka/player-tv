@@ -977,3 +977,7 @@ body.telegram-mode .nav-links { visibility: hidden; }
     .detail-body { gap: 14px; }
     .detail-poster { width: 96px; margin-top: -48px; }
 }
+
+
+/* Botones de enlace (anchors) iguales que los botones */
+a.source-btn { text-decoration: none; }
