@@ -359,36 +359,6 @@
         async getChatMessages(topicId) {
             const msgs = await this.getTopicMessages(topicId, 60);
             return msgs.map(m => { const doc = m.media && m.media.document; const isVideo = !!(doc && /video/.test(doc.mimeType || '')); return { id: m.id, text: m.message || '', date: m.date, hasMedia: !!m.media, isVideo, thumb: (m.media && (m.media.photo || (doc && doc.thumbs && doc.thumbs.length))) ? { t: 'g', id: m.id } : null, src: isVideo ? { t: 'doc', id: m.id, browser: true } : null }; });
-        },
-
-        // ---- Búsqueda en el bot (solo admin/propietario) ----
-        async resolveBot() {
-            if (this._bot) return this._bot;
-            if (!this.cfg.botId) throw new Error('No hay bot configurado.');
-            const raw = String(this.cfg.botId);
-            const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
-            try { this._bot = await this.client.getEntity(id); }
-            catch (e) { await this.client.getDialogs({ limit: 200 }); this._bot = await this.client.getEntity(id); }
-            return this._bot;
-        },
-        async botSearch(query) {
-            const bot = await this.resolveBot();
-            await this.client.sendMessage(bot, { message: String(query) });
-            // esperar a que el bot responda
-            await new Promise(r => setTimeout(r, 3000));
-            const msgs = await this.client.getMessages(bot, { limit: 25 });
-            const incoming = msgs.filter(m => !m.out).slice(0, 15);
-            const out = [];
-            for (const m of incoming) {
-                let thumbUrl = '';
-                try {
-                    const doc = m.media && m.media.document;
-                    if (m.media && m.media.photo) thumbUrl = URL.createObjectURL(new Blob([await this.client.downloadMedia(m, {})]));
-                    else if (doc && doc.thumbs && doc.thumbs.length) thumbUrl = URL.createObjectURL(new Blob([await this.client.downloadMedia(m, { thumb: doc.thumbs.length - 1 })]));
-                } catch {}
-                out.push({ id: m.id, text: m.message || '', thumbUrl });
-            }
-            return out;
         }
     };
     window.Engine = Engine;

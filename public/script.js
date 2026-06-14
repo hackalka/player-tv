@@ -50,7 +50,7 @@ const el = {
     body: document.body, brand: $('#brand-name'),
     netflixView: $('#netflix-view'), telegramView: $('#telegram-view'),
     navbar: $('.navbar'), navNetflix: $('#nav-netflix'), navTelegram: $('#nav-telegram'), viewSwitch: $('.view-switch'),
-    navLinks: $('#nav-links'), adminLock: $('#admin-lock'), adminRefresh: $('#admin-refresh'), adminBot: $('#admin-bot'),
+    navLinks: $('#nav-links'), adminLock: $('#admin-lock'), adminRefresh: $('#admin-refresh'),
     filterGenre: $('#filter-genre'), filterYear: $('#filter-year'),
     heroImage: $('#hero-image'), heroTitle: $('#hero-title'), heroDescription: $('#hero-description'), heroBadge: $('#hero-badge'), heroPlay: $('#hero-play'), heroInfo: $('#hero-info'),
     rowsContainer: $('#rows-container'),
@@ -268,12 +268,8 @@ const Player = {
             v.onended = () => Store.clearProgress(playable.id);
             this._clearWatch();
             this._watch = setTimeout(() => {
-                if (v.readyState < 2 && !v.error) {
-                    el.playerStatus.hidden = false;
-                    el.playerStatus.innerText = 'Está tardando en cargar. Puede ser un vídeo no optimizado o formato no compatible. Prueba "Abrir con reproductor externo".';
-                    ExternalPlayers.render(playable);
-                }
-            }, 15000);
+                if (v.readyState < 2 && !v.error) this.streamFailed(playable);
+            }, 11000);
             v.play().catch(() => {});
         } catch (e) { console.error(e); Player._lastError = e.message || String(e); this.streamFailed(playable); }
     },
@@ -281,6 +277,11 @@ const Player = {
     _clearWatch() { if (this._watch) { clearTimeout(this._watch); this._watch = null; } },
     streamFailed(playable) {
         this._clearWatch();
+        // Si aún no se intentó, caer a descarga directa (así vuelven a verse los vídeos)
+        if (playable && !playable._triedDl && playable.src && (playable.src.t === 'doc' || playable.src.t === 'l')) {
+            playable._triedDl = true;
+            return this.downloadAndPlay(playable);
+        }
         this.onError(playable);
     },
     onError(playable) {
@@ -290,10 +291,16 @@ const Player = {
         ExternalPlayers.render(playable);
     },
     async downloadAndPlay(playable) {
-        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando vídeo...';
+        this._clearWatch();
+        el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true;
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando vídeo... (descarga directa)';
         try {
             const url = await Engine.downloadFull(playable.src, (d, t) => { if (t) el.playerStatus.innerText = 'Cargando ' + Math.round(d / t * 100) + '%'; });
-            el.playerVideo.hidden = false; el.playerVideo.onerror = null; el.playerVideo.src = url; el.playerStatus.hidden = true; el.playerVideo.play().catch(() => {});
+            const v = el.playerVideo;
+            v.hidden = false;
+            v.onerror = () => this.onError(playable);
+            v.onplaying = () => { el.playerStatus.hidden = true; };
+            v.src = url; v.play().catch(() => {});
         } catch (e) { Player._lastError = e.message || String(e); this.onError(playable); }
     },
     async openExternalApp(playable) {
@@ -341,7 +348,7 @@ const Login = {
 const Admin = {
     async logout() { if (!confirm('¿Cerrar tu sesión de Telegram en esta web?')) return; try { await Engine.logout(); } catch {} location.reload(); },
     refresh() { location.reload(); },
-    reflect() { const a = !!state.isAdmin; el.navTelegram.hidden = !a; if (el.viewSwitch) el.viewSwitch.hidden = !a; el.adminRefresh.hidden = !a; el.adminBot.hidden = !a; el.adminLock.hidden = false; }
+    reflect() { const a = !!state.isAdmin; el.navTelegram.hidden = !a; if (el.viewSwitch) el.viewSwitch.hidden = !a; el.adminRefresh.hidden = !a; el.adminLock.hidden = false; }
 };
 
 /* ===== CHAT (admin) ===== */
@@ -412,38 +419,8 @@ const App = {
         el.filterGenre.innerHTML = '<option value="">Todos los géneros</option>' + [...genres].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
         el.filterYear.innerHTML = '<option value="">Todos los años</option>' + [...years].sort((a, b) => b - a).map(y => `<option value="${y}">${y}</option>`).join('');
     },
-    openSearch() { this.botMode = false; el.searchOverlay.hidden = false; el.searchInput.value = ''; el.searchInput.placeholder = 'Títulos, géneros, deportes...'; el.searchResults.innerHTML = ''; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
-    closeSearch() { this.botMode = false; el.searchOverlay.hidden = true; el.searchInput.value = ''; el.searchInput.placeholder = 'Títulos, géneros, deportes...'; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; },
-
-    // ---- Buscador del BOT (solo admin/propietario) ----
-    openBotSearch() {
-        this.botMode = true;
-        el.searchOverlay.hidden = false;
-        el.searchInput.value = '';
-        el.searchInput.placeholder = '🤖 Escribe un nombre y pulsa Enter para buscar en el bot...';
-        el.searchResults.innerHTML = '<div class="search-empty">Escribe un nombre y pulsa Enter. El bot responderá con los resultados.</div>';
-        el.body.style.overflow = 'hidden';
-        el.searchInput.focus();
-    },
-    async runBotSearch() {
-        const q = (el.searchInput.value || '').trim();
-        if (!q) return;
-        el.searchResults.innerHTML = '<div class="chat-loading"><div class="loader small"></div> Consultando al bot...</div>';
-        let results;
-        try { results = await Engine.botSearch(q); }
-        catch (e) { el.searchResults.innerHTML = '<div class="search-empty">No se pudo consultar al bot: ' + escapeHtml(e.message || e) + '</div>'; return; }
-        if (!results.length) { el.searchResults.innerHTML = '<div class="search-empty">El bot no devolvió resultados (o aún no respondió). Prueba de nuevo.</div>'; return; }
-        el.searchResults.innerHTML = '';
-        results.forEach(r => {
-            const c = document.createElement('div'); c.className = 'search-card focusable'; c.tabIndex = 0;
-            const img = r.thumbUrl || placeholderImage(r.id, r.text || 'bot');
-            c.innerHTML = `<img class="search-image" src="${img}" alt="" onerror="this.style.display='none'">
-                <div class="search-meta"><p style="white-space:pre-wrap">${this.linkify(escapeHtml(r.text || '(sin texto)'))}</p></div>`;
-            el.searchResults.appendChild(c);
-        });
-        TVNav.refresh();
-    },
-    linkify(t) { return t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
+    openSearch() { el.searchOverlay.hidden = false; el.searchInput.value = ''; el.searchResults.innerHTML = ''; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
+    closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
 };
 
 /* ===== Navegación TV Box ===== */
@@ -551,13 +528,11 @@ function wireUi() {
     el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
     el.adminLock.onclick = () => Admin.logout();
     el.adminRefresh.onclick = () => Admin.refresh();
-    el.adminBot.onclick = () => App.openBotSearch();
     $('.modal-close', el.playerModal).onclick = () => Detail.close();
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
-    el.searchInput.addEventListener('input', () => { if (!App.botMode) App.search(); });
-    el.searchInput.addEventListener('keydown', e => { if (e.key === 'Enter' && App.botMode) App.runBotSearch(); });
+    el.searchInput.addEventListener('input', () => App.search());
     el.filterGenre.addEventListener('change', () => App.search());
     el.filterYear.addEventListener('change', () => App.search());
     $('#btn-send-code').onclick = () => Login.sendCode();

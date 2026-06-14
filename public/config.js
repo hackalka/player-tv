@@ -13,9 +13,6 @@ window.CONFIG = {
     // Etiquetas: solo se muestran los temas cuyo título contenga alguna de estas
     autoTags: ['playertv:auto', 'tvplayer:auto'],
 
-    // Bot de búsqueda (solo lo usa el administrador/propietario). ID o @usuario del bot.
-    botId: 8478177255,
-
     // Mensajes a traer por tema
     messagesPerTopic: 80
 };
