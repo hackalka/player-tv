@@ -19,6 +19,15 @@
                 document.head.appendChild(s);
             });
 
+            // Polyfills que GramJS espera de Node (en navegador no existen)
+            if (!globalThis.global) globalThis.global = globalThis;
+            if (!globalThis.process) globalThis.process = { env: {}, nextTick: (f) => queueMicrotask(f), version: '' };
+            if (!globalThis.Buffer) {
+                for (const u of ['https://esm.sh/buffer@6.0.3', 'https://esm.sh/buffer']) {
+                    try { const m = await import(u); const B = m.Buffer || (m.default && m.default.Buffer); if (B) { globalThis.Buffer = B; window.Buffer = B; break; } } catch (e) { console.warn('buffer', e && e.message); }
+                }
+            }
+
             if (await wait(4)) return true; // por si algún <script> del head ya la cargó
 
             // Vía principal: esm.sh EMPAQUETADO (?bundle) para que no se rompan
