@@ -50,7 +50,7 @@ const el = {
     body: document.body, brand: $('#brand-name'),
     netflixView: $('#netflix-view'), telegramView: $('#telegram-view'),
     navbar: $('.navbar'), navNetflix: $('#nav-netflix'), navTelegram: $('#nav-telegram'), viewSwitch: $('.view-switch'),
-    navLinks: $('#nav-links'), adminLock: $('#admin-lock'), adminRefresh: $('#admin-refresh'),
+    navLinks: $('#nav-links'), adminLock: $('#admin-lock'), adminRefresh: $('#admin-refresh'), adminBot: $('#admin-bot'),
     filterGenre: $('#filter-genre'), filterYear: $('#filter-year'),
     heroImage: $('#hero-image'), heroTitle: $('#hero-title'), heroDescription: $('#hero-description'), heroBadge: $('#hero-badge'), heroPlay: $('#hero-play'), heroInfo: $('#hero-info'),
     rowsContainer: $('#rows-container'),
@@ -222,7 +222,7 @@ const ExternalPlayers = {
             items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.externalUrl)}">Copiar enlace</button>`);
         }
         const isTgDoc = !!(playable.src && (playable.src.t === 'doc' || playable.src.t === 'l'));
-        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">📲 Abrir en otra app</button>');
+        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">▶ Abrir con reproductor externo</button>');
         if (!items.length) { box.hidden = true; return; }
         const label = playable.aceUrl ? 'Enlace AceStream:'
             : (isTgDoc && playable.playableInBrowser === false ? 'Este formato (mkv/avi) no se reproduce en el navegador. Ábrelo en otra app/reproductor:' : 'Más opciones:');
@@ -271,7 +271,7 @@ const Player = {
     },
     onError(playable) {
         el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
-        el.playerStatus.hidden = false; el.playerStatus.innerText = 'No se pudo reproducir aquí. Prueba a descargar el archivo o usa un reproductor externo (abajo).';
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'No se pudo reproducir aquí. Usa "Abrir con reproductor externo" (abajo).';
         ExternalPlayers.render(playable);
     },
     async downloadAndPlay(playable) {
@@ -283,19 +283,28 @@ const Player = {
     },
     async openExternalApp(playable) {
         el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
-        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando para abrir en otra app...';
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Preparando vídeo... 0%';
+        let data;
         try {
-            const { blob, name, mime } = await Engine.downloadBlob(playable.src, (d, t) => { if (t) el.playerStatus.innerText = 'Cargando ' + Math.round(d / t * 100) + '% ...'; });
-            const file = new File([blob], name, { type: mime });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: playable.title || name });
-                el.playerStatus.hidden = true;
-            } else {
-                const url = URL.createObjectURL(blob);
-                window.open(url, '_blank');
-                el.playerStatus.innerText = 'Abierto en otra pestaña. En el PC, usa el menú del navegador o tu reproductor para abrirlo.';
-            }
-        } catch (e) { el.playerStatus.innerText = 'No se pudo abrir: ' + (e.message || e); }
+            data = await Engine.downloadBlob(playable.src, (d, t) => { if (t) el.playerStatus.innerText = 'Preparando vídeo... ' + Math.round(d / t * 100) + '%'; });
+        } catch (e) { el.playerStatus.innerText = 'No se pudo preparar: ' + (e.message || e); return; }
+        const file = new File([data.blob], data.name, { type: data.mime });
+        const url = URL.createObjectURL(data.blob);
+        // Mostramos botones: la apertura/compartición DEBE ir en un toque del usuario
+        el.playerStatus.innerHTML = 'Vídeo listo (' + escapeHtml(data.name) + '). Ábrelo con tu reproductor:<br><br>'
+            + '<button id="x-share" class="opt-btn focusable" tabindex="0">▶ Abrir con reproductor externo</button> '
+            + '<a id="x-open" class="opt-btn focusable" tabindex="0" href="' + url + '" target="_blank" rel="noopener">Abrir en pestaña</a>';
+        const share = document.getElementById('x-share');
+        share.onclick = async () => {
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: data.name });
+                } else {
+                    window.open(url, '_blank');
+                }
+            } catch (e) { try { window.open(url, '_blank'); } catch {} }
+        };
+        setTimeout(() => share.focus(), 30);
     },
     _last: 0,
     _tick() { const v = el.playerVideo, c = this.current; if (!c || !v.duration) return; const n = Date.now(); if (n - this._last > 5000) { this._last = n; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); } },
@@ -317,7 +326,7 @@ const Login = {
 const Admin = {
     async logout() { if (!confirm('¿Cerrar tu sesión de Telegram en esta web?')) return; try { await Engine.logout(); } catch {} location.reload(); },
     refresh() { location.reload(); },
-    reflect() { const a = !!state.isAdmin; el.navTelegram.hidden = !a; if (el.viewSwitch) el.viewSwitch.hidden = !a; el.adminRefresh.hidden = false; el.adminLock.hidden = false; }
+    reflect() { const a = !!state.isAdmin; el.navTelegram.hidden = !a; if (el.viewSwitch) el.viewSwitch.hidden = !a; el.adminRefresh.hidden = !a; el.adminBot.hidden = !a; el.adminLock.hidden = false; }
 };
 
 /* ===== CHAT (admin) ===== */
@@ -388,8 +397,38 @@ const App = {
         el.filterGenre.innerHTML = '<option value="">Todos los géneros</option>' + [...genres].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
         el.filterYear.innerHTML = '<option value="">Todos los años</option>' + [...years].sort((a, b) => b - a).map(y => `<option value="${y}">${y}</option>`).join('');
     },
-    openSearch() { el.searchOverlay.hidden = false; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
-    closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
+    openSearch() { this.botMode = false; el.searchOverlay.hidden = false; el.searchInput.value = ''; el.searchInput.placeholder = 'Títulos, géneros, deportes...'; el.searchResults.innerHTML = ''; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
+    closeSearch() { this.botMode = false; el.searchOverlay.hidden = true; el.searchInput.value = ''; el.searchInput.placeholder = 'Títulos, géneros, deportes...'; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; },
+
+    // ---- Buscador del BOT (solo admin/propietario) ----
+    openBotSearch() {
+        this.botMode = true;
+        el.searchOverlay.hidden = false;
+        el.searchInput.value = '';
+        el.searchInput.placeholder = '🤖 Escribe un nombre y pulsa Enter para buscar en el bot...';
+        el.searchResults.innerHTML = '<div class="search-empty">Escribe un nombre y pulsa Enter. El bot responderá con los resultados.</div>';
+        el.body.style.overflow = 'hidden';
+        el.searchInput.focus();
+    },
+    async runBotSearch() {
+        const q = (el.searchInput.value || '').trim();
+        if (!q) return;
+        el.searchResults.innerHTML = '<div class="chat-loading"><div class="loader small"></div> Consultando al bot...</div>';
+        let results;
+        try { results = await Engine.botSearch(q); }
+        catch (e) { el.searchResults.innerHTML = '<div class="search-empty">No se pudo consultar al bot: ' + escapeHtml(e.message || e) + '</div>'; return; }
+        if (!results.length) { el.searchResults.innerHTML = '<div class="search-empty">El bot no devolvió resultados (o aún no respondió). Prueba de nuevo.</div>'; return; }
+        el.searchResults.innerHTML = '';
+        results.forEach(r => {
+            const c = document.createElement('div'); c.className = 'search-card focusable'; c.tabIndex = 0;
+            const img = r.thumbUrl || placeholderImage(r.id, r.text || 'bot');
+            c.innerHTML = `<img class="search-image" src="${img}" alt="" onerror="this.style.display='none'">
+                <div class="search-meta"><p style="white-space:pre-wrap">${this.linkify(escapeHtml(r.text || '(sin texto)'))}</p></div>`;
+            el.searchResults.appendChild(c);
+        });
+        TVNav.refresh();
+    },
+    linkify(t) { return t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 };
 
 /* ===== Navegación TV Box ===== */
@@ -463,11 +502,13 @@ function wireUi() {
     el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
     el.adminLock.onclick = () => Admin.logout();
     el.adminRefresh.onclick = () => Admin.refresh();
+    el.adminBot.onclick = () => App.openBotSearch();
     $('.modal-close', el.playerModal).onclick = () => Detail.close();
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
-    el.searchInput.addEventListener('input', () => App.search());
+    el.searchInput.addEventListener('input', () => { if (!App.botMode) App.search(); });
+    el.searchInput.addEventListener('keydown', e => { if (e.key === 'Enter' && App.botMode) App.runBotSearch(); });
     el.filterGenre.addEventListener('change', () => App.search());
     el.filterYear.addEventListener('change', () => App.search());
     $('#btn-send-code').onclick = () => Login.sendCode();
