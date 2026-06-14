@@ -210,22 +210,34 @@ const ExternalPlayers = {
         const box = el.playerOptions; box.innerHTML = '';
         if (!playable) { box.hidden = true; return; }
         const items = [];
+        const isTme = (u) => u && /(^|\/\/|\.)t\.me\//i.test(u);
+        const tgUrl = playable.tgLink || (isTme(playable.externalUrl) ? playable.externalUrl : '');
+        const httpUrl = (playable.externalUrl && !isTme(playable.externalUrl)) ? playable.externalUrl : '';
+
+        // ▶ Abrir en la app de Telegram = streaming nativo (lo mejor para mp4/mkv, sin descargar)
+        if (tgUrl) items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(tgUrl)}">▶ Abrir en Telegram</a>`);
+
         if (playable.aceUrl) {
             items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(playable.aceUrl)}">▶ AceStream</a>`);
             const id = (playable.aceUrl.match(/[0-9a-fA-F]{40}/) || [''])[0];
             if (id) items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:#Intent;scheme=acestream;package=org.acestream.media;S.content_id=${id};end">AceStream (Android)</a>`);
             items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.aceUrl)}">Copiar enlace</button>`);
         }
-        if (playable.externalUrl) {
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(playable.externalUrl)}">Abrir en VLC</a>`);
-            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.externalUrl)}">Copiar enlace</button>`);
+        if (httpUrl) {
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(httpUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(httpUrl)}">Abrir en VLC</a>`);
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:${escapeHtml(httpUrl)}#Intent;type=video/*;action=android.intent.action.VIEW;end">Reproductor (Android/TV)</a>`);
+            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(httpUrl)}">Copiar enlace</button>`);
         }
+        // Archivo de Telegram sin enlace público: solo si no hay t.me/http ya
         const isTgDoc = !!(playable.src && (playable.src.t === 'doc' || playable.src.t === 'l'));
-        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">▶ Abrir con reproductor externo</button>');
+        if (isTgDoc && !tgUrl) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">⬇ Descargar y abrir</button>');
+
         if (!items.length) { box.hidden = true; return; }
-        const label = playable.aceUrl ? 'Enlace AceStream:'
-            : (isTgDoc && playable.playableInBrowser === false ? 'Este formato (mkv/avi) no se reproduce en el navegador. Ábrelo en otra app/reproductor:' : 'Más opciones:');
+        const label = tgUrl ? 'Ábrelo en la app de Telegram (streaming nativo, sin descargar):'
+            : (playable.aceUrl ? 'Enlace AceStream:'
+            : (httpUrl ? 'Ábrelo en tu reproductor:'
+            : 'Este formato no se reproduce en el navegador. Opciones:'));
         box.hidden = false; box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
         $$('button[data-copy]', box).forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.innerText = '¡Copiado!'; setTimeout(() => b.innerText = 'Copiar enlace', 1500); }).catch(() => {}));
         const oe = $('#openext-btn', box); if (oe) oe.onclick = () => Player.openExternalApp(playable);

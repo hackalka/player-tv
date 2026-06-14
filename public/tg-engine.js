@@ -68,6 +68,7 @@
             const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
             try { this.entity = await this.client.getEntity(id); }
             catch (e) { await this.client.getDialogs({ limit: 200 }); this.entity = await this.client.getEntity(id); }
+            this.groupUsername = (this.entity && this.entity.username) || null;
             return this.entity;
         },
         async isGroupAdmin() {
@@ -208,11 +209,12 @@
             const BROWSER_OK = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov', 'quicktime'];
             const playableInBrowser = isVideo && BROWSER_OK.includes((ext || '').toLowerCase());
 
+            const tgLink = (this.groupUsername && isVideo) ? ('https://t.me/' + this.groupUsername + '/' + topic.id + '/' + message.id) : '';
             return {
                 id: message.id, topicId: topic.id, uid: doc && doc.id ? String(doc.id) : '',
                 title, description, year, meta, date: Number(message.date) || 0,
                 duration: isVideo ? this._duration(doc) : '', size: doc ? this._bytes(doc.size) : '',
-                isVideo, ext: (ext || '').toLowerCase(), playableInBrowser, links,
+                isVideo, ext: (ext || '').toLowerCase(), playableInBrowser, links, tgLink,
                 thumb: hasThumb ? { t: 'g', id: message.id } : null,
                 src: isVideo ? { t: 'doc', id: message.id, browser: playableInBrowser } : (links[0] ? links[0].src : null)
             };
@@ -225,7 +227,7 @@
         },
         // Normaliza un enlace en {src, thumb, playableInBrowser, aceUrl, externalUrl}
         _linkSrc(link) {
-            if (link.kind === 'tg') return { playableInBrowser: true, src: { t: 'l', ch: link.channel, m: link.msgId, browser: true }, thumb: { t: 'l', ch: link.channel, m: link.msgId } };
+            if (link.kind === 'tg') return { playableInBrowser: true, src: { t: 'l', ch: link.channel, m: link.msgId, browser: true }, thumb: { t: 'l', ch: link.channel, m: link.msgId }, externalUrl: link.url };
             if (link.kind === 'ace') return { playableInBrowser: false, aceUrl: link.url, src: { ace: link.url } };
             const url = link.url || '';
             if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(url)) return { playableInBrowser: true, src: { t: 'url', url, browser: true }, externalUrl: url };
@@ -252,7 +254,7 @@
                 const seenEp = new Set(); const eps = [];
                 for (const e of sorted) { const kn = e.ep.season + '-' + e.ep.ep; const ku = e.it.uid ? 'u:' + e.it.uid : null; if (seenEp.has(kn) || (ku && seenEp.has(ku))) continue; seenEp.add(kn); if (ku) seenEp.add(ku); eps.push(e); }
                 const poster = (eps.find(e => e.it.thumb) || eps[0]).it;
-                const episodes = eps.map(e => ({ id: e.it.id, title: this._epLabel(e.ep), epNum: e.ep.ep, season: e.ep.season, src: e.it.src, thumb: e.it.thumb, aceUrl: e.it.aceUrl, externalUrl: e.it.externalUrl, playableInBrowser: e.it.playableInBrowser, duration: e.it.duration, size: e.it.size, description: e.it.description }));
+                const episodes = eps.map(e => ({ id: e.it.id, title: this._epLabel(e.ep), epNum: e.ep.ep, season: e.ep.season, src: e.it.src, thumb: e.it.thumb, aceUrl: e.it.aceUrl, externalUrl: e.it.externalUrl, tgLink: e.it.tgLink, playableInBrowser: e.it.playableInBrowser, duration: e.it.duration, size: e.it.size, description: e.it.description }));
                 shows.push({ id: 's-' + topic.id + '-' + key, topicId: topic.id, title: g.base || 'Serie', description: (eps.find(e => e.it.description) || eps[0]).it.description || '', year: (eps.find(e => e.it.year) || eps[0]).it.year || '', meta: (eps.find(e => e.it.meta && Object.keys(e.it.meta).length) || eps[0]).it.meta || {}, date: Math.max.apply(null, eps.map(e => e.it.date || 0)), isSeries: episodes.length > 1, episodeCount: episodes.length, thumb: poster.thumb, episodes });
             }
             return shows;
