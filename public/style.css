@@ -962,3 +962,18 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .card-meta { font-size: .72rem; text-shadow: 0 1px 2px rgba(0,0,0,.85); }
 /* La info no estorba al hacer zoom: se intensifica un poco el degradado */
 .card:hover .card-overlay { background: linear-gradient(0deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.5) 22%, transparent 55%); }
+
+
+/* ===== Ficha estilo Netflix: carátula al lado de la sinopsis ===== */
+.detail-body { display: flex; gap: 22px; align-items: flex-start; margin-bottom: 8px; }
+.detail-poster {
+    width: 150px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px;
+    flex-shrink: 0; background: #000; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    margin-top: -64px; /* sube la carátula para solaparse con el hero, estilo Netflix */
+    border: 2px solid rgba(255,255,255,.08); position: relative; z-index: 3;
+}
+.detail-info { flex: 1; min-width: 0; }
+@media (max-width: 640px) {
+    .detail-body { gap: 14px; }
+    .detail-poster { width: 96px; margin-top: -48px; }
+}

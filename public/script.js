@@ -101,6 +101,7 @@ const el = {
     playerStatus: $('#player-status'),
     detailHero: $('#detail-hero'),
     detailBackdrop: $('#detail-backdrop'),
+    detailPoster: $('#detail-poster'),
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     playerOptions: $('#player-options'),
@@ -241,6 +242,7 @@ const Detail = {
         const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = poster;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
+        if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
 
         this.resetVideo();
         this.resetSources();
