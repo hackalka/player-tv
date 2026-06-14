@@ -26,6 +26,8 @@ class SessionManager {
 
     _load() { try { return JSON.parse(fs.readFileSync(this.storeFile, 'utf8')); } catch { return {}; } }
     _save() { try { fs.writeFileSync(this.storeFile, JSON.stringify(this.persisted)); } catch (e) { console.warn('persist', e.message); } }
+    persistedCount() { return Object.keys(this.persisted || {}).length; }
+    canWrite() { try { const p = path.join(this.cfg.dataDir, '.wtest'); fs.writeFileSync(p, '1'); fs.unlinkSync(p); return true; } catch { return false; } }
 
     newClient(session) {
         return new TelegramClient(new StringSession(session || ''), this.cfg.apiId, this.cfg.apiHash, {

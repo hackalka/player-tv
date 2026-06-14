@@ -235,7 +235,21 @@ app.get('/api/stream-link/:channel/:msgId', withUser, async (req, res) => {
 });
 
 /* ===================== FRONTEND ===================== */
+app.get('/api/health', (req, res) => {
+    res.json({
+        ok: true,
+        app: cfg.appName,
+        dataDir: cfg.dataDir,
+        writable: sessions.canWrite(),
+        sessions: sessions.persistedCount()
+    });
+});
+
 app.use(express.static(PUBLIC_DIR));
 app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-app.listen(cfg.port, () => console.log(`🚀 ${cfg.appName} (multi-usuario) en el puerto ${cfg.port}`));
+app.listen(cfg.port, () => {
+    console.log(`🚀 ${cfg.appName} (multi-usuario) en el puerto ${cfg.port}`);
+    console.log('📂 DATA_DIR =', cfg.dataDir, '| escribible:', sessions.canWrite(), '| sesiones guardadas:', sessions.persistedCount());
+    if (!sessions.canWrite()) console.warn('⚠️  DATA_DIR NO es escribible: las sesiones se perderán en cada redeploy. Crea un Volume y pon DATA_DIR a su mount path.');
+});
