@@ -21,3 +21,7 @@ npm-debug.log*
 /captures
 .externalNativeBuild
 .cxx
+
+
+# Artefacto temporal del build del bundle
+entry.build.js

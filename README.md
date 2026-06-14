@@ -1,79 +1,83 @@
 # Tv Player
 
-Catálogo estilo **Netflix** sobre un **grupo de Telegram**, con **una sesión por usuario**:
-cada persona entra con **su propia cuenta** (teléfono + 2FA) y el contenido se sirve a través
-de **su** sesión. Pensado para desplegar en **Railway** (o cualquier host de Node).
+Catálogo estilo **Netflix** sobre un **grupo de Telegram**, **100% en el navegador**:
+cada usuario entra con **su propia cuenta** (teléfono + 2FA) y el vídeo va **directo de
+Telegram a su dispositivo**, usando **su** ancho de banda y **su** caché. El servidor solo
+sirve archivos estáticos (unos KB), así que aguanta de sobra en un plan **gratuito**.
 
-- **Vista Cine (Netflix):** temas con la etiqueta configurada (películas, series, deportes…).
-- **Vista Chat (Telegram):** solo para **administradores del grupo** (editar / borrar contenido).
-- **Login por usuario** dentro de la web (sin terminal, sin bots).
-- **Admin automático:** quien sea administrador/creador del grupo en Telegram ve el panel de chat.
+## ⚠️ Paso obligatorio la primera vez: generar el bundle
 
-## Arranque rápido (Railway)
+GramJS no funciona en el navegador desde un CDN; hay que empaquetarlo. Eso lo hace
+**GitHub Actions** por ti (no necesitas instalar nada en tu PC):
 
-1. Sube el repo a GitHub y crea el servicio en Railway desde el repo.
-2. En **Variables** pon:
-   - `TG_API_ID`, `TG_API_HASH` (de https://my.telegram.org)
-   - `TG_GROUP_ID` = `-1003749684388`
-   - `APP_NAME` = `Tv Player`
-   - `AUTO_TAG` = `playertv:auto`
-   - *(opcional)* `DATA_DIR` = una ruta persistente para guardar las sesiones de usuario.
-3. Railway construye con Nixpacks y arranca con `npm start`.
-4. **Settings → Networking → Generate Domain** para tener la URL pública.
-5. Abre la web: cada usuario inicia sesión con **su teléfono + código + 2FA**.
+1. En GitHub, ve a la pestaña **Actions**.
+2. Abre el workflow **"Build Telegram bundle"** y pulsa **Run workflow** (elige la rama).
+3. La Action genera y **sube** `public/vendor/telegram.bundle.js` al repo.
+4. Railway redespliega y la web ya carga (sin CDN, sin errores de navegador).
 
-> Sin `TG_SESSION` ni `ADMIN_PASSWORD`: el acceso es por usuario y el rol de admin se detecta
-> automáticamente según los permisos de esa cuenta en el grupo.
+> Mientras no exista ese archivo, la web mostrará un aviso pidiendo ejecutar la Action.
+> El workflow también se ejecuta solo cuando cambian el script de build o el propio workflow.
 
-## Local
+## Configuración
+
+Todo en **`public/config.js`** (se ejecuta en el navegador):
+
+```js
+window.CONFIG = {
+  apiId: 8952741,
+  apiHash: '....',
+  groupId: -1003749684388,
+  appName: 'Tv Player',
+  autoTags: ['playertv:auto', 'tvplayer:auto'],
+  messagesPerTopic: 80
+};
+```
+
+El servidor solo usa `PORT`.
+
+## Desplegar (Railway u hosting estático)
 
 ```bash
-cp .env.example .env
 npm install
-npm start            # http://localhost:3000
+npm start            # sirve public/ en el PORT (Railway o local)
 ```
 
-## Arquitectura
+Debe servirse por **HTTPS o localhost** (lo exige el Service Worker del streaming).
+
+## Estructura
 
 ```
-server/
-  index.js      API + streaming por rangos + auth por cookie + sirve el frontend
-  sessions.js   Una sesión/cliente de Telegram POR usuario (login + persistencia)
-  telegram.js   Motor ligado al cliente de cada usuario (catálogo, temas, streaming)
-  config.js     Configuración por variables de entorno
-public/         Frontend (login, catálogo Netflix, chat admin, navegación TV)
+server/index.js                       Servidor estático (solo sirve public/)
+scripts/build-bundle.js               Genera el bundle de navegador (lo usa la Action)
+.github/workflows/build-telegram-bundle.yml   CI que construye y sube el bundle
+public/
+  index.html         UI (carga vendor/telegram.bundle.js)
+  config.js          Configuración de cliente
+  tg-engine.js       Motor de Telegram en el navegador (login, catálogo, streaming)
+  sw.js              Service Worker de streaming por rangos
+  script.js          Interfaz
+  vendor/telegram.bundle.js   (lo genera la GitHub Action)
 ```
 
-Cada usuario tiene su propio cliente de Telegram en el servidor (relé), así que **el streaming
-y las descargas usan la cuenta de cada usuario** y su propio acceso al grupo.
+## Cómo funciona
 
-## Temas que se muestran
-
-Solo se muestran los temas del foro cuyo **título** contenga la etiqueta (por defecto
-`playertv:auto` o `tvplayer:auto`, configurable con `AUTO_TAG`). El nombre se muestra **sin** la
-etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
-
-## Formatos de publicación admitidos
-
-- **Vídeo subido a Telegram** (mp4/mkv/avi…): se reproduce dentro (mkv/avi → reproductor externo).
-- **Varios enlaces en un post** (deportes/multicanal): "Enlace DAZN 1/2/3", AceStream, `.mp4`, etc.
-- **Serie en un solo post**: título + metadatos + sinopsis + episodios como enlaces `t.me`
-  (se reproducen aunque estén en otro canal público al que el usuario tenga acceso).
+- El navegador carga el **bundle local** de GramJS y se conecta directo a Telegram (WSS).
+- La sesión de cada usuario se guarda en su navegador (`localStorage`).
+- El **Service Worker** sirve el vídeo por rangos pidiéndolo a Telegram con la cuenta del usuario.
+- "Admin" = quien sea **administrador/creador** del grupo (automático): chat editar/borrar.
 
 ## Funciones
 
-- Vista de detalle estilo Netflix (póster, sinopsis, metadatos, botón Ver).
-- Series agrupadas por capítulos.
-- **Continuar viendo** (con botón ✕ para quitar) y **Mi lista** (favoritos).
-- **Novedades** y **buscador con filtros** por género/año.
-- Reproductores externos (VLC / AceStream) y copiar enlace.
-- **Chat admin** (editar/borrar) solo para administradores del grupo.
-- Navegación con **mando de TV Box** (flechas / OK / atrás).
-- Caché de miniaturas, streaming con reintentos y cabeceras de seguridad básicas.
+- Login por usuario (teléfono → código → 2FA), sesión en el navegador.
+- Detalle Netflix (póster, sinopsis, metadatos), series por capítulos.
+- Multi-enlace (DAZN 1/2/3), AceStream, `.mp4` directo, enlaces `t.me`.
+- **Continuar viendo** (con ✕), **Mi lista**, **Novedades**, **buscador con filtros**.
+- Chat admin (editar/borrar) solo para administradores del grupo.
+- Navegación con **mando de TV Box**.
 
-## Notas
+## Notas / límites
 
-- La cuenta de cada usuario debe poder **acceder al grupo** (y a los canales de los enlaces `t.me`).
-- Las sesiones se guardan en `DATA_DIR`; si usas el directorio temporal, un redeploy puede
-  cerrar sesiones (los usuarios vuelven a entrar).
-- El servidor actúa de relé: el ancho de banda de streaming pasa por el servidor (Railway).
+- **TV Box:** el navegador hace el trabajo (MTProto + streaming); en cajas muy básicas puede ir más justo.
+- **mkv/avi:** no se reproducen en navegador; se ofrece **descargar**.
+- `apiId/apiHash` quedan visibles en el navegador (es un cliente; usa unas dedicadas).
+- Cada usuario debe poder **acceder al grupo** (y a los canales de los enlaces `t.me`).
