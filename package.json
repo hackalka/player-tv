@@ -1,7 +1,7 @@
 {
   "name": "tv-player",
-  "version": "3.0.0",
-  "description": "Tv Player — catálogo estilo Netflix sobre un grupo de Telegram, con sesión por usuario (cada usuario usa su propia cuenta)",
+  "version": "4.0.0",
+  "description": "Tv Player — catálogo estilo Netflix sobre un grupo de Telegram, 100% en el navegador (cada usuario usa su cuenta, su ancho de banda y su caché)",
   "main": "server/index.js",
   "type": "commonjs",
   "scripts": {
@@ -11,10 +11,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "big-integer": "^1.6.52",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "telegram": "^2.26.22"
+    "express": "^4.19.2"
   },
   "license": "MIT"
 }
