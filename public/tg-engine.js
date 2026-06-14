@@ -312,15 +312,19 @@
             const doc = s.message.media.document;
             const Api = this.Api;
             const BIG = (window.telegram && window.telegram.bigInt) || window.bigInt || null;
-            const ALIGN = 4096;
+            const ALIGN = 4096, MB = 1048576;
             const alignedStart = Math.floor(start / ALIGN) * ALIGN;
             const skip = start - alignedStart;
             const need = end - start + 1;
             let limit = Math.ceil((skip + need) / ALIGN) * ALIGN;
+            // Telegram exige que (offset, limit) NO cruce un bloque de 1 MB
+            const room = MB - (alignedStart % MB);
+            if (limit > room) limit = room;
+            if (limit > MB) limit = MB;
             const location = new Api.InputDocumentFileLocation({ id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '' });
             const chunks = [];
             try {
-                for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
+                for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: limit, dcId: doc.dcId })) {
                     chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
                 }
             } catch (e) {
@@ -328,7 +332,8 @@
             }
             let total = 0; chunks.forEach(c => total += c.byteLength);
             const merged = new Uint8Array(total); let off = 0; chunks.forEach(c => { merged.set(c, off); off += c.byteLength; });
-            return { chunk: merged.slice(skip, skip + need), size: s.size, mime: s.mime };
+            // Puede devolver menos que "need" (limitado al bloque de 1MB); el SW pedirá el resto
+            return { chunk: merged.subarray(skip, skip + need), size: s.size, mime: s.mime };
         },
 
         // ---- descarga completa (fallback de reproducción interna) ----
