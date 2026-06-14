@@ -319,8 +319,12 @@
             let limit = Math.ceil((skip + need) / ALIGN) * ALIGN;
             const location = new Api.InputDocumentFileLocation({ id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '' });
             const chunks = [];
-            for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
-                chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
+            try {
+                for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
+                    chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
+                }
+            } catch (e) {
+                throw new Error('Telegram: ' + (e.errorMessage || e.message || e));
             }
             let total = 0; chunks.forEach(c => total += c.byteLength);
             const merged = new Uint8Array(total); let off = 0; chunks.forEach(c => { merged.set(c, off); off += c.byteLength; });

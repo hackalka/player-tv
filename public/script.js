@@ -243,8 +243,10 @@ const Player = {
         const src = playable.src;
         if (!src || src.ace) { el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false; el.playerStatus.hidden = false; el.playerStatus.innerText = src && src.ace ? 'Contenido AceStream: ábrelo con el botón de abajo.' : 'No reproducible.'; ExternalPlayers.render(playable); return; }
         if (src.ext) { el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true; el.playerVideo.hidden = true; el.playerIframe.hidden = false; el.playerIframe.src = this.embed(src.ext); return; }
-        el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true; el.playerStatus.hidden = true;
+        el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true;
         el.playerIframe.hidden = true; el.playerIframe.src = '';
+        el.playerStatus.hidden = false; el.playerStatus.innerText = 'Cargando vídeo...';
+        Player._lastError = '';
         try {
             let url;
             if (src.t === 'url') url = src.url;
@@ -255,26 +257,36 @@ const Player = {
                 SW.register(r.streamId, r.size, r.mime);
                 url = r.url;
             }
-            el.playerVideo.hidden = false; el.playerVideo.src = url;
+            const v = el.playerVideo;
+            v.hidden = false; v.src = url;
             const resume = (Store.progress[playable.id] || {}).time || 0;
-            el.playerVideo.onloadedmetadata = () => { if (resume > 8 && resume < el.playerVideo.duration - 5) el.playerVideo.currentTime = resume; };
-            el.playerVideo.onerror = () => this.streamFailed(playable);
-            el.playerVideo.ontimeupdate = () => this._tick();
-            el.playerVideo.onended = () => Store.clearProgress(playable.id);
-            el.playerVideo.play().catch(() => {});
-        } catch (e) { console.error(e); this.streamFailed(playable); }
+            v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
+            const hide = () => { el.playerStatus.hidden = true; Player._clearWatch(); };
+            v.onplaying = hide; v.onloadeddata = hide; v.oncanplay = hide;
+            v.onerror = () => this.streamFailed(playable);
+            v.ontimeupdate = () => this._tick();
+            v.onended = () => Store.clearProgress(playable.id);
+            this._clearWatch();
+            this._watch = setTimeout(() => {
+                if (v.readyState < 2 && !v.error) {
+                    el.playerStatus.hidden = false;
+                    el.playerStatus.innerText = 'Está tardando en cargar. Puede ser un vídeo no optimizado o formato no compatible. Prueba "Abrir con reproductor externo".';
+                    ExternalPlayers.render(playable);
+                }
+            }, 15000);
+            v.play().catch(() => {});
+        } catch (e) { console.error(e); Player._lastError = e.message || String(e); this.streamFailed(playable); }
     },
+    _watch: null, _lastError: '',
+    _clearWatch() { if (this._watch) { clearTimeout(this._watch); this._watch = null; } },
     streamFailed(playable) {
-        // Si el formato es reproducible en navegador, intentar descarga completa a blob
-        if (playable && playable.playableInBrowser !== false && !playable._triedDl) {
-            playable._triedDl = true;
-            return this.downloadAndPlay(playable);
-        }
+        this._clearWatch();
         this.onError(playable);
     },
     onError(playable) {
         el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
-        el.playerStatus.hidden = false; el.playerStatus.innerText = 'No se pudo reproducir aquí. Usa "Abrir con reproductor externo" (abajo).';
+        el.playerStatus.hidden = false;
+        el.playerStatus.innerText = 'No se pudo reproducir.' + (Player._lastError ? ' Motivo: ' + Player._lastError + '.' : '') + ' Usa "Abrir con reproductor externo" (abajo).';
         ExternalPlayers.render(playable);
     },
     async downloadAndPlay(playable) {
@@ -282,7 +294,7 @@ const Player = {
         try {
             const url = await Engine.downloadFull(playable.src, (d, t) => { if (t) el.playerStatus.innerText = 'Cargando ' + Math.round(d / t * 100) + '%'; });
             el.playerVideo.hidden = false; el.playerVideo.onerror = null; el.playerVideo.src = url; el.playerStatus.hidden = true; el.playerVideo.play().catch(() => {});
-        } catch (e) { this.onError(playable); }
+        } catch (e) { Player._lastError = e.message || String(e); this.onError(playable); }
     },
     async openExternalApp(playable) {
         el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
@@ -469,7 +481,8 @@ const SW = {
         if (this._initing) return this._initing;
         this._initing = (async () => {
             try {
-                await navigator.serviceWorker.register('sw.js');
+                const reg = await navigator.serviceWorker.register('sw.js');
+                try { reg.update(); } catch {}
                 await navigator.serviceWorker.ready;
                 if (!navigator.serviceWorker.controller) {
                     await Promise.race([
@@ -502,7 +515,7 @@ const SW = {
                 const { chunk } = await Engine.streamRange(d.streamId, d.start, d.start + d.size - 1);
                 const buf = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
                 this.port.postMessage({ requestId: d.requestId, chunk: buf }, [buf]);
-            } catch (err) { this.port.postMessage({ requestId: d.requestId, error: err.message || 'error' }); }
+            } catch (err) { Player._lastError = err && (err.message || String(err)); this.port.postMessage({ requestId: d.requestId, error: Player._lastError || 'error' }); }
         }
     },
     register(streamId, fileSize, mimeType) {
