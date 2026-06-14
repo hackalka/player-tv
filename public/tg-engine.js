@@ -10,7 +10,7 @@
         isAdmin: false, name: '', authorized: false,
 
         async waitLib() {
-            const ok = () => !!(window.telegram && window.telegram.TelegramClient && window.telegram.sessions);
+            const ok = () => !!(window.telegram && window.telegram.TelegramClient && window.telegram.sessions && window.telegram.sessions.StringSession);
             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
             const wait = async (tries) => { let n = 0; while (!ok() && n < tries) { await sleep(300); n++; } return ok(); };
             const inject = (src) => new Promise(res => {
@@ -19,28 +19,25 @@
                 document.head.appendChild(s);
             });
 
-            if (await wait(8)) return true; // ¿ya lo cargó el <script> del head?
+            if (await wait(8)) return true; // ¿lo cargó el <script> del head?
 
-            const urls = [
-                'https://unpkg.com/telegram/browser/telegram.js',
-                'https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js',
-                'https://unpkg.com/telegram@2.26.22/browser/telegram.js'
-            ];
-            for (const u of urls) {
-                await inject(u);
-                if (await wait(25)) return true;
+            // Vía principal: esm.sh. IMPORTANTE: TelegramClient y StringSession deben
+            // venir del MISMO módulo, o GramJS lanza "Only StringSession ... supported".
+            for (const base of ['https://esm.sh/telegram', 'https://esm.sh/telegram@2.26.22']) {
+                try {
+                    const tg = await import(base);
+                    if (tg && tg.TelegramClient && tg.sessions && tg.sessions.StringSession) {
+                        window.telegram = tg;
+                        if (await wait(6)) return true;
+                    }
+                } catch (e) { console.warn('esm', base, e && e.message); }
             }
 
-            // último recurso: esm.sh (ensambla window.telegram)
-            try {
-                const m = await import('https://esm.sh/telegram');
-                const ses = await import('https://esm.sh/telegram/sessions');
-                let bi; try { bi = (await import('https://esm.sh/big-integer')).default; } catch {}
-                window.telegram = Object.assign({}, m, { sessions: ses });
-                if (bi && !window.bigInt) window.bigInt = bi;
-                if (await wait(10)) return true;
-            } catch (e) { console.warn('esm.sh falló:', e && e.message); }
-
+            // Respaldo: bundles UMD (si existieran en el CDN)
+            for (const u of ['https://unpkg.com/telegram/browser/telegram.js', 'https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js']) {
+                await inject(u);
+                if (await wait(20)) return true;
+            }
             return ok();
         },
 
