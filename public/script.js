@@ -252,7 +252,7 @@ const Player = {
             if (src.t === 'url') url = src.url;
             else {
                 const okSW = await SW.ensure();
-                if (!okSW) { return this.downloadAndPlay(playable); }
+                if (!okSW) { Player._lastError = 'No se pudo activar el streaming (Service Worker).'; return this.onError(playable); }
                 const r = await Engine.prepareStream(src);
                 SW.register(r.streamId, r.size, r.mime);
                 url = r.url;
@@ -277,11 +277,8 @@ const Player = {
     _clearWatch() { if (this._watch) { clearTimeout(this._watch); this._watch = null; } },
     streamFailed(playable) {
         this._clearWatch();
-        // Si aún no se intentó, caer a descarga directa (así vuelven a verse los vídeos)
-        if (playable && !playable._triedDl && playable.src && (playable.src.t === 'doc' || playable.src.t === 'l')) {
-            playable._triedDl = true;
-            return this.downloadAndPlay(playable);
-        }
+        // No descargamos la peli entera (eso causaba "cargando" infinito).
+        // Mostramos el motivo y las opciones (abrir con reproductor externo).
         this.onError(playable);
     },
     onError(playable) {
