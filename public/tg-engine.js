@@ -19,11 +19,12 @@
                 document.head.appendChild(s);
             });
 
-            if (await wait(8)) return true; // ¿lo cargó el <script> del head?
+            if (await wait(4)) return true; // por si algún <script> del head ya la cargó
 
-            // Vía principal: esm.sh. IMPORTANTE: TelegramClient y StringSession deben
-            // venir del MISMO módulo, o GramJS lanza "Only StringSession ... supported".
-            for (const base of ['https://esm.sh/telegram', 'https://esm.sh/telegram@2.26.22']) {
+            // Vía principal: esm.sh EMPAQUETADO (?bundle) para que no se rompan
+            // las referencias internas de GramJS (p. ej. generateRandomLong).
+            // TelegramClient y StringSession deben venir del MISMO módulo.
+            for (const base of ['https://esm.sh/telegram@2.26.22?bundle', 'https://esm.sh/telegram?bundle', 'https://esm.sh/telegram@2.19.10?bundle']) {
                 try {
                     const tg = await import(base);
                     if (tg && tg.TelegramClient && tg.sessions && tg.sessions.StringSession) {
@@ -33,10 +34,10 @@
                 } catch (e) { console.warn('esm', base, e && e.message); }
             }
 
-            // Respaldo: bundles UMD (si existieran en el CDN)
-            for (const u of ['https://unpkg.com/telegram/browser/telegram.js', 'https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js']) {
+            // Respaldo: bundles UMD (si existieran)
+            for (const u of ['https://unpkg.com/telegram/browser/telegram.js']) {
                 await inject(u);
-                if (await wait(20)) return true;
+                if (await wait(15)) return true;
             }
             return ok();
         },
@@ -344,7 +345,7 @@
             let limit = Math.ceil((skip + need) / ALIGN) * ALIGN;
             const location = new Api.InputDocumentFileLocation({ id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '' });
             const chunks = [];
-            for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: 512 * 1024, dcId: doc.dcId })) {
+            for await (const c of this.client.iterDownload({ file: location, offset: alignedStart, limit, requestSize: 512 * 1024, dcId: doc.dcId })) {
                 chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
             }
             let total = 0; chunks.forEach(c => total += c.byteLength);
