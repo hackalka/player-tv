@@ -25,7 +25,7 @@ jobs:
           node-version: '20'
 
       - name: Instalar dependencias de build
-        run: npm install --no-save telegram@2.26.22 esbuild@0.21.5 buffer@6.0.3
+        run: npm install --no-save telegram@2.26.22 esbuild@0.20.2 buffer@6.0.3 esbuild-plugin-polyfill-node@0.3.0
 
       - name: Generar bundle de navegador
         run: node scripts/build-bundle.js
