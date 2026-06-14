@@ -319,7 +319,8 @@
             const s = this.streams.get(streamId);
             if (!s) throw new Error('stream desconocido');
             const doc = s.message.media.document;
-            const Api = this.Api; const BIG = window.bigInt;
+            const Api = this.Api;
+            const BIG = (window.telegram && window.telegram.bigInt) || window.bigInt || null;
             const ALIGN = 4096;
             const alignedStart = Math.floor(start / ALIGN) * ALIGN;
             const skip = start - alignedStart;
@@ -327,7 +328,7 @@
             let limit = Math.ceil((skip + need) / ALIGN) * ALIGN;
             const location = new Api.InputDocumentFileLocation({ id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '' });
             const chunks = [];
-            for await (const c of this.client.iterDownload({ file: location, offset: alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
+            for await (const c of this.client.iterDownload({ file: location, offset: BIG ? BIG(alignedStart) : alignedStart, limit, requestSize: 1024 * 1024, dcId: doc.dcId })) {
                 chunks.push(c instanceof Uint8Array ? c : new Uint8Array(c));
             }
             let total = 0; chunks.forEach(c => total += c.byteLength);
