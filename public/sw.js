@@ -1,17 +1,42 @@
-/* Service Worker: sirve el vídeo de Telegram por rangos pidiéndoselo a la página. */
-const META = new Map(); // streamId -> { size, mime }
-const CHUNK = 2 * 1024 * 1024; // 2 MB por petición de rango (menos viajes = más fluido)
+// Tv Player — Service Worker de streaming por rangos (puerto persistente + ReadableStream)
+// Sirve /tg-stream/{streamId} con soporte HTTP Range real, pidiendo los trozos
+// (1 MB) a la página principal por un MessagePort y entregándolos de forma progresiva.
 
-self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const streams = new Map();   // streamId -> { fileSize, mimeType }
+const pending = new Map();   // requestId -> { resolve, reject }
+let port = null;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 self.addEventListener('message', (e) => {
     const d = e.data || {};
-    if (d.type === 'REGISTER') {
-        META.set(d.streamId, { size: d.size, mime: d.mime });
-        if (e.ports && e.ports[0]) e.ports[0].postMessage({ ok: true }); // confirmar registro
+    if (d.type === 'INIT') {
+        port = e.ports[0];
+        port.onmessage = (ev) => {
+            const { requestId, chunk, error } = ev.data || {};
+            const p = pending.get(requestId);
+            if (!p) return;
+            pending.delete(requestId);
+            if (error) p.reject(new Error(error));
+            else p.resolve(chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : chunk);
+        };
+        port.postMessage({ type: 'READY' });
+    } else if (d.type === 'REGISTER') {
+        streams.set(d.streamId, { fileSize: d.fileSize, mimeType: d.mimeType });
     }
 });
+
+function fetchChunk(streamId, start, size) {
+    return new Promise((resolve, reject) => {
+        if (!port) { reject(new Error('Puerto no listo')); return; }
+        const requestId = streamId + '-' + start + '-' + Date.now() + '-' + Math.random();
+        pending.set(requestId, { resolve, reject });
+        port.postMessage({ type: 'FETCH_RANGE', requestId, streamId, start, size });
+        setTimeout(() => { if (pending.has(requestId)) { pending.delete(requestId); reject(new Error('Timeout')); } }, 45000);
+    });
+}
 
 self.addEventListener('fetch', (e) => {
     const url = new URL(e.request.url);
@@ -21,49 +46,45 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(handle(e, streamId));
 });
 
-async function handle(event, streamId) {
-    const meta = META.get(streamId);
-    if (!meta) return new Response('stream no registrado', { status: 404 });
-    const size = meta.size, mime = meta.mime;
+async function handle(e, streamId) {
+    let meta = streams.get(streamId);
+    // esperar al REGISTER por si el <video> pide antes (carrera)
+    for (let i = 0; i < 40 && !meta; i++) { await sleep(50); meta = streams.get(streamId); }
+    if (!meta || !port) return new Response('Stream no listo', { status: 503 });
 
-    const rangeHeader = event.request.headers.get('Range');
+    const size = meta.fileSize;
+    const mime = meta.mimeType || 'video/mp4';
+    const rangeHeader = e.request.headers.get('range') || '';
     let start = 0, end = size - 1;
     if (rangeHeader) {
-        const m = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
-        if (m) { start = parseInt(m[1], 10); if (m[2]) end = Math.min(parseInt(m[2], 10), size - 1); }
+        const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (m) { start = parseInt(m[1], 10); end = m[2] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1; }
     }
-    // primer trozo pequeño = arranque rápido; el resto más grande = más fluido
-    const chunkSize = (start === 0) ? (512 * 1024) : CHUNK;
-    end = Math.min(end, start + chunkSize - 1, size - 1);
-    if (start >= size) return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + size } });
+    const CHUNK = 1024 * 1024;
+    const total = end - start + 1;
+    let pos = start;
 
-    let data;
-    try { data = await requestRange(event.clientId, streamId, start, end); }
-    catch (err) { return new Response('error: ' + (err && err.message), { status: 500 }); }
-
-    return new Response(data, {
-        status: 206,
-        headers: {
-            'Content-Type': mime,
-            'Content-Length': String(end - start + 1),
-            'Content-Range': 'bytes ' + start + '-' + end + '/' + size,
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'no-store'
+    const stream = new ReadableStream({
+        async pull(controller) {
+            if (pos > end) { controller.close(); return; }
+            const sz = Math.min(CHUNK, end - pos + 1);
+            try {
+                const chunk = await fetchChunk(streamId, pos, sz);
+                if (!chunk || !chunk.byteLength) { controller.close(); return; }
+                controller.enqueue(chunk);
+                pos += chunk.byteLength;
+                if (pos > end) controller.close();
+            } catch (err) { controller.error(err); }
         }
     });
-}
 
-async function requestRange(clientId, streamId, start, end) {
-    const client = (clientId && await self.clients.get(clientId)) || (await self.clients.matchAll())[0];
-    if (!client) throw new Error('sin página');
-    return await new Promise((resolve, reject) => {
-        const channel = new MessageChannel();
-        const timer = setTimeout(() => reject(new Error('timeout rango')), 60000);
-        channel.port1.onmessage = (ev) => {
-            clearTimeout(timer);
-            if (ev.data && ev.data.error) reject(new Error(ev.data.error));
-            else resolve(ev.data.chunk);
-        };
-        client.postMessage({ type: 'RANGE', streamId, start, end }, [channel.port2]);
+    return new Response(stream, {
+        status: rangeHeader ? 206 : 200,
+        headers: {
+            'Content-Type': mime,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': String(total),
+            'Content-Range': `bytes ${start}-${end}/${size}`
+        }
     });
 }

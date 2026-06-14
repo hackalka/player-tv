@@ -249,8 +249,11 @@ const Player = {
             let url;
             if (src.t === 'url') url = src.url;
             else {
-                if (!navigator.serviceWorker.controller) { return this.downloadAndPlay(playable); }
-                const r = await Engine.registerStream(src); url = r.url;
+                const okSW = await SW.ensure();
+                if (!okSW) { return this.downloadAndPlay(playable); }
+                const r = await Engine.prepareStream(src);
+                SW.register(r.streamId, r.size, r.mime);
+                url = r.url;
             }
             el.playerVideo.hidden = false; el.playerVideo.src = url;
             const resume = (Store.progress[playable.id] || {}).time || 0;
@@ -457,28 +460,61 @@ const TVNav = {
     }
 };
 
-/* ===== ARRANQUE ===== */
-async function registerSW() {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-        await navigator.serviceWorker.register('sw.js');
-        await navigator.serviceWorker.ready;
-        navigator.serviceWorker.addEventListener('message', async (e) => {
-            const d = e.data || {}; if (d.type !== 'RANGE') return;
-            const port = e.ports[0];
-            try { const { chunk } = await Engine.streamRange(d.streamId, d.start, d.end); port.postMessage({ chunk }, [chunk.buffer]); }
-            catch (err) { port.postMessage({ error: err.message }); }
-        });
-        if (!navigator.serviceWorker.controller) {
-            await Promise.race([new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true })), new Promise(r => setTimeout(r, 3000))]);
+/* ===== Service Worker (streaming por rangos, puerto persistente) ===== */
+const SW = {
+    port: null, ready: false, _initing: null,
+    async ensure() {
+        if (!('serviceWorker' in navigator)) return false;
+        if (this.ready && navigator.serviceWorker.controller) return true;
+        if (this._initing) return this._initing;
+        this._initing = (async () => {
+            try {
+                await navigator.serviceWorker.register('sw.js');
+                await navigator.serviceWorker.ready;
+                if (!navigator.serviceWorker.controller) {
+                    await Promise.race([
+                        new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true })),
+                        new Promise(r => setTimeout(r, 3000))
+                    ]);
+                }
+                const ctrl = navigator.serviceWorker.controller;
+                if (!ctrl) { this._initing = null; return false; }
+                await new Promise((resolve) => {
+                    const ch = new MessageChannel();
+                    this.port = ch.port1;
+                    this.port.onmessage = (ev) => this._onMsg(ev);
+                    const done = () => { this.ready = true; resolve(); };
+                    this._readyResolve = done;
+                    ctrl.postMessage({ type: 'INIT' }, [ch.port2]);
+                    setTimeout(done, 1500);
+                });
+                this._initing = null;
+                return true;
+            } catch (e) { console.warn('SW', e.message); this._initing = null; return false; }
+        })();
+        return this._initing;
+    },
+    async _onMsg(ev) {
+        const d = ev.data || {};
+        if (d.type === 'READY') { if (this._readyResolve) this._readyResolve(); return; }
+        if (d.type === 'FETCH_RANGE') {
+            try {
+                const { chunk } = await Engine.streamRange(d.streamId, d.start, d.start + d.size - 1);
+                const buf = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
+                this.port.postMessage({ requestId: d.requestId, chunk: buf }, [buf]);
+            } catch (err) { this.port.postMessage({ requestId: d.requestId, error: err.message || 'error' }); }
         }
-    } catch (e) { console.warn('SW', e.message); }
-}
+    },
+    register(streamId, fileSize, mimeType) {
+        const ctrl = navigator.serviceWorker.controller;
+        if (ctrl) ctrl.postMessage({ type: 'REGISTER', streamId, fileSize, mimeType });
+    }
+};
 
 async function boot() {
     try {
         if (window.CONFIG && window.CONFIG.appName) { el.brand.innerText = window.CONFIG.appName.toUpperCase(); document.title = window.CONFIG.appName; }
-        await registerSW();
+        await SW.ensure();
         el.loadingText.innerText = 'Conectando con Telegram...';
         const authorized = await Engine.init(window.CONFIG);
         if (!authorized) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
