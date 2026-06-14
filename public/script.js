@@ -70,6 +70,8 @@ const Store = {
     },
     favList() { return Object.values(this.favs).reverse(); },
     setLastEp(seriesId, epId) { const l = this.lastEp; l[seriesId] = epId; this.lastEp = l; },
+    get volume() { const v = parseFloat(localStorage.getItem('tvp_vol')); return isNaN(v) ? 1 : v; },
+    set volume(v) { try { localStorage.setItem('tvp_vol', String(v)); } catch {} },
 };
 
 const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
@@ -447,13 +449,16 @@ const Player = {
         if (playable.streamUrl) {
             el.playerIframe.hidden = true; el.playerIframe.src = '';
             el.playerVideo.hidden = false;
-            el.playerVideo.src = playable.streamUrl;
+            const v = el.playerVideo;
+            v.src = playable.streamUrl;
             const resume = (Store.progress[playable.id] || {}).time || 0;
-            el.playerVideo.onloadedmetadata = () => { if (resume > 8 && resume < el.playerVideo.duration - 5) el.playerVideo.currentTime = resume; };
-            el.playerVideo.onerror = () => this.onPlayError(playable);
-            el.playerVideo.ontimeupdate = () => this._tick();
-            el.playerVideo.onended = () => Store.clearProgress(playable.id);
-            el.playerVideo.play().catch(() => {});
+            try { v.volume = Store.volume; } catch {}
+            v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
+            v.onerror = () => this.onPlayError(playable);
+            v.ontimeupdate = () => this._tick();
+            v.onvolumechange = () => { Store.volume = v.volume; };
+            v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
+            v.play().catch(() => {});
             return;
         }
         if (playable.externalUrl) {
@@ -462,6 +467,16 @@ const Player = {
             return;
         }
         this.onPlayError(playable);
+    },
+
+    maybeNext(playable, parent) {
+        if (!parent || !parent.episodes || parent.episodes.length < 2) return;
+        const i = parent.episodes.findIndex(e => String(e.id) === String(playable.id));
+        if (i < 0 || i >= parent.episodes.length - 1) return;
+        const next = parent.episodes[i + 1];
+        if (Detail && Detail.current === parent) { Detail.primary = next; }
+        if (typeof ExternalPlayers !== 'undefined') ExternalPlayers.render(next);
+        this.play(next, parent);
     },
 
     onPlayError(playable) {
