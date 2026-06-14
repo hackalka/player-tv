@@ -211,11 +211,7 @@ const ExternalPlayers = {
         if (!playable) { box.hidden = true; return; }
         const items = [];
         const isTme = (u) => u && /(^|\/\/|\.)t\.me\//i.test(u);
-        const tgUrl = playable.tgLink || (isTme(playable.externalUrl) ? playable.externalUrl : '');
         const httpUrl = (playable.externalUrl && !isTme(playable.externalUrl)) ? playable.externalUrl : '';
-
-        // ▶ Abrir en la app de Telegram = streaming nativo (lo mejor para mp4/mkv, sin descargar)
-        if (tgUrl) items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(tgUrl)}">▶ Abrir en Telegram</a>`);
 
         if (playable.aceUrl) {
             items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(playable.aceUrl)}">▶ AceStream</a>`);
@@ -229,15 +225,13 @@ const ExternalPlayers = {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:${escapeHtml(httpUrl)}#Intent;type=video/*;action=android.intent.action.VIEW;end">Reproductor (Android/TV)</a>`);
             items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(httpUrl)}">Copiar enlace</button>`);
         }
-        // Archivo de Telegram sin enlace público: solo si no hay t.me/http ya
         const isTgDoc = !!(playable.src && (playable.src.t === 'doc' || playable.src.t === 'l'));
-        if (isTgDoc && !tgUrl) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">⬇ Descargar y abrir</button>');
+        if (isTgDoc) items.push('<button class="opt-btn focusable" tabindex="0" id="openext-btn">⬇ Descargar y abrir</button>');
 
         if (!items.length) { box.hidden = true; return; }
-        const label = tgUrl ? 'Ábrelo en la app de Telegram (streaming nativo, sin descargar):'
-            : (playable.aceUrl ? 'Enlace AceStream:'
+        const label = playable.aceUrl ? 'Enlace AceStream:'
             : (httpUrl ? 'Ábrelo en tu reproductor:'
-            : 'Este formato no se reproduce en el navegador. Opciones:'));
+            : 'Si no se reproduce aquí, ábrelo con tu reproductor:');
         box.hidden = false; box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
         $$('button[data-copy]', box).forEach(b => b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.innerText = '¡Copiado!'; setTimeout(() => b.innerText = 'Copiar enlace', 1500); }).catch(() => {}));
         const oe = $('#openext-btn', box); if (oe) oe.onclick = () => Player.openExternalApp(playable);
@@ -480,8 +474,18 @@ const SW = {
                         new Promise(r => setTimeout(r, 3000))
                     ]);
                 }
-                const ctrl = navigator.serviceWorker.controller;
-                if (!ctrl) { this._initing = null; return false; }
+                const ctrl0 = navigator.serviceWorker.controller;
+                if (!ctrl0) {
+                    // El SW está activo pero no controla esta carga -> recargar UNA vez
+                    if (!sessionStorage.getItem('tvp_sw_reload')) {
+                        sessionStorage.setItem('tvp_sw_reload', '1');
+                        location.reload();
+                        return false;
+                    }
+                    this._initing = null; return false;
+                }
+                sessionStorage.removeItem('tvp_sw_reload');
+                const ctrl = ctrl0;
                 await new Promise((resolve) => {
                     const ch = new MessageChannel();
                     this.port = ch.port1;
