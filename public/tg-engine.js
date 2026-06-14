@@ -10,16 +10,43 @@
         isAdmin: false, name: '', authorized: false,
 
         async waitLib() {
-            const inject = (src) => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
-            const ok = () => !!(window.telegram && window.telegram.TelegramClient);
-            let n = 0; while (!ok() && n < 25) { await new Promise(r => setTimeout(r, 400)); n++; }
-            if (!ok()) { await inject('https://unpkg.com/telegram/browser/telegram.js'); n = 0; while (!ok() && n < 25) { await new Promise(r => setTimeout(r, 400)); n++; } }
+            const ok = () => !!(window.telegram && window.telegram.TelegramClient && window.telegram.sessions);
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const wait = async (tries) => { let n = 0; while (!ok() && n < tries) { await sleep(300); n++; } return ok(); };
+            const inject = (src) => new Promise(res => {
+                const s = document.createElement('script'); s.src = src;
+                s.onload = () => res(true); s.onerror = () => { console.warn('No cargó', src); res(false); };
+                document.head.appendChild(s);
+            });
+
+            if (await wait(8)) return true; // ¿ya lo cargó el <script> del head?
+
+            const urls = [
+                'https://unpkg.com/telegram/browser/telegram.js',
+                'https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js',
+                'https://unpkg.com/telegram@2.26.22/browser/telegram.js'
+            ];
+            for (const u of urls) {
+                await inject(u);
+                if (await wait(25)) return true;
+            }
+
+            // último recurso: esm.sh (ensambla window.telegram)
+            try {
+                const m = await import('https://esm.sh/telegram');
+                const ses = await import('https://esm.sh/telegram/sessions');
+                let bi; try { bi = (await import('https://esm.sh/big-integer')).default; } catch {}
+                window.telegram = Object.assign({}, m, { sessions: ses });
+                if (bi && !window.bigInt) window.bigInt = bi;
+                if (await wait(10)) return true;
+            } catch (e) { console.warn('esm.sh falló:', e && e.message); }
+
             return ok();
         },
 
         async init(cfg) {
             this.cfg = cfg;
-            if (!await this.waitLib()) throw new Error('No se pudo cargar la librería de Telegram.');
+            if (!await this.waitLib()) throw new Error('No se pudo cargar la librería de Telegram (CDN bloqueado o sin conexión). Reintenta o prueba con otra red.');
             const { TelegramClient, sessions } = window.telegram;
             this.Api = window.telegram.Api;
             const saved = localStorage.getItem('tvp_session') || '';

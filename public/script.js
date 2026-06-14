@@ -430,7 +430,10 @@ async function boot() {
         App.populateFilters(); Netflix.render(); App.switchView('netflix');
         setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
     } catch (e) {
-        console.error(e); el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar.<br>${escapeHtml(e.message)}</div>`;
+        console.error(e);
+        el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar.<br>${escapeHtml(e.message)}<br><br>
+            <button class="btn btn-play" onclick="location.reload()" style="display:inline-flex">Reintentar</button></div>`;
+        el.netflixView.hidden = false;
     } finally { el.loadingScreen.classList.add('hidden'); }
 }
 
