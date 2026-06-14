@@ -304,8 +304,15 @@
             const streamId = 's' + Date.now() + Math.floor(Math.random() * 1e6);
             const size = Number(doc.size); const mime = doc.mimeType || 'video/mp4';
             this.streams.set(streamId, { message, size, mime });
-            if (navigator.serviceWorker.controller)
-                navigator.serviceWorker.controller.postMessage({ type: 'REGISTER', streamId, size, mime });
+            // Registrar en el SW y ESPERAR confirmación (evita carrera con el <video>)
+            await new Promise((res) => {
+                const ctrl = navigator.serviceWorker.controller;
+                if (!ctrl) return res();
+                const ch = new MessageChannel();
+                ch.port1.onmessage = () => res();
+                try { ctrl.postMessage({ type: 'REGISTER', streamId, size, mime }, [ch.port2]); } catch { res(); }
+                setTimeout(res, 800);
+            });
             return { url: 'tg-stream/' + streamId, size, mime };
         },
         async streamRange(streamId, start, end) {

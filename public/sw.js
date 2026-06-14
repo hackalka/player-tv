@@ -7,7 +7,10 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
 self.addEventListener('message', (e) => {
     const d = e.data || {};
-    if (d.type === 'REGISTER') META.set(d.streamId, { size: d.size, mime: d.mime });
+    if (d.type === 'REGISTER') {
+        META.set(d.streamId, { size: d.size, mime: d.mime });
+        if (e.ports && e.ports[0]) e.ports[0].postMessage({ ok: true }); // confirmar registro
+    }
 });
 
 self.addEventListener('fetch', (e) => {
