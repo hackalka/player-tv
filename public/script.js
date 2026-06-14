@@ -798,6 +798,13 @@ async function boot() {
 
         const me = await api('/api/me').catch(() => ({ loggedIn: false }));
         if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
+        if (me.inGroup === false) {
+            el.loadingScreen.classList.add('hidden');
+            el.rowsContainer.innerHTML = `<div class="empty-state">🔒 Tu cuenta <b>${escapeHtml(me.name || '')}</b> no es miembro del grupo.<br><br>
+                Pide al administrador que te añada al grupo de Telegram para poder ver el contenido.<br><br>
+                <button class="btn btn-play" onclick="location.reload()" style="display:inline-flex">Reintentar</button></div>`;
+            return;
+        }
 
         state.isAdmin = !!me.isAdmin;
         state.userName = me.name || '';

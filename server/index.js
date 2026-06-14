@@ -38,6 +38,7 @@ async function withUser(req, res, next) {
     try {
         const u = await sessions.getByToken(getToken(req));
         if (!u) return res.status(401).json({ needLogin: true });
+        if (!u.inGroup) return res.status(403).json({ needAccess: true, error: 'Tu cuenta no es miembro del grupo. Pide al administrador que te añada.' });
         req.user = u; next();
     } catch (e) { res.status(401).json({ needLogin: true, error: e.message }); }
 }
@@ -72,7 +73,7 @@ app.get('/api/me', async (req, res) => {
     try {
         const u = await sessions.getByToken(getToken(req));
         if (!u) return res.json({ loggedIn: false });
-        res.json({ loggedIn: true, isAdmin: u.isAdmin, name: u.name });
+        res.json({ loggedIn: true, isAdmin: u.isAdmin, name: u.name, inGroup: !!u.inGroup });
     } catch { res.json({ loggedIn: false }); }
 });
 

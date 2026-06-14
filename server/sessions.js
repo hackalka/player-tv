@@ -81,10 +81,11 @@ class SessionManager {
         const session = l.client.session.save();
         const token = crypto.randomBytes(24).toString('hex');
         const service = new TelegramService(l.client, this.cfg);
-        let isAdmin = false, name = '';
+        let isAdmin = false, name = '', inGroup = false;
+        try { await service.resolveGroup(); inGroup = true; } catch {}
         try { isAdmin = await service.isGroupAdmin(); } catch {}
         try { const me = await l.client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
-        this.users.set(token, { service, client: l.client, isAdmin, name, lastUsed: Date.now() });
+        this.users.set(token, { service, client: l.client, isAdmin, name, inGroup, lastUsed: Date.now() });
         this.persisted[token] = session; this._save();
         this.logins.delete(loginId);
         return { token, isAdmin, name };
@@ -101,10 +102,11 @@ class SessionManager {
             if (!await client.checkAuthorization()) { delete this.persisted[token]; this._save(); return null; }
         } catch (e) { return null; }
         const service = new TelegramService(client, this.cfg);
-        let isAdmin = false, name = '';
+        let isAdmin = false, name = '', inGroup = false;
+        try { await service.resolveGroup(); inGroup = true; } catch {}
         try { isAdmin = await service.isGroupAdmin(); } catch {}
         try { const me = await client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
-        const u = { service, client, isAdmin, name, lastUsed: Date.now() };
+        const u = { service, client, isAdmin, name, inGroup, lastUsed: Date.now() };
         this.users.set(token, u);
         return u;
     }
