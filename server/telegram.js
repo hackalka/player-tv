@@ -113,12 +113,12 @@ class TelegramService {
         if (!name) name = 'Sin nombre';
         const low = name.toLowerCase();
         let icon = '📁', type = 'other';
-        if (/pel[ií]cul|movie|cine|film/.test(low)) { icon = '🎬'; type = 'movie'; }
-        else if (/serie|series|temporada|tv\b/.test(low)) { icon = '📺'; type = 'series'; }
-        else if (/deporte|sport|f[uú]tbol|liga|nba|ufc|box/.test(low)) { icon = '⚽'; type = 'sports'; }
-        else if (/doc(u|s)|documental/.test(low)) { icon = '🎥'; type = 'docs'; }
-        else if (/anime|manga/.test(low)) { icon = '🌸'; type = 'anime'; }
-        else if (/infantil|kids|niñ/.test(low)) { icon = '🧸'; type = 'kids'; }
+        if (/pel[ií]cul|movie|cine|film/.test(low)) { icon = ''; type = 'movie'; }
+        else if (/serie|series|temporada|tv\b/.test(low)) { icon = ''; type = 'series'; }
+        else if (/deporte|sport|f[uú]tbol|liga|nba|ufc|box/.test(low)) { icon = ''; type = 'sports'; }
+        else if (/doc(u|s)|documental/.test(low)) { icon = ''; type = 'docs'; }
+        else if (/anime|manga/.test(low)) { icon = ''; type = 'anime'; }
+        else if (/infantil|kids|niñ/.test(low)) { icon = ''; type = 'kids'; }
         return { name, icon, type };
     }
 
@@ -178,7 +178,7 @@ class TelegramService {
                 if (isUrl(line)) break;
                 let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
                 if (j < allLines.length && isUrl(allLines[j])) break;
-                if (/^[📅📺🎭🎬🌟⭐📝🎥]|g[eé]neros|temporadas|episodios|puntuaci|estreno/i.test(line)) continue;
+                if (/^[]|g[eé]neros|temporadas|episodios|puntuaci|estreno/i.test(line)) continue;
                 parts.push(line);
             }
             description = clean(parts.join(' '));
@@ -189,7 +189,7 @@ class TelegramService {
                 const line = allLines[i]; if (!line || isUrl(line)) continue;
                 let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
                 if (j < allLines.length && isUrl(allLines[j])) continue;
-                if (/^[📅📺🎭🎬🌟⭐📝🎥]|g[eé]neros|temporadas|episodios|puntuaci|estreno|sinopsis|en emisi/i.test(line)) continue;
+                if (/^[]|g[eé]neros|temporadas|episodios|puntuaci|estreno|sinopsis|en emisi/i.test(line)) continue;
                 parts.push(line);
             }
             description = clean(parts.join(' '));
