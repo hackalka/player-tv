@@ -16,8 +16,8 @@
     --transition-medium: 300ms ease;
     --transition-slow: 450ms ease;
 
-    --card-width: 210px;
-    --card-ratio: 16 / 9;
+    --card-width: 180px;
+    --card-ratio: 2 / 3;
     --row-gap: 4px;
     --section-gap: 3vw;
 }
@@ -613,7 +613,7 @@ body {
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
     :root {
-        --card-width: 200px;
+        --card-width: 160px;
     }
 
     .hero-content {
@@ -626,7 +626,7 @@ body {
 }
 @media (max-width: 768px) {
     :root {
-        --card-width: 150px;
+        --card-width: 130px;
         --navbar-height: 56px;
     }
 
@@ -658,7 +658,7 @@ body {
 }
 @media (max-width: 480px) {
     :root {
-        --card-width: 120px;
+        --card-width: 110px;
     }
 
     .slider-arrow {
