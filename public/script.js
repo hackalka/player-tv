@@ -144,7 +144,7 @@ const Netflix = {
         if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));
 
         const novedades = state.allItems.filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
-        if (novedades.length) el.rowsContainer.appendChild(this.row('🆕 Novedades', novedades));
+        if (novedades.length) el.rowsContainer.appendChild(this.row('Novedades', novedades));
 
         if (!cats.length && !cont.length && !favs.length) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
