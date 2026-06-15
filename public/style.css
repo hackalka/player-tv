@@ -16,7 +16,7 @@
     --transition-medium: 300ms ease;
     --transition-slow: 450ms ease;
 
-    --card-width: 250px;
+    --card-width: 210px;
     --card-ratio: 16 / 9;
     --row-gap: 4px;
     --section-gap: 3vw;
@@ -981,3 +981,10 @@ body.telegram-mode .nav-links { visibility: hidden; }
 
 /* Botones de enlace (anchors) iguales que los botones */
 a.source-btn { text-decoration: none; }
+
+
+/* ===== Logo de marca (imagen) adaptable por dispositivo ===== */
+.brand-logo { height: 34px; width: auto; border-radius: 8px; display: block; }
+.logo { gap: 10px; }
+@media (max-width: 640px) { .brand-logo { height: 28px; } .logo-text { display: none; } }
+@media (min-width: 1600px) { .brand-logo { height: 44px; } }  /* TV / pantallas grandes */
