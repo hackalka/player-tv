@@ -109,16 +109,31 @@ class TelegramService {
             const re = new RegExp(tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
             name = name.replace(re, '');
         }
+        // Tipo forzado por etiqueta del propio tema (gana siempre): @series, @peliculas, @deportes, @docu, @anime, @kids
+        let forced = '';
+        const fm = name.match(/@(series|tv|peliculas|pelicula|movies|movie|deportes|sports|docu|documental|anime|kids|infantil)/i);
+        if (fm) {
+            const t = fm[1].toLowerCase();
+            if (/series|tv/.test(t)) forced = 'series';
+            else if (/peliculas|pelicula|movies|movie/.test(t)) forced = 'movie';
+            else if (/deportes|sports/.test(t)) forced = 'sports';
+            else if (/docu/.test(t)) forced = 'docs';
+            else if (/anime/.test(t)) forced = 'anime';
+            else if (/kids|infantil/.test(t)) forced = 'kids';
+            name = name.replace(fm[0], '');
+        }
         name = name.replace(/[\-|·•:]+\s*$/g, '').replace(/^\s*[\-|·•:]+/g, '').replace(/\s{2,}/g, ' ').trim();
         if (!name) name = 'Sin nombre';
         const low = name.toLowerCase();
         let icon = '📁', type = 'other';
-        if (/pel[ií]cul|movie|cine|film/.test(low)) { icon = ''; type = 'movie'; }
-        else if (/serie|series|temporada|tv\b/.test(low)) { icon = ''; type = 'series'; }
-        else if (/deporte|sport|f[uú]tbol|liga|nba|ufc|box/.test(low)) { icon = ''; type = 'sports'; }
-        else if (/doc(u|s)|documental/.test(low)) { icon = ''; type = 'docs'; }
-        else if (/anime|manga/.test(low)) { icon = ''; type = 'anime'; }
-        else if (/infantil|kids|niñ/.test(low)) { icon = ''; type = 'kids'; }
+        // Detectores por palabra (con \b para evitar falsos positivos)
+        if (/\bserie(s)?\b|\btemporada(s)?\b|\bcap[ií]tulos?\b/.test(low)) { icon = '📺'; type = 'series'; }
+        else if (/\bpel[ií]cul(a|as)?\b|\bmovie(s)?\b|\bcine\b|\bfilm(s)?\b/.test(low)) { icon = '🎬'; type = 'movie'; }
+        else if (/\bdeporte(s)?\b|\bsport(s)?\b|\bf[uú]tbol\b|\bliga\b|\bnba\b|\bufc\b|\bbox(eo)?\b/.test(low)) { icon = '⚽'; type = 'sports'; }
+        else if (/\bdocu(mental(es)?)?\b|\bdocs?\b/.test(low)) { icon = '🎥'; type = 'docs'; }
+        else if (/\banime\b|\bmanga\b/.test(low)) { icon = '🌸'; type = 'anime'; }
+        else if (/\binfantil(es)?\b|\bkids\b|\bniñ[oa]s?\b/.test(low)) { icon = '🧸'; type = 'kids'; }
+        if (forced) type = forced;
         return { name, icon, type };
     }
 
@@ -348,6 +363,11 @@ class TelegramService {
         const raw = msgs
             .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)) || (m.message && /acestream/i.test(m.message)))
             .map(m => this.buildItem(m, topic));
+
+        // Si el tema NO es serie pero los items parecen serie (Temporada N / 1x01 / Capítulo), tratarlos como series
+        const seriesHint = (it) => /\btemporada\s*\d+|\bs\d{1,2}\s*e\d{1,3}\b|\b\d{1,2}\s*x\s*\d{1,3}\b|cap[ií]tulo|episodio/i.test(it.title || '');
+        const promoteToSeries = topic.type !== 'series' && raw.some(seriesHint);
+        if (promoteToSeries) topic = Object.assign({}, topic, { type: 'series', _promoted: true });
 
         if (topic.type !== 'series') {
             const seen = new Set();
