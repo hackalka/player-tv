@@ -104,6 +104,8 @@ const el = {
     detailHero: $('#detail-hero'),
     detailBackdrop: $('#detail-backdrop'),
     detailPoster: $('#detail-poster'),
+    detailGenres: $('#detail-genres'),
+    modalRating: $('#modal-rating'),
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     playerOptions: $('#player-options'),
@@ -182,6 +184,22 @@ const Netflix = {
         return row;
     },
 
+    renderCategory(name) {
+        const cat = state.catalog.categories.find(c => c.name === name);
+        el.rowsContainer.innerHTML = '';
+        if (!cat || !cat.items.length) { el.rowsContainer.innerHTML = '<div class="empty-state">Sin contenido en ' + escapeHtml(name) + '.</div>'; return; }
+        // Fila "Todas" + una fila por cada género
+        el.rowsContainer.appendChild(this.row(`${cat.icon || ''} Todas`, cat.items));
+        const byGenre = {};
+        cat.items.forEach(it => {
+            const gs = (it.meta && it.meta.genres) ? it.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
+            gs.forEach(g => { (byGenre[g] = byGenre[g] || []).push(it); });
+        });
+        Object.keys(byGenre).sort().forEach(g => el.rowsContainer.appendChild(this.row('🎭 ' + g, byGenre[g])));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        TVNav.refresh();
+    },
+
     card(item, kind) {
         const card = document.createElement('div');
         card.className = 'card focusable';
@@ -240,9 +258,15 @@ const Detail = {
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
             : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
-        el.modalDescription.innerText = this._descWithMeta(item);
+        el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        if (el.modalRating) el.modalRating.innerText = (item.meta && item.meta.rating) ? ('★ ' + item.meta.rating) : '';
+        if (el.detailGenres) {
+            const gs = (item.meta && item.meta.genres) ? item.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
+            el.detailGenres.innerHTML = gs.map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('');
+        }
+        const backdrop = item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
-        el.detailBackdrop.src = poster;
+        el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
 
@@ -360,23 +384,52 @@ const Detail = {
 
     renderEpisodes(eps, parent) {
         el.episodesTrack.innerHTML = '';
-        eps.forEach((ep, i) => {
-            const row = document.createElement('div');
-            row.className = 'episode focusable'; row.tabIndex = 0;
-            const thumb = ep.thumbUrl || placeholderImage(ep.id, ep.title);
-            const prog = Store.progress[ep.id];
-            const pct = prog && prog.duration ? Math.min(100, Math.round(prog.time / prog.duration * 100)) : 0;
-            row.innerHTML = `
-                <div class="episode-index">${i + 1}</div>
-                <img class="episode-thumb" src="${thumb}" alt="" onerror="this.src='${placeholderImage(ep.id, ep.title)}'">
-                <div class="episode-info">
-                    <div class="episode-name">${escapeHtml(ep.title)}</div>
-                    <div class="episode-sub">${escapeHtml(ep.duration || ep.size || '')}${pct ? ` · ${pct}% visto` : ''}</div>
-                </div>
-                <span class="episode-play"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>`;
-            row.onclick = () => { ExternalPlayers.render(ep); Player.play(ep, parent); };
-            el.episodesTrack.appendChild(row);
-        });
+        const bySeason = {};
+        eps.forEach(ep => { const s = ep.season || 1; (bySeason[s] = bySeason[s] || []).push(ep); });
+        const seasons = Object.keys(bySeason).map(Number).sort((a, b) => a - b);
+
+        const renderList = (list, container, grouped) => {
+            container.innerHTML = '';
+            list.forEach((ep, i) => {
+                const row = document.createElement('div');
+                row.className = 'episode focusable'; row.tabIndex = 0;
+                const thumb = ep.thumbUrl || placeholderImage(ep.id, ep.title);
+                const prog = Store.progress[ep.id];
+                const pct = prog && prog.duration ? Math.min(100, Math.round(prog.time / prog.duration * 100)) : 0;
+                const name = grouped ? ('Capítulo ' + (ep.epNum || (i + 1))) : ep.title;
+                row.innerHTML = `
+                    <div class="episode-index">${ep.epNum || (i + 1)}</div>
+                    <img class="episode-thumb" src="${thumb}" alt="" onerror="this.src='${placeholderImage(ep.id, ep.title)}'">
+                    <div class="episode-info">
+                        <div class="episode-name">${escapeHtml(name)}</div>
+                        <div class="episode-sub">${escapeHtml(ep.duration || ep.size || '')}${pct ? ` · ${pct}% visto` : ''}</div>
+                    </div>
+                    <span class="episode-play"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>`;
+                row.onclick = () => { ExternalPlayers.render(ep); Player.play(ep, parent); };
+                container.appendChild(row);
+            });
+            TVNav.refresh();
+        };
+
+        if (seasons.length > 1) {
+            const tabs = document.createElement('div'); tabs.className = 'season-tabs';
+            const cont = document.createElement('div'); cont.className = 'season-eps';
+            seasons.forEach(s => {
+                const b = document.createElement('button');
+                b.className = 'season-tab focusable'; b.tabIndex = 0; b.innerText = 'Temporada ' + s;
+                b.onclick = () => { $$('.season-tab', tabs).forEach(x => x.classList.remove('active')); b.classList.add('active'); renderList(bySeason[s], cont, true); };
+                tabs.appendChild(b);
+            });
+            el.episodesTrack.appendChild(tabs);
+            el.episodesTrack.appendChild(cont);
+            const lastId = Store.lastEp[parent.id];
+            let def = seasons[0]; const le = eps.find(e => String(e.id) === String(lastId)); if (le) def = le.season || 1;
+            const idx = Math.max(0, seasons.indexOf(def));
+            $$('.season-tab', tabs)[idx].classList.add('active');
+            renderList(bySeason[def], cont, true);
+        } else {
+            renderList(eps, el.episodesTrack, false);
+        }
     },
 
     resetVideo() {
@@ -852,9 +905,8 @@ function wireUi() {
         e.preventDefault();
         $$('#nav-links a').forEach(x => x.classList.remove('active'));
         a.classList.add('active');
-        if (!a.dataset.cat) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-        const row = $$('.row-title').find(t => t.innerText.includes(a.dataset.cat));
-        if (row) row.closest('.content-row').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!a.dataset.cat) { Netflix.render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+        Netflix.renderCategory(a.dataset.cat);
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;

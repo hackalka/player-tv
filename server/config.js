@@ -29,6 +29,9 @@ module.exports = {
     autoTags: (process.env.AUTO_TAG || 'playertv:auto,tvplayer:auto')
         .split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
 
+    // TMDB: rellena sinopsis, año, nota, géneros y carátula buscando por el título
+    tmdbKey: (process.env.TMDB_KEY || 'cbb1fa07c88626f5c57d56e48d8ce704').trim(),
+
     // Carpeta de datos (sesiones de usuario persistidas + caché de miniaturas)
     dataDir: process.env.DATA_DIR || path.join(os.tmpdir(), 'tvp-data')
 };

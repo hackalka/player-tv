@@ -117,10 +117,10 @@
                     <div class="detail-actions">
                         <button class="btn btn-play focusable" id="detail-play">
                             <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-                            Ver
+                            Reproducir
                         </button>
-                        <button class="btn btn-fav focusable" id="fav-btn" aria-label="Añadir a Mi lista">
-                            <span class="fav-ico">＋</span> <span class="fav-txt">Mi lista</span>
+                        <button class="btn btn-fav focusable" id="fav-btn" aria-label="Añadir a favoritos">
+                            <span class="fav-ico">★</span> <span class="fav-txt">Añadir a favoritos</span>
                         </button>
                     </div>
                 </div>
@@ -131,11 +131,12 @@
                     <img class="detail-poster" id="detail-poster" alt="">
                     <div class="detail-info">
                         <div class="modal-meta">
-                            <span class="match">Recomendado</span>
+                            <span class="rating" id="modal-rating"></span>
                             <span class="year" id="modal-year"></span>
                             <span class="duration" id="modal-duration"></span>
                             <span class="quality">HD</span>
                         </div>
+                        <div class="detail-genres" id="detail-genres"></div>
                         <p class="modal-description" id="modal-description"></p>
                     </div>
                 </div>

@@ -988,3 +988,16 @@ a.source-btn { text-decoration: none; }
 .logo { gap: 10px; }
 @media (max-width: 640px) { .brand-logo { height: 28px; } .logo-text { display: none; } }
 @media (min-width: 1600px) { .brand-logo { height: 44px; } }  /* TV / pantallas grandes */
+
+
+/* Ficha: chips de género + nota (con tus colores, sin amarillo) */
+.detail-genres { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.chip { padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: #fff; font-size: .78rem; }
+.modal-meta .rating { color: var(--netflix-red); font-weight: 700; }
+.modal-meta .duration { color: var(--netflix-light-gray); }
+
+/* Pestañas de temporada */
+.season-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+.season-tab { background: rgba(255,255,255,.08); color: #fff; border: none; padding: 7px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: .85rem; }
+.season-tab.active { background: var(--netflix-red); }
+.season-eps { display: flex; flex-direction: column; gap: 6px; }
