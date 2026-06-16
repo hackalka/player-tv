@@ -1001,3 +1001,11 @@ a.source-btn { text-decoration: none; }
 .season-tab { background: rgba(255,255,255,.08); color: #fff; border: none; padding: 7px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: .85rem; }
 .season-tab.active { background: var(--netflix-red); }
 .season-eps { display: flex; flex-direction: column; gap: 6px; }
+
+
+/* Número del Top 10 sobre la carátula */
+.card-rank { position: absolute; top: 6px; left: 8px; z-index: 3; font-size: 2.4rem; font-weight: 900; line-height: 1; color: #fff; text-shadow: 0 0 6px rgba(0,0,0,.9), 2px 2px 0 rgba(0,0,0,.5); }
+.card.watched .card-image { opacity: .55; filter: grayscale(.4); }
+.card-watched { position: absolute; top: 8px; right: 8px; z-index: 3; background: var(--netflix-red); color: #fff; font-size: .62rem; font-weight: 800; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
+/* Botón "Marcar como visto" activo */
+.btn-fav.active { background: var(--netflix-red); color: #fff; }

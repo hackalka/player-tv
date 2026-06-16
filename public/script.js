@@ -72,6 +72,10 @@ const Store = {
     setLastEp(seriesId, epId) { const l = this.lastEp; l[seriesId] = epId; this.lastEp = l; },
     get volume() { const v = parseFloat(localStorage.getItem('tvp_vol')); return isNaN(v) ? 1 : v; },
     set volume(v) { try { localStorage.setItem('tvp_vol', String(v)); } catch {} },
+    get watched() { return this._get('tvp_watched', {}); },
+    set watched(v) { this._set('tvp_watched', v); },
+    isWatched(id) { return !!this.watched[id]; },
+    toggleWatched(id) { const w = this.watched; if (w[id]) delete w[id]; else w[id] = Date.now(); this.watched = w; return !!w[id]; },
 };
 
 /* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
@@ -111,7 +115,16 @@ const CloudStore = {
             await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true });
         } catch (e) { console.warn('syncProgress:', e.message); }
     },
-    async saveProgress() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true }); } catch {} }
+    async saveProgress() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true }); } catch {} },
+    async syncWatched() {
+        if (!this.db || !this.uid) return;
+        try {
+            const doc = await this.db.collection('users').doc(this.uid).get();
+            if (doc.exists && doc.data().watched) Store.watched = Object.assign({}, doc.data().watched, Store.watched);
+            await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true });
+        } catch {}
+    },
+    async saveWatched() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} }
 };
 
 const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
@@ -148,6 +161,7 @@ const el = {
     modalRating: $('#modal-rating'),
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
+    watchedBtn: $('#watched-btn'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
@@ -187,6 +201,11 @@ const Netflix = {
 
         const novedades = state.allItems.filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
         if (novedades.length) el.rowsContainer.appendChild(this.row('Novedades', novedades));
+
+        const top = state.allItems.filter(it => it.meta && parseFloat(it.meta.rating) > 0)
+            .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 10);
+        top.forEach((it, i) => it._rank = i + 1);
+        if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top 10', top, 'top'));
 
         if (!cats.length && !cont.length && !favs.length) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
@@ -242,13 +261,15 @@ const Netflix = {
 
     card(item, kind) {
         const card = document.createElement('div');
-        card.className = 'card focusable';
+        card.className = 'card focusable' + (Store.isWatched(item.id) ? ' watched' : '');
         card.tabIndex = 0;
         const img = item.thumbUrl || placeholderImage(item.id, item.title || item.epTitle);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
+            ${kind === 'top' && item._rank ? `<div class="card-rank">${item._rank}</div>` : ''}
             <img class="card-image" src="${img}" alt="${escapeHtml(item.title || '')}" loading="lazy"
                  onerror="this.src='${placeholderImage(item.id, item.title)}'">
+            ${Store.isWatched(item.id) ? '<div class="card-watched">VISTO</div>' : ''}
             <div class="card-overlay">
                 <h3 class="card-title">${escapeHtml(item.title || '')}</h3>
                 <div class="card-meta">
@@ -333,6 +354,10 @@ const Detail = {
         ExternalPlayers.render(primary);
         el.detailPlay.onclick = () => Player.play(Detail.primary, item);
         el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); CloudStore.saveFavs(); };
+        if (el.watchedBtn) {
+            this.updateWatched();
+            el.watchedBtn.onclick = () => { Store.toggleWatched(item.id); this.updateWatched(); CloudStore.saveWatched && CloudStore.saveWatched(); Netflix.render(); };
+        }
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
@@ -420,6 +445,12 @@ const Detail = {
         const it = this.current;
         const fav = it && Store.isFav(it.id);
         el.favBtn.querySelector('.fav-ico').innerText = fav ? '✓' : '＋';
+    },
+    updateWatched() {
+        const it = this.current; if (!it || !el.watchedBtn) return;
+        const w = Store.isWatched(it.id);
+        el.watchedBtn.querySelector('.watched-txt').innerText = w ? 'Visto' : 'Marcar como visto';
+        el.watchedBtn.classList.toggle('active', w);
     },
 
     renderEpisodes(eps, parent) {
@@ -907,6 +938,7 @@ async function boot() {
         CloudStore.init(me.name || 'user');
         await CloudStore.syncFavs();
         await CloudStore.syncProgress();
+        await CloudStore.syncWatched();
 
         el.loadingText.innerText = 'Cargando catálogo...';
         const catalog = await api('/api/catalog');

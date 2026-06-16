@@ -277,7 +277,7 @@ class TelegramService {
                 items = this._buildTopicItems(msgs, topic);
             } catch (e) { console.warn(`Tema ${topic.name} falló:`, e.message); }
             // Enriquecer con TMDB (solo películas y series)
-            if (this.cfg.tmdbKey && typeof fetch === 'function' && (topic.type === 'movie' || topic.type === 'series')) {
+            if ((this.cfg.tmdbKey || this.cfg.tmdbToken) && typeof fetch === 'function' && (topic.type === 'movie' || topic.type === 'series')) {
                 const isTv = topic.type === 'series';
                 await Promise.all(items.map(it => this.tmdbEnrich(it, isTv).catch(() => {})));
             }
@@ -286,12 +286,17 @@ class TelegramService {
         return { categories };
     }
 
+    _tmdbHeaders() {
+        return this.cfg.tmdbToken ? { 'Authorization': 'Bearer ' + this.cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
+    }
+    _tmdbAuthQuery() { return this.cfg.tmdbToken ? '' : ('&api_key=' + (this.cfg.tmdbKey || '')); }
+
     async _tmdbGenres() {
         if (this._genres) return this._genres;
         this._genres = {};
         try {
             for (const t of ['movie', 'tv']) {
-                const r = await fetch(`https://api.themoviedb.org/3/genre/${t}/list?api_key=${this.cfg.tmdbKey}&language=es-ES`);
+                const r = await fetch(`https://api.themoviedb.org/3/genre/${t}/list?language=es-ES${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
                 const d = await r.json();
                 (d.genres || []).forEach(g => { this._genres[g.id] = g.name; });
             }
@@ -300,7 +305,8 @@ class TelegramService {
     }
 
     async tmdbEnrich(item, isTv) {
-        if (!this.cfg.tmdbKey || typeof fetch !== 'function' || !item.title) return;
+        if (typeof fetch !== 'function' || !item.title) return;
+        if (!this.cfg.tmdbKey && !this.cfg.tmdbToken) return;
         if (!this._tmdbCache) this._tmdbCache = new Map();
         const ck = (isTv ? 'tv' : 'movie') + ':' + item.title.toLowerCase() + ':' + (item.year || '');
         let info = this._tmdbCache.get(ck);
@@ -309,9 +315,9 @@ class TelegramService {
             try {
                 const gmap = await this._tmdbGenres();
                 const type = isTv ? 'tv' : 'movie';
-                const url = `https://api.themoviedb.org/3/search/${type}?api_key=${this.cfg.tmdbKey}&language=es-ES&include_adult=false&query=${encodeURIComponent(item.title)}` + (item.year ? `&year=${item.year}` : '');
+                const url = `https://api.themoviedb.org/3/search/${type}?language=es-ES&include_adult=false&query=${encodeURIComponent(item.title)}` + (item.year ? `&year=${item.year}` : '') + this._tmdbAuthQuery();
                 const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 6000);
-                const r = await fetch(url, { signal: ctrl.signal }); clearTimeout(tm);
+                const r = await fetch(url, { signal: ctrl.signal, headers: this._tmdbHeaders() }); clearTimeout(tm);
                 const d = await r.json();
                 const hit = (d.results || [])[0];
                 if (hit) {
