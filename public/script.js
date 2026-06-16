@@ -74,6 +74,46 @@ const Store = {
     set volume(v) { try { localStorage.setItem('tvp_vol', String(v)); } catch {} },
 };
 
+/* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
+const CloudStore = {
+    db: null, uid: null,
+    init(userId) {
+        try {
+            if (!window.firebase || !window.firebase.firestore) return;
+            if (!firebase.apps.length) {
+                firebase.initializeApp({ apiKey: 'AIzaSyDummy', projectId: 'playertv-9449c' });
+            }
+            this.db = firebase.firestore();
+            this.uid = String(userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '');
+        } catch (e) { console.warn('Firebase init:', e.message); }
+    },
+    async syncFavs() {
+        if (!this.db || !this.uid) return;
+        try {
+            const doc = await this.db.collection('users').doc(this.uid).get();
+            if (doc.exists && doc.data().favs) { Store.favs = Object.assign({}, doc.data().favs, Store.favs); }
+            await this.db.collection('users').doc(this.uid).set({ favs: Store.favs }, { merge: true });
+        } catch (e) { console.warn('syncFavs:', e.message); }
+    },
+    async saveFavs() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ favs: Store.favs }, { merge: true }); } catch {} },
+    async syncProgress() {
+        if (!this.db || !this.uid) return;
+        try {
+            const doc = await this.db.collection('users').doc(this.uid).get();
+            if (doc.exists && doc.data().progress) {
+                const remote = doc.data().progress, local = Store.progress, merged = {};
+                new Set([...Object.keys(remote), ...Object.keys(local)]).forEach(k => {
+                    const r = remote[k], l = local[k];
+                    merged[k] = (!r ? l : !l ? r : ((r.updated || 0) > (l.updated || 0) ? r : l));
+                });
+                Store.progress = merged;
+            }
+            await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true });
+        } catch (e) { console.warn('syncProgress:', e.message); }
+    },
+    async saveProgress() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true }); } catch {} }
+};
+
 const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
 
 const el = {
@@ -292,7 +332,7 @@ const Detail = {
         this.primary = primary;
         ExternalPlayers.render(primary);
         el.detailPlay.onclick = () => Player.play(Detail.primary, item);
-        el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); };
+        el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); CloudStore.saveFavs(); };
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
@@ -557,7 +597,7 @@ const Player = {
         const v = el.playerVideo, c = this.current;
         if (!c || !v.duration) return;
         const now = Date.now();
-        if (now - this._lastSave > 5000) { this._lastSave = now; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); }
+        if (now - this._lastSave > 5000) { this._lastSave = now; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); CloudStore.saveProgress(); }
     },
     flushProgress() {
         const v = el.playerVideo, c = this.current;
@@ -862,6 +902,11 @@ async function boot() {
         state.isAdmin = !!me.isAdmin;
         state.userName = me.name || '';
         Admin.reflect();
+
+        // Firebase: sincronizar favoritos y progreso del usuario
+        CloudStore.init(me.name || 'user');
+        await CloudStore.syncFavs();
+        await CloudStore.syncProgress();
 
         el.loadingText.innerText = 'Cargando catálogo...';
         const catalog = await api('/api/catalog');
