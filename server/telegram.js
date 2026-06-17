@@ -330,20 +330,47 @@ class TelegramService {
             try {
                 const gmap = await this._tmdbGenres();
                 const type = isTv ? 'tv' : 'movie';
-                const url = `https://api.themoviedb.org/3/search/${type}?language=es-ES&include_adult=false&query=${encodeURIComponent(item.title)}` + (item.year ? `&year=${item.year}` : '') + this._tmdbAuthQuery();
-                const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 6000);
-                const r = await fetch(url, { signal: ctrl.signal, headers: this._tmdbHeaders() }); clearTimeout(tm);
-                const d = await r.json();
-                const hit = (d.results || [])[0];
+                // Limpiar título (quitar calidad/lenguaje/extensiones)
+                const cleanTitle = String(item.title)
+                    .replace(/\b(1080p|720p|480p|2160p|4k|hd|hdr|bluray|brrip|webrip|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|latino|castellano|espa[ñn]ol|spanish|english|sub|subs|temporada\s*\d+|t\d+|s\d+|cap[ií]tulo\s*\d+|cap\s*\d+|ep\.?\s*\d+|episodio\s*\d+)\b/ig, ' ')
+                    .replace(/[\[\(].*?[\]\)]/g, ' ')
+                    .replace(/[._-]+/g, ' ')
+                    .replace(/\s{2,}/g, ' ').trim();
+                // Intentos: con año + es, con año + en, sin año + es, sin año + en, título limpio + es
+                const attempts = [];
+                if (item.year) attempts.push({ q: item.title, lang: 'es-ES', year: item.year });
+                if (item.year) attempts.push({ q: item.title, lang: 'en-US', year: item.year });
+                attempts.push({ q: item.title, lang: 'es-ES' });
+                attempts.push({ q: item.title, lang: 'en-US' });
+                if (cleanTitle && cleanTitle !== item.title) {
+                    attempts.push({ q: cleanTitle, lang: 'es-ES' });
+                    attempts.push({ q: cleanTitle, lang: 'en-US' });
+                }
+                let hit = null;
+                for (const a of attempts) {
+                    const url = `https://api.themoviedb.org/3/search/${type}?language=${a.lang}&include_adult=false&query=${encodeURIComponent(a.q)}` + (a.year ? `&year=${a.year}` : '') + this._tmdbAuthQuery();
+                    try {
+                        const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 5000);
+                        const r = await fetch(url, { signal: ctrl.signal, headers: this._tmdbHeaders() }); clearTimeout(tm);
+                        const d = await r.json();
+                        if (d.results && d.results.length) { hit = d.results[0]; break; }
+                    } catch {}
+                }
                 if (hit) {
-                    const date = hit.release_date || hit.first_air_date || '';
+                    // Pedir detalles en español para sinopsis traducida y título oficial
+                    let det = hit;
+                    try {
+                        const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+                        const d2 = await r2.json(); if (d2 && d2.id) det = d2;
+                    } catch {}
+                    const date = det.release_date || det.first_air_date || hit.release_date || hit.first_air_date || '';
                     info = {
-                        overview: hit.overview || '',
+                        overview: det.overview || hit.overview || '',
                         year: (String(date).match(/^(\d{4})/) || [])[1] || '',
-                        rating: hit.vote_average ? String(Math.round(hit.vote_average * 10) / 10) : '',
-                        genres: (hit.genre_ids || []).map(id => gmap[id]).filter(Boolean).join(', '),
-                        poster: hit.poster_path ? ('https://image.tmdb.org/t/p/w500' + hit.poster_path) : '',
-                        backdrop: hit.backdrop_path ? ('https://image.tmdb.org/t/p/w780' + hit.backdrop_path) : ''
+                        rating: (det.vote_average || hit.vote_average) ? String(Math.round((det.vote_average || hit.vote_average) * 10) / 10) : '',
+                        genres: ((det.genres && det.genres.map(g => g.name)) || (hit.genre_ids || []).map(id => gmap[id])).filter(Boolean).join(', '),
+                        poster: (det.poster_path || hit.poster_path) ? ('https://image.tmdb.org/t/p/w500' + (det.poster_path || hit.poster_path)) : '',
+                        backdrop: (det.backdrop_path || hit.backdrop_path) ? ('https://image.tmdb.org/t/p/w780' + (det.backdrop_path || hit.backdrop_path)) : ''
                     };
                 }
             } catch {}

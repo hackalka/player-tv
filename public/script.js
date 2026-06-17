@@ -129,7 +129,16 @@ const CloudStore = {
             await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true });
         } catch {}
     },
-    async saveWatched() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} }
+    async saveWatched() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} },
+    // Carátulas personalizadas (admin) — compartidas para todos los usuarios
+    async syncCovers() {
+        if (!this.db) return;
+        try {
+            const doc = await this.db.collection('shared').doc('covers').get();
+            if (doc.exists && doc.data().covers) Store.covers = Object.assign({}, doc.data().covers, Store.covers);
+        } catch {}
+    },
+    async saveCovers() { if (!this.db) return; try { await this.db.collection('shared').doc('covers').set({ covers: Store.covers }, { merge: true }); } catch {} }
 };
 
 const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
@@ -372,7 +381,8 @@ const Detail = {
                 const url = prompt('Pega la URL de la carátula (deja vacío para quitar):', cur);
                 if (url === null) return;
                 Store.setCover(item.id, url.trim());
-                Detail.open(item); // recarga la ficha con la nueva
+                if (state.isAdmin) CloudStore.saveCovers();
+                Detail.open(item);
                 Netflix.render();   // refresca tarjetas
             };
         }
@@ -952,6 +962,7 @@ async function boot() {
         await CloudStore.syncFavs();
         await CloudStore.syncProgress();
         await CloudStore.syncWatched();
+        await CloudStore.syncCovers();
 
         el.loadingText.innerText = 'Cargando catálogo...';
         const catalog = await api('/api/catalog');
