@@ -27,10 +27,10 @@ function getToken(req) {
     return m ? decodeURIComponent(m[1]) : '';
 }
 function setTokenCookie(res, token) {
-    res.set('Set-Cookie', `tvp=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=31536000`);
+    res.append('Set-Cookie', `tvp=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=63072000; Secure`);
 }
 function clearTokenCookie(res) {
-    res.set('Set-Cookie', 'tvp=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
+    res.append('Set-Cookie', 'tvp=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0; Secure');
 }
 
 // ---- middlewares de auth ----
