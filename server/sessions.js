@@ -101,26 +101,22 @@ class SessionManager {
         console.log('[sessions] Restaurando sesion del token ' + token.slice(0, 8) + '...');
         const client = this.newClient(session);
         try {
-            await client.connect();
-            let authorized = false;
-            try { authorized = await client.checkAuthorization(); } catch (e) { console.warn('[sessions] checkAuthorization fallo (transitorio):', e.message); }
-            if (!authorized) {
-                // SOLO borrar si Telegram dice claramente que la sesion no es valida (AUTH_KEY_*).
-                // Si es error de red u otra cosa, conservar la sesion para reintentar.
-                const msg = String((arguments[0] && arguments[0].errorMessage) || '');
-                console.warn('[sessions] No autorizado al restaurar (' + token.slice(0,8) + '...). Conservo la sesion para reintentar.');
-                try { await client.disconnect(); } catch {}
-                return null;
-            }
+            // Conectamos pero NO verificamos cada F5 — confiamos en la sesión guardada.
+            // Si fuera realmente inválida, las llamadas downstream (catalog, stream...) lo revelarán.
+            await Promise.race([
+                client.connect(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('connect timeout')), 8000))
+            ]);
         } catch (e) {
-            console.warn('[sessions] Error al conectar (transitorio):', e.message, '— conservo la sesion');
+            console.warn('[sessions] Error al conectar (transitorio):', e.message, '— mantengo sesion en disco');
+            try { await client.disconnect(); } catch {}
             return null;
         }
         const service = new TelegramService(client, this.cfg);
         let isAdmin = false, name = '', inGroup = false;
-        try { await service.resolveGroup(); inGroup = true; } catch {}
+        try { await service.resolveGroup(); inGroup = true; } catch (e) { console.warn('[sessions] resolveGroup falló:', e.message); }
         try { isAdmin = await service.isGroupAdmin(); } catch {}
-        try { const me = await client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
+        try { const me = await client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch (e) { console.warn('[sessions] getMe falló:', e.message); }
         const u = { service, client, isAdmin, name, inGroup, lastUsed: Date.now() };
         this.users.set(token, u);
         return u;
