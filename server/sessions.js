@@ -24,8 +24,8 @@ class SessionManager {
         if (t.unref) t.unref();
     }
 
-    _load() { try { return JSON.parse(fs.readFileSync(this.storeFile, 'utf8')); } catch { return {}; } }
-    _save() { try { fs.writeFileSync(this.storeFile, JSON.stringify(this.persisted)); } catch (e) { console.warn('persist', e.message); } }
+    _load() { try { const d = JSON.parse(fs.readFileSync(this.storeFile, 'utf8')); console.log('[sessions] Cargadas ' + Object.keys(d).length + ' sesiones desde ' + this.storeFile); return d; } catch (e) { console.log('[sessions] Sin sesiones previas en ' + this.storeFile); return {}; } }
+    _save() { try { fs.writeFileSync(this.storeFile, JSON.stringify(this.persisted)); console.log('[sessions] Guardadas ' + Object.keys(this.persisted).length + ' sesiones en ' + this.storeFile); } catch (e) { console.warn('[sessions] ERROR al guardar:', e.message); } }
     persistedCount() { return Object.keys(this.persisted || {}).length; }
     canWrite() { try { const p = path.join(this.cfg.dataDir, '.wtest'); fs.writeFileSync(p, '1'); fs.unlinkSync(p); return true; } catch { return false; } }
 
@@ -97,7 +97,8 @@ class SessionManager {
         if (!token) return null;
         if (this.users.has(token)) { const u = this.users.get(token); u.lastUsed = Date.now(); return u; }
         const session = this.persisted[token];
-        if (!session) return null;
+        if (!session) { console.log('[sessions] Token recibido pero NO está en persisted (' + token.slice(0, 8) + '...). Total guardadas: ' + Object.keys(this.persisted).length); return null; }
+        console.log('[sessions] Restaurando sesion del token ' + token.slice(0, 8) + '...');
         const client = this.newClient(session);
         try {
             await client.connect();
