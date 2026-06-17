@@ -39,12 +39,23 @@ function clearTokenCookie(res) {
 
 // ---- middlewares de auth ----
 async function withUser(req, res, next) {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ needLogin: true });
+    // Si no tenemos persisted, NO hay sesión real -> login
+    if (!sessions.persisted || !sessions.persisted[token]) return res.status(401).json({ needLogin: true });
     try {
-        const u = await sessions.getByToken(getToken(req));
-        if (!u) return res.status(401).json({ needLogin: true });
+        const u = await sessions.getByToken(token);
+        if (!u) {
+            // La sesión está persistida pero no se pudo restaurar (timeout/red).
+            // Devolvemos 503 transitorio: el cliente reintenta sin enviar al login.
+            return res.status(503).json({ retry: true, error: 'Reconectando con Telegram, intenta de nuevo en unos segundos.' });
+        }
         if (!u.inGroup) return res.status(403).json({ needAccess: true, error: 'Tu cuenta no es miembro del grupo. Pide al administrador que te añada.' });
         req.user = u; next();
-    } catch (e) { res.status(401).json({ needLogin: true, error: e.message }); }
+    } catch (e) {
+        // Error transitorio -> 503 (no echar al usuario)
+        res.status(503).json({ retry: true, error: e.message });
+    }
 }
 function adminOnly(req, res, next) {
     if (!req.user || !req.user.isAdmin) return res.status(403).json({ error: 'Solo para administradores del grupo.' });
@@ -73,12 +84,18 @@ async function serveThumb(res, key, downloader) {
 /* ===================== PÚBLICO ===================== */
 app.get('/api/app', (req, res) => res.json({ appName: cfg.appName }));
 
-app.get('/api/me', async (req, res) => {
-    try {
-        const u = await sessions.getByToken(getToken(req));
-        if (!u) return res.json({ loggedIn: false });
-        res.json({ loggedIn: true, isAdmin: u.isAdmin, name: u.name, inGroup: !!u.inGroup });
-    } catch { res.json({ loggedIn: false }); }
+app.get('/api/me', (req, res) => {
+    const token = getToken(req);
+    if (!token) return res.json({ loggedIn: false });
+    // Comprobación ligera (sin contactar a Telegram). Si el token está persistido, confiamos.
+    if (sessions.users && sessions.users.has(token)) {
+        const u = sessions.users.get(token);
+        return res.json({ loggedIn: true, isAdmin: u.isAdmin, name: u.name, inGroup: !!u.inGroup });
+    }
+    if (sessions.persisted && sessions.persisted[token]) {
+        return res.json({ loggedIn: true, isAdmin: false, name: '', inGroup: true, _restoring: true });
+    }
+    res.json({ loggedIn: false });
 });
 
 /* ===================== LOGIN (por usuario) ===================== */

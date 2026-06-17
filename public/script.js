@@ -26,10 +26,15 @@ async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers);
     if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
     try { const t = localStorage.getItem('tvp_token'); if (t) headers['x-auth-token'] = t; } catch {}
-    const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
-    const data = await r.json().catch(() => ({}));
+    let r, data;
+    // Reintento si el servidor dice 503 (reconectando con Telegram). Hasta 3 intentos.
+    for (let attempt = 0; attempt < 3; attempt++) {
+        r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
+        data = await r.json().catch(() => ({}));
+        if (r.status !== 503 || !(data && data.retry)) break;
+        await new Promise(rsv => setTimeout(rsv, 800 + attempt * 600));
+    }
     if (r.status === 401 || (data && data.needLogin)) {
-        // Sesión expirada: limpiar y volver a login (sin alert feo)
         try { localStorage.removeItem('tvp_token'); } catch {}
         if (typeof Login !== 'undefined' && Login && Login.open && el && el.loginModal) {
             el.loadingScreen && el.loadingScreen.classList.add('hidden');
