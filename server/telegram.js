@@ -140,17 +140,22 @@ class TelegramService {
     async getTopicMessages(topicId, limit) {
         const entity = await this.resolveGroup();
         const target = limit || this.cfg.messagesPerTopic;
+        const opts = { limit: target };
+        if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
         const all = [];
-        let offsetId = 0;
-        while (all.length < target) {
-            const opts = { limit: Math.min(100, target - all.length), offsetId };
-            if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
-            const batch = await this.client.getMessages(entity, opts);
-            if (!batch || !batch.length) break;
-            all.push(...batch);
-            offsetId = batch[batch.length - 1].id;
-            if (batch.length < (opts.limit || 100)) break;
+        try {
+            // iterMessages maneja la paginación internamente y respeta replyTo correctamente
+            for await (const m of this.client.iterMessages(entity, opts)) {
+                all.push(m);
+                if (all.length >= target) break;
+            }
+        } catch (e) {
+            console.warn('[telegram] iterMessages falló, usando getMessages:', e.message);
+            // Fallback
+            const msgs = await this.client.getMessages(entity, opts);
+            if (msgs) all.push(...msgs);
         }
+        console.log(`[telegram] Tema ${topicId}: ${all.length} mensajes obtenidos`);
         this._cache(all);
         return all;
     }
@@ -299,6 +304,7 @@ class TelegramService {
             try {
                 const msgs = await this.getTopicMessages(topic.id, this.cfg.messagesPerTopic);
                 items = this._buildTopicItems(msgs, topic);
+                console.log(`[catalog] ${topic.name}: ${msgs.length} mensajes -> ${items.length} items`);
             } catch (e) { console.warn(`Tema ${topic.name} falló:`, e.message); }
             // Enriquecer con TMDB (solo películas y series)
             if ((this.cfg.tmdbKey || this.cfg.tmdbToken) && typeof fetch === 'function' && (topic.type === 'movie' || topic.type === 'series')) {
