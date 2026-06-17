@@ -25,10 +25,20 @@ function absUrl(p) { return p ? new URL(p, location.href).href : ''; }
 async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers);
     if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    // Fallback de auth: si guardamos un token en localStorage, lo enviamos como header
     try { const t = localStorage.getItem('tvp_token'); if (t) headers['x-auth-token'] = t; } catch {}
     const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
     const data = await r.json().catch(() => ({}));
+    if (r.status === 401 || (data && data.needLogin)) {
+        // Sesión expirada: limpiar y volver a login (sin alert feo)
+        try { localStorage.removeItem('tvp_token'); } catch {}
+        if (typeof Login !== 'undefined' && Login && Login.open && el && el.loginModal) {
+            el.loadingScreen && el.loadingScreen.classList.add('hidden');
+            Login.open();
+        } else {
+            location.reload();
+        }
+        throw new Error('Sesión expirada');
+    }
     if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
     return data;
 }
