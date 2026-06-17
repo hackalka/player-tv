@@ -1025,3 +1025,15 @@ a.source-btn { text-decoration: none; }
 body.cinema-mode .navbar { display: none; }
 body.cinema-mode .modal-details, body.cinema-mode .episodes, body.cinema-mode .player-options, body.cinema-mode .sources { opacity: .15; transition: opacity .3s; }
 body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.cinema-mode .player-options:hover, body.cinema-mode .sources:hover { opacity: 1; }
+
+
+/* Logo TMDB en la ficha (sustituye al texto del título cuando existe) */
+.detail-title { line-height: 1; }
+.detail-title .tmdb-logo { max-width: 380px; max-height: 110px; height: auto; width: auto; display: block; filter: drop-shadow(0 4px 12px rgba(0,0,0,.6)); }
+@media (max-width: 640px) {
+    .detail-title .tmdb-logo { max-width: 80vw; max-height: 80px; }
+}
+
+/* Datos financieros bajo los chips de género */
+.detail-financials { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0 12px; font-size: .88rem; color: var(--netflix-light-gray); }
+.detail-financials span { display: inline-flex; align-items: center; gap: 4px; }
