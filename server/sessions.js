@@ -102,8 +102,20 @@ class SessionManager {
         const client = this.newClient(session);
         try {
             await client.connect();
-            if (!await client.checkAuthorization()) { delete this.persisted[token]; this._save(); return null; }
-        } catch (e) { return null; }
+            let authorized = false;
+            try { authorized = await client.checkAuthorization(); } catch (e) { console.warn('[sessions] checkAuthorization fallo (transitorio):', e.message); }
+            if (!authorized) {
+                // SOLO borrar si Telegram dice claramente que la sesion no es valida (AUTH_KEY_*).
+                // Si es error de red u otra cosa, conservar la sesion para reintentar.
+                const msg = String((arguments[0] && arguments[0].errorMessage) || '');
+                console.warn('[sessions] No autorizado al restaurar (' + token.slice(0,8) + '...). Conservo la sesion para reintentar.');
+                try { await client.disconnect(); } catch {}
+                return null;
+            }
+        } catch (e) {
+            console.warn('[sessions] Error al conectar (transitorio):', e.message, '— conservo la sesion');
+            return null;
+        }
         const service = new TelegramService(client, this.cfg);
         let isAdmin = false, name = '', inGroup = false;
         try { await service.resolveGroup(); inGroup = true; } catch {}

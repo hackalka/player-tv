@@ -8,6 +8,7 @@ const cfg = require('./config');
 const { SessionManager } = require('./sessions');
 
 const app = express();
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(express.json());
 app.use((req, res, next) => {
@@ -24,13 +25,16 @@ const ALIGN = 4096;
 function getToken(req) {
     const c = req.headers.cookie || '';
     const m = c.match(/(?:^|;\s*)tvp=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
+    if (m) return decodeURIComponent(m[1]);
+    // Fallback: header (para clientes que pierden la cookie, p. ej. PWAs/incógnito)
+    return req.headers['x-auth-token'] || '';
 }
 function setTokenCookie(res, token) {
-    res.append('Set-Cookie', `tvp=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=63072000; Secure`);
+    // Sin "Secure" obligatorio para que funcione tras proxies/incógnito; con "Lax" es suficiente
+    res.append('Set-Cookie', `tvp=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=63072000`);
 }
 function clearTokenCookie(res) {
-    res.append('Set-Cookie', 'tvp=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0; Secure');
+    res.append('Set-Cookie', 'tvp=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
 }
 
 // ---- middlewares de auth ----
@@ -95,14 +99,14 @@ app.post('/api/login/sign-in', async (req, res) => {
         const r = await sessions.signIn(req.body.loginId, req.body.code);
         if (r.needPassword) return res.json({ needPassword: true });
         setTokenCookie(res, r.token);
-        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name });
+        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name, token: r.token });
     } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
 });
 app.post('/api/login/password', async (req, res) => {
     try {
         const r = await sessions.signInPassword(req.body.loginId, String(req.body.password || ''));
         setTokenCookie(res, r.token);
-        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name });
+        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name, token: r.token });
     } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
 });
 app.post('/api/logout', async (req, res) => {

@@ -25,6 +25,8 @@ function absUrl(p) { return p ? new URL(p, location.href).href : ''; }
 async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers);
     if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    // Fallback de auth: si guardamos un token en localStorage, lo enviamos como header
+    try { const t = localStorage.getItem('tvp_token'); if (t) headers['x-auth-token'] = t; } catch {}
     const r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || ('Error ' + r.status));
@@ -770,14 +772,14 @@ const Login = {
         try {
             const r = await api('/api/login/sign-in', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, code }) });
             if (r.needPassword) { this.msg('Tu cuenta tiene verificación en dos pasos.'); this.step('password'); $('#login-password').focus(); }
-            else location.reload();
+            else { if (r.token) try { localStorage.setItem('tvp_token', r.token); } catch {} ; location.reload(); }
         } catch (e) { this.msg(e.message); }
     },
     async verifyPassword() {
         const password = $('#login-password').value;
         if (!password) return this.msg('Escribe tu contraseña 2FA.');
         this.msg('Comprobando...');
-        try { await api('/api/login/password', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, password }) }); location.reload(); }
+        try { const r = await api('/api/login/password', { method: 'POST', body: JSON.stringify({ loginId: this.loginId, password }) }); if (r.token) try { localStorage.setItem('tvp_token', r.token); } catch {} ; location.reload(); }
         catch (e) { this.msg(e.message); }
     }
 };
@@ -787,6 +789,7 @@ const Admin = {
     async logout() {
         if (!confirm('¿Cerrar tu sesión de Telegram en esta web?')) return;
         try { await api('/api/logout', { method: 'POST', body: '{}' }); } catch {}
+        try { localStorage.removeItem('tvp_token'); } catch {}
         location.reload();
     },
     async refresh() {
