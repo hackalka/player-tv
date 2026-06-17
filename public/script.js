@@ -254,9 +254,21 @@ const Netflix = {
                 <button class="slider-arrow next" aria-label="Derecha"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg></button>
             </div>`;
         const track = $('.slider-track', row);
-        items.forEach(it => track.appendChild(this.card(it, kind)));
+        // Carga progresiva: render inicial + más al hacer scroll
+        const STEP = 12;
+        let rendered = 0;
+        const renderMore = () => {
+            const end = Math.min(rendered + STEP, items.length);
+            for (let i = rendered; i < end; i++) track.appendChild(this.card(items[i], kind));
+            rendered = end;
+        };
+        renderMore();
+        track.addEventListener('scroll', () => {
+            if (rendered >= items.length) return;
+            if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 600) renderMore();
+        });
         $('.prev', row).onclick = () => track.scrollBy({ left: -800, behavior: 'smooth' });
-        $('.next', row).onclick = () => track.scrollBy({ left: 800, behavior: 'smooth' });
+        $('.next', row).onclick = () => { if (rendered < items.length) renderMore(); track.scrollBy({ left: 800, behavior: 'smooth' }); };
         return row;
     },
 
@@ -1034,11 +1046,37 @@ async function boot() {
         await CloudStore.syncCovers();
 
         el.loadingText.innerText = 'Cargando catálogo...';
+        // 1) Mostrar caché del navegador inmediatamente (si existe y es de hoy)
+        let usedCache = false;
+        try {
+            const cached = JSON.parse(sessionStorage.getItem('tvp_catalog') || 'null');
+            if (cached && cached.ts && (Date.now() - cached.ts) < 30 * 60 * 1000) {
+                state.catalog = cached.data;
+                state.allItems = []; state.itemsById = {};
+                state.catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
+                App.populateFilters(); Netflix.render(); App.switchView('netflix');
+                usedCache = true;
+            }
+        } catch {}
+        // 2) Si había caché, refrescar en segundo plano; si no, cargar ahora
+        if (usedCache) {
+            (async () => {
+                try {
+                    const fresh = await api('/api/catalog');
+                    state.catalog = fresh; state.allItems = []; state.itemsById = {};
+                    fresh.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
+                    try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: fresh })); } catch {}
+                    App.populateFilters(); Netflix.render();
+                } catch {}
+            })();
+            return; // ya cargado desde caché
+        }
         const catalog = await api('/api/catalog');
         state.catalog = catalog;
         catalog.categories.forEach(c => c.items.forEach(it => {
             it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it;
         }));
+        try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
         App.populateFilters();
         Netflix.render();
         App.switchView('netflix');
