@@ -403,18 +403,12 @@ const Detail = {
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
 
-        // Trailer YouTube (autoplay muted) — Netflix style
+        // Trailer YouTube (autoplay muted) — Netflix style con detección de errores
         Detail._stopTrailer();
         if (item.trailerKey && el.trailerIframe) {
-            // Espera 1.5s para que se vea el backdrop primero, luego el trailer
             Detail._trailerTimer = setTimeout(() => {
                 if (el.playerModal.hidden) return;
-                // youtube-nocookie permite el embedding en más videos que youtube.com
-                const origin = encodeURIComponent(location.origin);
-                el.trailerIframe.src = `https://www.youtube-nocookie.com/embed/${item.trailerKey}?autoplay=1&mute=1&controls=0&showinfo=0&modestbranding=1&rel=0&loop=1&playlist=${item.trailerKey}&playsinline=1&iv_load_policy=3&disablekb=1&origin=${origin}`;
-                el.trailerIframe.hidden = false;
-                el.trailerMute.hidden = false;
-                el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1';
+                Detail._loadTrailer(item.trailerKey);
             }, 1500);
         }
 
@@ -623,16 +617,59 @@ const Detail = {
     },
     _stopTrailer() {
         if (Detail._trailerTimer) { clearTimeout(Detail._trailerTimer); Detail._trailerTimer = null; }
-        if (el.trailerIframe) { el.trailerIframe.hidden = true; el.trailerIframe.src = ''; }
+        if (Detail._ytPlayer) { try { Detail._ytPlayer.destroy(); } catch {} Detail._ytPlayer = null; }
+        if (el.trailerIframe) { el.trailerIframe.hidden = true; el.trailerIframe.src = 'about:blank'; }
         if (el.trailerMute) el.trailerMute.hidden = true;
     },
+    _loadTrailer(key) {
+        // Asegurarse de que la API de YouTube está cargada
+        const tryCreate = () => {
+            if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
+            try {
+                el.trailerIframe.hidden = false;
+                Detail._ytPlayer = new YT.Player('trailer-iframe', {
+                    videoId: key,
+                    host: 'https://www.youtube-nocookie.com',
+                    playerVars: {
+                        autoplay: 1, mute: 1, controls: 0, showinfo: 0, modestbranding: 1,
+                        rel: 0, loop: 1, playlist: key, playsinline: 1, iv_load_policy: 3, disablekb: 1, fs: 0
+                    },
+                    events: {
+                        onReady: (e) => {
+                            try { e.target.mute(); e.target.playVideo(); } catch {}
+                            el.trailerMute.hidden = false;
+                            el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1';
+                        },
+                        onError: (e) => {
+                            // 101 / 150 / 153 = embed deshabilitado o configuración no válida
+                            // Otros: 2 (param invalido), 5 (HTML5), 100 (no encontrado)
+                            console.warn('YT error:', e.data, '— ocultando trailer');
+                            Detail._stopTrailer();
+                        },
+                        onStateChange: (e) => {
+                            // 0 = ended -> reiniciar el loop manual (algunos vídeos ignoran loop=1)
+                            if (e.data === 0 && Detail._ytPlayer) { try { Detail._ytPlayer.seekTo(0); Detail._ytPlayer.playVideo(); } catch {} }
+                        }
+                    }
+                });
+            } catch (err) { console.warn('YT init', err.message); Detail._stopTrailer(); }
+        };
+        // Cargar YouTube IFrame API si aún no está
+        if (!window.YT || !window.YT.Player) {
+            if (!document.getElementById('yt-iframe-api')) {
+                const s = document.createElement('script');
+                s.id = 'yt-iframe-api'; s.src = 'https://www.youtube.com/iframe_api';
+                document.head.appendChild(s);
+            }
+        }
+        tryCreate();
+    },
     toggleTrailerSound() {
-        if (!el.trailerIframe || el.trailerIframe.hidden) return;
-        const muted = el.trailerMute.dataset.muted === '1';
-        const src = el.trailerIframe.src;
-        el.trailerIframe.src = src.replace(/[?&]mute=[01]/, '?mute=' + (muted ? '0' : '1'));
-        el.trailerMute.innerText = muted ? '🔊' : '🔇';
-        el.trailerMute.dataset.muted = muted ? '0' : '1';
+        if (!Detail._ytPlayer) return;
+        try {
+            if (Detail._ytPlayer.isMuted()) { Detail._ytPlayer.unMute(); el.trailerMute.innerText = '🔊'; el.trailerMute.dataset.muted = '0'; }
+            else { Detail._ytPlayer.mute(); el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1'; }
+        } catch {}
     },
 
     close() {
