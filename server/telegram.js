@@ -410,21 +410,43 @@ class TelegramService {
         }
 
         const groups = new Map();
-        const shows = [];
         for (const it of raw) {
             const epLinks = (it.links || []).filter(l =>
                 /\b\d{1,2}\s*x\s*\d{1,3}\b/i.test(l.label) || /cap[ií]tulo|episodio|\bep\b/i.test(l.label));
             const isSelfSeries = (it.links && it.links.length) && (it.links.length > 1 || epLinks.length > 0);
-            if (isSelfSeries) { shows.push(this._showFromPost(it, topic)); continue; }
+
+            // Calcular nombre BASE (sin "T-1", "(2023)", etc.) y temporada por defecto del post
             const ep = this._parseEpisode(it.title);
             const baseRaw = (ep && ep.base) ? ep.base : it.title;
             const base = this._normalizeShowName(baseRaw);
             const key = this._slug(base);
+            const postSeason = ep ? ep.season : 1;
             if (!groups.has(key)) groups.set(key, { base, eps: [] });
             const g = groups.get(key);
-            g.eps.push({ it, ep: ep || { season: 1, ep: g.eps.length + 1, guessed: true } });
+
+            if (isSelfSeries) {
+                // Cada link del post es un episodio; usamos la temporada del propio link si la trae,
+                // o la del título del post (T-1 -> season 1).
+                it.links.forEach((l, i) => {
+                    const lEp = this._parseEpisode(l.label);
+                    const season = (lEp && lEp.season) || postSeason || 1;
+                    const epNum = (lEp && lEp.ep) || (i + 1);
+                    const pl = this._linkPlayable(l);
+                    const pseudo = Object.assign({
+                        id: it.id + '-l' + i,
+                        title: this._epLabel({ season, ep: epNum }),
+                        thumbUrl: pl.thumbUrl || it.thumbUrl,
+                        description: it.description, year: it.year, meta: it.meta, date: it.date,
+                        hasThumb: !!it.hasThumb, uid: it.uid + ':' + i, _showSeason: season, _showEp: epNum
+                    }, pl);
+                    g.eps.push({ it: pseudo, ep: { season, ep: epNum } });
+                });
+            } else {
+                g.eps.push({ it, ep: ep || { season: 1, ep: g.eps.length + 1, guessed: true } });
+            }
         }
 
+        const shows = [];
         for (const [key, g] of groups) {
             const sorted = g.eps.sort((a, b) => (a.ep.season - b.ep.season) || (a.ep.ep - b.ep.ep));
             const seenEp = new Set();

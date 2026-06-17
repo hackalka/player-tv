@@ -969,13 +969,13 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .detail-poster {
     width: 150px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px;
     flex-shrink: 0; background: #000; box-shadow: 0 8px 24px rgba(0,0,0,.5);
-    margin-top: -64px; /* sube la carátula para solaparse con el hero, estilo Netflix */
-    border: 2px solid rgba(255,255,255,.08); position: relative; z-index: 3;
+    margin-top: 0; /* no solapar con botones de arriba */
+    border: 2px solid rgba(255,255,255,.08); position: relative; z-index: 1;
 }
 .detail-info { flex: 1; min-width: 0; }
 @media (max-width: 640px) {
-    .detail-body { gap: 14px; }
-    .detail-poster { width: 96px; margin-top: -48px; }
+    .detail-body { gap: 14px; flex-direction: column; }
+    .detail-poster { width: 130px; margin-top: 0; }
 }
 
 
