@@ -76,6 +76,11 @@ const Store = {
     set watched(v) { this._set('tvp_watched', v); },
     isWatched(id) { return !!this.watched[id]; },
     toggleWatched(id) { const w = this.watched; if (w[id]) delete w[id]; else w[id] = Date.now(); this.watched = w; return !!w[id]; },
+    // Carátulas personalizadas (override por admin cuando TMDB no acierta)
+    get covers() { return this._get('tvp_covers', {}); },
+    set covers(v) { this._set('tvp_covers', v); },
+    setCover(id, url) { const c = this.covers; if (url) c[id] = url; else delete c[id]; this.covers = c; },
+    getCover(id) { return this.covers[id] || ''; },
 };
 
 /* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
@@ -162,6 +167,7 @@ const el = {
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
+    coverBtn: $('#cover-btn'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
@@ -263,7 +269,7 @@ const Netflix = {
         const card = document.createElement('div');
         card.className = 'card focusable' + (Store.isWatched(item.id) ? ' watched' : '');
         card.tabIndex = 0;
-        const img = item.thumbUrl || placeholderImage(item.id, item.title || item.epTitle);
+        const img = Store.getCover(item.id) || item.thumbUrl || placeholderImage(item.id, item.title || item.epTitle);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
             ${kind === 'top' && item._rank ? `<div class="card-rank">${item._rank}</div>` : ''}
@@ -296,7 +302,7 @@ const Netflix = {
 
     updateHero(item) {
         if (!item) return;
-        el.heroImage.src = item.thumbUrl || placeholderImage(item.id, item.title);
+        el.heroImage.src = Store.getCover(item.id) || item.thumbUrl || placeholderImage(item.id, item.title);
         el.heroImage.onerror = () => { el.heroImage.src = placeholderImage(item.id, item.title); };
         el.heroTitle.innerText = item.title;
         el.heroDescription.innerText = item.description || '';
@@ -325,8 +331,9 @@ const Detail = {
             const gs = (item.meta && item.meta.genres) ? item.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
             el.detailGenres.innerHTML = gs.map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('');
         }
-        const backdrop = item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
-        const poster = item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const cover = Store.getCover(item.id);
+        const backdrop = cover || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const poster = cover || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
@@ -357,6 +364,17 @@ const Detail = {
         if (el.watchedBtn) {
             this.updateWatched();
             el.watchedBtn.onclick = () => { Store.toggleWatched(item.id); this.updateWatched(); CloudStore.saveWatched && CloudStore.saveWatched(); Netflix.render(); };
+        }
+        if (el.coverBtn) {
+            el.coverBtn.hidden = !state.isAdmin;
+            el.coverBtn.onclick = async () => {
+                const cur = Store.getCover(item.id) || '';
+                const url = prompt('Pega la URL de la carátula (deja vacío para quitar):', cur);
+                if (url === null) return;
+                Store.setCover(item.id, url.trim());
+                Detail.open(item); // recarga la ficha con la nueva
+                Netflix.render();   // refresca tarjetas
+            };
         }
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
@@ -540,10 +558,8 @@ const ExternalPlayers = {
         }
         if (stream) {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(stream)}">Abrir en VLC</a>`);
-            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(stream)}">Copiar enlace</button>`);
         } else if (playable.externalUrl) {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
-            items.push(`<button class="opt-btn focusable" tabindex="0" data-copy="${escapeHtml(playable.externalUrl)}">Copiar enlace</button>`);
         }
 
         const notBrowser = playable.streamUrl && playable.playableInBrowser === false;
@@ -554,9 +570,6 @@ const ExternalPlayers = {
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
         box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
-        $$('button[data-copy]', box).forEach(b => b.onclick = () => {
-            navigator.clipboard.writeText(b.dataset.copy).then(() => { b.innerText = '¡Copiado!'; setTimeout(() => b.innerText = 'Copiar enlace', 1500); }).catch(() => {});
-        });
     }
 };
 
