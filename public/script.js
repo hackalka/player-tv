@@ -384,7 +384,9 @@ const Detail = {
             // Espera 1.5s para que se vea el backdrop primero, luego el trailer
             Detail._trailerTimer = setTimeout(() => {
                 if (el.playerModal.hidden) return;
-                el.trailerIframe.src = `https://www.youtube.com/embed/${item.trailerKey}?autoplay=1&mute=1&controls=0&showinfo=0&modestbranding=1&rel=0&loop=1&playlist=${item.trailerKey}&playsinline=1&iv_load_policy=3`;
+                // youtube-nocookie permite el embedding en más videos que youtube.com
+                const origin = encodeURIComponent(location.origin);
+                el.trailerIframe.src = `https://www.youtube-nocookie.com/embed/${item.trailerKey}?autoplay=1&mute=1&controls=0&showinfo=0&modestbranding=1&rel=0&loop=1&playlist=${item.trailerKey}&playsinline=1&iv_load_policy=3&disablekb=1&origin=${origin}`;
                 el.trailerIframe.hidden = false;
                 el.trailerMute.hidden = false;
                 el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1';
