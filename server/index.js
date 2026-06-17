@@ -236,12 +236,17 @@ app.get('/api/stream-link/:channel/:msgId', withUser, async (req, res) => {
 
 /* ===================== FRONTEND ===================== */
 app.get('/api/health', (req, res) => {
+    const writable = sessions.canWrite();
+    const dir = cfg.dataDir;
+    const isPersistent = !/(^\/tmp\/|tmp[\\/]tvp-data)/i.test(dir) && writable;
     res.json({
         ok: true,
         app: cfg.appName,
-        dataDir: cfg.dataDir,
-        writable: sessions.canWrite(),
-        sessions: sessions.persistedCount()
+        dataDir: dir,
+        writable,
+        persistent: isPersistent,
+        sessions: sessions.persistedCount(),
+        hint: isPersistent ? 'OK - las sesiones persisten entre redeploys' : 'DATA_DIR apunta a /tmp (temporal). Crea un Volume en Railway y pon DATA_DIR=/data'
     });
 });
 
