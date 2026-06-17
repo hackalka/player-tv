@@ -130,6 +130,42 @@ app.get('/api/catalog', withUser, async (req, res) => {
     } catch (e) { console.error('catalog', e); res.status(500).json({ error: e.message }); }
 });
 
+// TMDB: recomendaciones por id (para "Porque viste...")
+app.get('/api/tmdb/recommendations/:type/:id', withUser, async (req, res) => {
+    try {
+        const t = req.params.type === 'tv' ? 'tv' : 'movie';
+        const url = `https://api.themoviedb.org/3/${t}/${req.params.id}/recommendations?language=es-ES` + (cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')));
+        const headers = cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
+        const r = await fetch(url, { headers });
+        const d = await r.json();
+        res.json({ results: (d.results || []).slice(0, 12).map(x => ({
+            id: x.id, type: t, title: x.title || x.name,
+            year: ((x.release_date || x.first_air_date || '').match(/^(\d{4})/) || [])[1] || '',
+            poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
+            rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
+        })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// TMDB: próximos estrenos (cine en próximos meses)
+app.get('/api/tmdb/upcoming', withUser, async (req, res) => {
+    try {
+        const url = `https://api.themoviedb.org/3/movie/upcoming?language=es-ES&region=ES&page=1` + (cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')));
+        const headers = cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
+        const r = await fetch(url, { headers });
+        const d = await r.json();
+        res.json({ results: (d.results || []).slice(0, 14).map(x => ({
+            id: 'up-' + x.id, type: 'movie', title: x.title,
+            year: ((x.release_date || '').match(/^(\d{4})/) || [])[1] || '',
+            date: x.release_date || '',
+            poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
+            backdrop: x.backdrop_path ? 'https://image.tmdb.org/t/p/w780' + x.backdrop_path : '',
+            description: x.overview || '',
+            rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
+        })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 /* ===================== CHAT (solo admin del grupo) ===================== */
 app.get('/api/topics', withUser, adminOnly, async (req, res) => {
     try {

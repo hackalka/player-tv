@@ -175,6 +175,8 @@ const el = {
     detailPoster: $('#detail-poster'),
     detailGenres: $('#detail-genres'),
     modalRating: $('#modal-rating'),
+    trailerIframe: $('#trailer-iframe'),
+    trailerMute: $('#trailer-mute'),
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
@@ -223,6 +225,20 @@ const Netflix = {
             .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 10);
         top.forEach((it, i) => it._rank = i + 1);
         if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top 10', top, 'top'));
+
+        // Próximamente (TMDB upcoming) — se carga async sin bloquear el render
+        if (state._upcoming && state._upcoming.length) {
+            el.rowsContainer.appendChild(this.row('🎬 Próximamente', state._upcoming, 'upcoming'));
+        } else {
+            api('/api/tmdb/upcoming').then(d => {
+                state._upcoming = (d.results || []).map(x => ({
+                    id: x.id, title: x.title, year: x.year, description: x.description,
+                    thumbUrl: x.poster, backdropUrl: x.backdrop, meta: { rating: x.rating ? String(x.rating) : '' },
+                    isUpcoming: true, _upcomingDate: x.date
+                }));
+                if (state._upcoming.length) Netflix.render();
+            }).catch(() => {});
+        }
 
         if (!cats.length && !cont.length && !favs.length) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
@@ -314,9 +330,10 @@ const Netflix = {
             </div>`;
         const onActivate = () => {
             if (kind === 'continue') Detail.resume(item);
+            else if (item.isUpcoming) alert('🎬 Próximo estreno' + (item._upcomingDate ? ': ' + item._upcomingDate : ''));
             else Detail.open(item);
         };
-        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : Detail.open(item, { autoplay: true }); };
+        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : (item.isUpcoming ? onActivate() : Detail.open(item, { autoplay: true })); };
         const rm = $('.card-remove', card);
         if (rm) rm.onclick = (e) => { e.stopPropagation(); Store.clearProgress(item.id); Netflix.render(); };
         card.onclick = onActivate;
@@ -360,6 +377,19 @@ const Detail = {
         el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
+
+        // Trailer YouTube (autoplay muted) — Netflix style
+        Detail._stopTrailer();
+        if (item.trailerKey && el.trailerIframe) {
+            // Espera 1.5s para que se vea el backdrop primero, luego el trailer
+            Detail._trailerTimer = setTimeout(() => {
+                if (el.playerModal.hidden) return;
+                el.trailerIframe.src = `https://www.youtube.com/embed/${item.trailerKey}?autoplay=1&mute=1&controls=0&showinfo=0&modestbranding=1&rel=0&loop=1&playlist=${item.trailerKey}&playsinline=1&iv_load_policy=3`;
+                el.trailerIframe.hidden = false;
+                el.trailerMute.hidden = false;
+                el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1';
+            }, 1500);
+        }
 
         this.resetVideo();
         this.resetSources();
@@ -554,9 +584,23 @@ const Detail = {
         el.detailHero.classList.remove('playing');
         el.playerStatus.hidden = true;
     },
+    _stopTrailer() {
+        if (Detail._trailerTimer) { clearTimeout(Detail._trailerTimer); Detail._trailerTimer = null; }
+        if (el.trailerIframe) { el.trailerIframe.hidden = true; el.trailerIframe.src = ''; }
+        if (el.trailerMute) el.trailerMute.hidden = true;
+    },
+    toggleTrailerSound() {
+        if (!el.trailerIframe || el.trailerIframe.hidden) return;
+        const muted = el.trailerMute.dataset.muted === '1';
+        const src = el.trailerIframe.src;
+        el.trailerIframe.src = src.replace(/[?&]mute=[01]/, '?mute=' + (muted ? '0' : '1'));
+        el.trailerMute.innerText = muted ? '🔊' : '🔇';
+        el.trailerMute.dataset.muted = muted ? '0' : '1';
+    },
 
     close() {
         Player.flushProgress();
+        Detail._stopTrailer();
         el.playerModal.hidden = true;
         el.body.style.overflow = '';
         this.resetVideo();
@@ -623,6 +667,7 @@ const Player = {
     current: null,
     play(playable, parent) {
         if (!playable) return;
+        Detail._stopTrailer();
         this.flushProgress();
         this.current = { playable, parent };
         if (parent && parent.episodes && parent.episodes.length > 1) Store.setLastEp(parent.id, playable.id);
@@ -1120,6 +1165,22 @@ function wireUi() {
         if (e.key !== 'Escape') return;
         if (!el.searchOverlay.hidden) App.closeSearch();
         else if (!el.playerModal.hidden) Detail.close();
+    });
+    if (el.trailerMute) el.trailerMute.onclick = () => Detail.toggleTrailerSound();
+
+    // Atajos de teclado del reproductor
+    document.addEventListener('keydown', (e) => {
+        if (el.playerModal.hidden) return;
+        const v = el.playerVideo;
+        if (v.hidden) return;
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        const k = e.key.toLowerCase();
+        if (k === ' ' || k === 'k') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); v.currentTime = Math.min((v.currentTime || 0) + 10, v.duration || Infinity); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); v.currentTime = Math.max((v.currentTime || 0) - 10, 0); }
+        else if (k === 'f') { e.preventDefault(); if (document.fullscreenElement) document.exitFullscreen(); else v.requestFullscreen && v.requestFullscreen(); }
+        else if (k === 'm') { e.preventDefault(); v.muted = !v.muted; }
+        else if (k === 'c') { e.preventDefault(); el.body.classList.toggle('cinema-mode'); }
     });
     window.addEventListener('scroll', () => { el.navbar.classList.toggle('scrolled', window.scrollY > 50); });
     // ocultar Chat hasta que haya admin

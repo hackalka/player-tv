@@ -372,20 +372,41 @@ class TelegramService {
                     } catch {}
                 }
                 if (hit) {
-                    // Pedir detalles en español para sinopsis traducida y título oficial
-                    let det = hit;
+                    // Pedir detalles en español + videos (trailers de YouTube)
+                    let det = hit; let trailerKey = '';
                     try {
-                        const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+                        const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES&append_to_response=videos${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
                         const d2 = await r2.json(); if (d2 && d2.id) det = d2;
+                        // Buscar trailer YouTube (es-ES o, si no, en-US)
+                        const pickTrailer = (videos) => {
+                            if (!videos || !videos.results) return '';
+                            const r = videos.results;
+                            const t = r.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
+                                     r.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
+                                     r.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
+                                     r.find(v => v.site === 'YouTube');
+                            return t ? t.key : '';
+                        };
+                        trailerKey = pickTrailer(det.videos);
+                        if (!trailerKey) {
+                            try {
+                                const r3 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}/videos?language=en-US${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+                                const d3 = await r3.json();
+                                trailerKey = pickTrailer(d3);
+                            } catch {}
+                        }
                     } catch {}
                     const date = det.release_date || det.first_air_date || hit.release_date || hit.first_air_date || '';
                     info = {
+                        tmdbId: det.id || hit.id,
+                        type,
                         overview: det.overview || hit.overview || '',
                         year: (String(date).match(/^(\d{4})/) || [])[1] || '',
                         rating: (det.vote_average || hit.vote_average) ? String(Math.round((det.vote_average || hit.vote_average) * 10) / 10) : '',
                         genres: ((det.genres && det.genres.map(g => g.name)) || (hit.genre_ids || []).map(id => gmap[id])).filter(Boolean).join(', '),
                         poster: (det.poster_path || hit.poster_path) ? ('https://image.tmdb.org/t/p/w500' + (det.poster_path || hit.poster_path)) : '',
-                        backdrop: (det.backdrop_path || hit.backdrop_path) ? ('https://image.tmdb.org/t/p/w780' + (det.backdrop_path || hit.backdrop_path)) : ''
+                        backdrop: (det.backdrop_path || hit.backdrop_path) ? ('https://image.tmdb.org/t/p/w1280' + (det.backdrop_path || hit.backdrop_path)) : '',
+                        trailerKey
                     };
                 }
             } catch {}
@@ -399,6 +420,8 @@ class TelegramService {
         if (info.genres) item.meta.genres = info.genres;
         if (info.poster) { item.thumbUrl = info.poster; item.tmdbPoster = info.poster; }
         if (info.backdrop) item.backdropUrl = info.backdrop;
+        if (info.trailerKey) item.trailerKey = info.trailerKey;
+        if (info.tmdbId) { item.tmdbId = info.tmdbId; item.tmdbType = info.type; }
     }
 
     _buildTopicItems(msgs, topic) {

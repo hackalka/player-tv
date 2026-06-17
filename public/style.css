@@ -1009,3 +1009,19 @@ a.source-btn { text-decoration: none; }
 .card-watched { position: absolute; top: 8px; right: 8px; z-index: 3; background: var(--netflix-red); color: #fff; font-size: .62rem; font-weight: 800; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
 /* Botón "Marcar como visto" activo */
 .btn-fav.active { background: var(--netflix-red); color: #fff; }
+
+
+/* ===== Trailer YouTube en la ficha ===== */
+.trailer-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; z-index: 0; }
+.detail-hero .trailer-iframe + .detail-backdrop, .detail-hero .trailer-iframe ~ #detail-backdrop { opacity: 0; }
+.trailer-mute {
+    position: absolute; top: 16px; right: 64px; z-index: 5;
+    background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.25);
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.05rem;
+}
+.trailer-mute:hover { background: rgba(0,0,0,.8); }
+
+/* ===== Modo cine (tecla C) ===== */
+body.cinema-mode .navbar { display: none; }
+body.cinema-mode .modal-details, body.cinema-mode .episodes, body.cinema-mode .player-options, body.cinema-mode .sources { opacity: .15; transition: opacity .3s; }
+body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.cinema-mode .player-options:hover, body.cinema-mode .sources:hover { opacity: 1; }
