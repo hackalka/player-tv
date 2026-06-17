@@ -23,7 +23,7 @@ module.exports = {
     port: parseInt(process.env.PORT || '3000', 10),
 
     // Mensajes a traer por tema
-    messagesPerTopic: parseInt(process.env.MESSAGES_PER_TOPIC || '80', 10),
+    messagesPerTopic: parseInt(process.env.MESSAGES_PER_TOPIC || '300', 10),
 
     // Etiqueta(s) que debe tener el título de un tema para mostrarse (separadas por coma)
     autoTags: (process.env.AUTO_TAG || 'playertv:auto,tvplayer:auto')

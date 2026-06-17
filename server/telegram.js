@@ -139,11 +139,20 @@ class TelegramService {
 
     async getTopicMessages(topicId, limit) {
         const entity = await this.resolveGroup();
-        const opts = { limit: limit || this.cfg.messagesPerTopic };
-        if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
-        const msgs = await this.client.getMessages(entity, opts);
-        this._cache(msgs);
-        return msgs;
+        const target = limit || this.cfg.messagesPerTopic;
+        const all = [];
+        let offsetId = 0;
+        while (all.length < target) {
+            const opts = { limit: Math.min(100, target - all.length), offsetId };
+            if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
+            const batch = await this.client.getMessages(entity, opts);
+            if (!batch || !batch.length) break;
+            all.push(...batch);
+            offsetId = batch[batch.length - 1].id;
+            if (batch.length < (opts.limit || 100)) break;
+        }
+        this._cache(all);
+        return all;
     }
 
     buildItem(message, topic) {
@@ -388,7 +397,18 @@ class TelegramService {
 
     _buildTopicItems(msgs, topic) {
         const raw = msgs
-            .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)) || (m.message && /acestream/i.test(m.message)))
+            // Mantenemos cualquier mensaje que tenga: media, una URL, acestream, o texto con TÍTULO real (>= 4 chars no espacios)
+            .filter(m => {
+                if (m.media && m.media.document) return true;
+                if (m.media) return true; // foto = posible carátula
+                const t = m.message || '';
+                if (/https?:\/\//.test(t)) return true;
+                if (/acestream/i.test(t)) return true;
+                // Posts solo de texto que parezcan ficha (línea con título): se quedan
+                const firstLine = (t.split('\n')[0] || '').trim();
+                if (firstLine.length >= 4 && firstLine.length <= 120) return true;
+                return false;
+            })
             .map(m => this.buildItem(m, topic));
 
         // Si el tema NO es serie pero los items parecen serie (Temporada N / T-1 / 1x01 / Capítulo), tratarlos como series
