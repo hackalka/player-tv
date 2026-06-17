@@ -174,6 +174,7 @@ const el = {
     detailBackdrop: $('#detail-backdrop'),
     detailPoster: $('#detail-poster'),
     detailGenres: $('#detail-genres'),
+    detailFinancials: $('#detail-financials'),
     modalRating: $('#modal-rating'),
     trailerIframe: $('#trailer-iframe'),
     trailerMute: $('#trailer-mute'),
@@ -360,16 +361,30 @@ const Detail = {
         this.current = item;
         const eps = item.episodes || [];
         const hasLinks = !!(item.links && item.links.length);
-        el.modalTitle.innerText = item.title;
+        if (item.tmdbLogo) {
+            el.modalTitle.innerHTML = `<img class="tmdb-logo" src="${item.tmdbLogo}" alt="${escapeHtml(item.title)}" onerror="this.parentNode.innerText=this.alt">`;
+        } else {
+            el.modalTitle.innerText = item.title;
+        }
         el.modalYear.innerText = item.year || '';
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
+            : (item.tmdbRuntime ? this._fmtRuntime(item.tmdbRuntime)
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
-            : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
+            : (item.duration || (eps[0] && eps[0].duration) || item.size || '')));
         el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
         if (el.modalRating) el.modalRating.innerText = (item.meta && item.meta.rating) ? ('★ ' + item.meta.rating) : '';
         if (el.detailGenres) {
             const gs = (item.meta && item.meta.genres) ? item.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
             el.detailGenres.innerHTML = gs.map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('');
+        }
+        // Datos financieros (de TMDB) — duración, presupuesto, recaudación
+        if (el.detailFinancials) {
+            const bits = [];
+            if (item.tmdbRuntime) bits.push('⏱️ ' + this._fmtRuntime(item.tmdbRuntime));
+            if (item.tmdbBudget) bits.push('💰 ' + this._fmtMoney(item.tmdbBudget));
+            if (item.tmdbRevenue) bits.push('📊 ' + this._fmtMoney(item.tmdbRevenue));
+            el.detailFinancials.innerHTML = bits.map(b => `<span>${escapeHtml(b)}</span>`).join('');
+            el.detailFinancials.hidden = bits.length === 0;
         }
         const cover = Store.getCover(item.id);
         const backdrop = cover || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
@@ -585,6 +600,16 @@ const Detail = {
         el.detailBackdrop.hidden = false;
         el.detailHero.classList.remove('playing');
         el.playerStatus.hidden = true;
+    },
+    _fmtRuntime(min) {
+        const m = Number(min) || 0;
+        if (!m) return '';
+        const h = Math.floor(m / 60), r = m % 60;
+        return h ? `${h}h ${r}m` : `${r}m`;
+    },
+    _fmtMoney(n) {
+        const v = Number(n) || 0; if (!v) return '';
+        return '$' + v.toLocaleString('en-US');
     },
     _stopTrailer() {
         if (Detail._trailerTimer) { clearTimeout(Detail._trailerTimer); Detail._trailerTimer = null; }

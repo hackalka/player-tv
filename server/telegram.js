@@ -372,12 +372,11 @@ class TelegramService {
                     } catch {}
                 }
                 if (hit) {
-                    // Pedir detalles en español + videos (trailers de YouTube)
-                    let det = hit; let trailerKey = '';
+                    // Pedir detalles en español + videos (trailers) + images (logo PNG)
+                    let det = hit; let trailerKey = ''; let logoUrl = '';
                     try {
-                        const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES&append_to_response=videos${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+                        const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES&append_to_response=videos,images&include_image_language=es,en,null${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
                         const d2 = await r2.json(); if (d2 && d2.id) det = d2;
-                        // Buscar trailer YouTube (es-ES o, si no, en-US)
                         const pickTrailer = (videos) => {
                             if (!videos || !videos.results) return '';
                             const r = videos.results;
@@ -395,6 +394,15 @@ class TelegramService {
                                 trailerKey = pickTrailer(d3);
                             } catch {}
                         }
+                        // Logo: preferir español, luego inglés, luego sin idioma
+                        if (det.images && det.images.logos && det.images.logos.length) {
+                            const order = ['es', 'en', null];
+                            for (const lang of order) {
+                                const found = det.images.logos.find(l => l.iso_639_1 === lang);
+                                if (found) { logoUrl = 'https://image.tmdb.org/t/p/w500' + found.file_path; break; }
+                            }
+                            if (!logoUrl) logoUrl = 'https://image.tmdb.org/t/p/w500' + det.images.logos[0].file_path;
+                        }
                     } catch {}
                     const date = det.release_date || det.first_air_date || hit.release_date || hit.first_air_date || '';
                     info = {
@@ -406,7 +414,11 @@ class TelegramService {
                         genres: ((det.genres && det.genres.map(g => g.name)) || (hit.genre_ids || []).map(id => gmap[id])).filter(Boolean).join(', '),
                         poster: (det.poster_path || hit.poster_path) ? ('https://image.tmdb.org/t/p/w500' + (det.poster_path || hit.poster_path)) : '',
                         backdrop: (det.backdrop_path || hit.backdrop_path) ? ('https://image.tmdb.org/t/p/w1280' + (det.backdrop_path || hit.backdrop_path)) : '',
-                        trailerKey
+                        trailerKey,
+                        logo: logoUrl,
+                        runtime: det.runtime || (det.episode_run_time && det.episode_run_time[0]) || 0,
+                        budget: det.budget || 0,
+                        revenue: det.revenue || 0
                     };
                 }
             } catch {}
@@ -422,6 +434,10 @@ class TelegramService {
         if (info.backdrop) item.backdropUrl = info.backdrop;
         if (info.trailerKey) item.trailerKey = info.trailerKey;
         if (info.tmdbId) { item.tmdbId = info.tmdbId; item.tmdbType = info.type; }
+        if (info.logo) item.tmdbLogo = info.logo;
+        if (info.runtime) item.tmdbRuntime = info.runtime;
+        if (info.budget) item.tmdbBudget = info.budget;
+        if (info.revenue) item.tmdbRevenue = info.revenue;
     }
 
     _buildTopicItems(msgs, topic) {
