@@ -391,8 +391,8 @@ class TelegramService {
             .filter(m => (m.media && m.media.document) || m.media || (m.message && /https?:\/\//.test(m.message)) || (m.message && /acestream/i.test(m.message)))
             .map(m => this.buildItem(m, topic));
 
-        // Si el tema NO es serie pero los items parecen serie (Temporada N / 1x01 / Capítulo), tratarlos como series
-        const seriesHint = (it) => /\btemporada\s*\d+|\bs\d{1,2}\s*e\d{1,3}\b|\b\d{1,2}\s*x\s*\d{1,3}\b|cap[ií]tulo|episodio/i.test(it.title || '');
+        // Si el tema NO es serie pero los items parecen serie (Temporada N / T-1 / 1x01 / Capítulo), tratarlos como series
+        const seriesHint = (it) => /\btemporada\s*\d+|\bs\d{1,2}\s*e\d{1,3}\b|\b\d{1,2}\s*x\s*\d{1,3}\b|cap[ií]tulo|episodio|\bt\s*[-_.]?\s*\d{1,2}\b/i.test(it.title || '');
         const promoteToSeries = topic.type !== 'series' && raw.some(seriesHint);
         if (promoteToSeries) topic = Object.assign({}, topic, { type: 'series', _promoted: true });
 
@@ -417,7 +417,8 @@ class TelegramService {
             const isSelfSeries = (it.links && it.links.length) && (it.links.length > 1 || epLinks.length > 0);
             if (isSelfSeries) { shows.push(this._showFromPost(it, topic)); continue; }
             const ep = this._parseEpisode(it.title);
-            const base = (ep && ep.base) ? ep.base : it.title;
+            const baseRaw = (ep && ep.base) ? ep.base : it.title;
+            const base = this._normalizeShowName(baseRaw);
             const key = this._slug(base);
             if (!groups.has(key)) groups.set(key, { base, eps: [] });
             const g = groups.get(key);
@@ -443,7 +444,7 @@ class TelegramService {
                 duration: e.it.duration, size: e.it.size, description: e.it.description
             }));
             shows.push({
-                id: 's-' + topic.id + '-' + key, topicId: topic.id, title: g.base || 'Serie',
+                id: 's-' + topic.id + '-' + key, topicId: topic.id, title: this._titleCase(g.base) || 'Serie',
                 description: (eps.find(e => e.it.description) || eps[0]).it.description || '',
                 year: (eps.find(e => e.it.year) || eps[0]).it.year || '',
                 meta: (eps.find(e => e.it.meta && Object.keys(e.it.meta).length) || eps[0]).it.meta || {},
@@ -473,13 +474,37 @@ class TelegramService {
     _parseEpisode(title) {
         const t = String(title || '');
         let m;
-        m = t.match(/\b[st](\d{1,2})\s*[ex](\d{1,3})\b/i);
-        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
+        // S01E02, T1E02
+        m = t.match(/\b[st]\s*\.?\s*-?\s*(\d{1,2})\s*[ex]\s*\.?\s*(\d{1,3})\b/i);
+        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index) };
+        // 1x02
         m = t.match(/\b(\d{1,2})\s*x\s*(\d{1,3})\b/i);
-        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index).trim() };
+        if (m) return { season: +m[1], ep: +m[2], base: t.slice(0, m.index) };
+        // Capítulo 3 / Episodio 3
         m = t.match(/(cap[ií]tulo|cap\.?|episodio|epis\.?|ep\.?)\s*\.?\s*(\d{1,3})/i);
-        if (m) return { season: 1, ep: +m[2], base: t.slice(0, m.index).trim() };
+        if (m) return { season: 1, ep: +m[2], base: t.slice(0, m.index) };
+        // Temporada 1 / T-1 / T1 / T 1 — paquete de temporada completa (sin episodio)
+        m = t.match(/(?:^|[\s\(\[])temporada\s*(\d{1,2})\b/i) || t.match(/(?:^|[\s\(\[])t\s*[-_.]?\s*(\d{1,2})\b/i);
+        if (m) return { season: +m[1], ep: 1, base: t.slice(0, m.index), packSeason: true };
         return null;
+    }
+    _normalizeShowName(s) {
+        return String(s || '')
+            .replace(/\([^)]*\)/g, ' ')           // (2023)
+            .replace(/\b(19|20)\d{2}\b/g, ' ')    // años sueltos
+            .replace(/[\-–—]+\s*$/g, ' ')
+            .replace(/[^a-zA-Z0-9À-ÿ\s]+/g, ' ')  // signos
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+    _titleCase(s) {
+        const str = String(s || '').trim();
+        if (!str) return '';
+        // Si está TODO en mayúsculas, ponemos Title Case; si tiene mezcla, lo respetamos
+        if (str === str.toUpperCase()) {
+            return str.toLowerCase().replace(/\b([a-zà-ÿ])/g, c => c.toUpperCase());
+        }
+        return str;
     }
     _epLabel(ep) { return (ep.season && ep.season > 1) ? `T${ep.season} · Capítulo ${ep.ep}` : `Capítulo ${ep.ep}`; }
     _slug(s) {
