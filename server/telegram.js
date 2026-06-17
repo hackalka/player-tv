@@ -283,6 +283,50 @@ class TelegramService {
         return { externalUrl: url, playableInBrowser: false };
     }
 
+    // Clave para agrupar películas con el mismo nombre (ignora calidad/idioma/año/paréntesis)
+    _movieKey(title) {
+        let t = String(title || '').toLowerCase();
+        t = t.replace(/\b(2160p|1080p|720p|480p|4k|uhd|fhd|hdr|hd|bluray|brrip|bdrip|webrip|web-?dl|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|latino|castellano|espa[ñn]ol|spanish|english|vose|vos|sub(?:s|titulad[oa])?)\b/ig, ' ');
+        t = t.replace(/[\[\(].*?[\]\)]/g, ' ');
+        t = t.replace(/\b(19|20)\d{2}\b/g, ' ');
+        return 't:' + this._slug(t);
+    }
+
+    // Etiqueta de calidad/idioma para distinguir versiones de la misma película
+    _qualityTag(title) {
+        const m = String(title || '').match(/\b(2160p|1080p|720p|480p|4k|uhd|hdr|latino|castellano|espa[ñn]ol|spanish|english|vose|vos|dual)\b/i);
+        return m ? m[0].toUpperCase() : '';
+    }
+
+    // Devuelve las fuentes reproducibles de un post de película
+    _movieSources(it) {
+        const out = [];
+        if (it.links && it.links.length) {
+            it.links.forEach(l => out.push({
+                label: l.label || it.title,
+                streamUrl: l.streamUrl || '',
+                externalUrl: l.externalUrl || '',
+                aceUrl: l.kind === 'ace' ? l.url : (l.aceUrl || ''),
+                thumbUrl: l.thumbUrl || it.thumbUrl || '',
+                ext: l.ext || '',
+                playableInBrowser: l.playableInBrowser === true
+            }));
+            return out;
+        }
+        if (it.streamUrl || it.aceUrl || it.externalUrl) {
+            out.push({
+                label: it.title,
+                streamUrl: it.streamUrl || '',
+                externalUrl: it.externalUrl || '',
+                aceUrl: it.aceUrl || '',
+                thumbUrl: it.thumbUrl || '',
+                ext: it.ext || '',
+                playableInBrowser: it.playableInBrowser !== false
+            });
+        }
+        return out;
+    }
+
     _duration(doc) {
         const attr = (doc.attributes || []).find(a => a.className === 'DocumentAttributeVideo');
         if (!attr || !attr.duration) return '';
@@ -462,14 +506,48 @@ class TelegramService {
         if (promoteToSeries) topic = Object.assign({}, topic, { type: 'series', _promoted: true });
 
         if (topic.type !== 'series') {
-            const seen = new Set();
-            const out = [];
+            // Agrupar películas con el MISMO nombre en una sola tarjeta,
+            // juntando dentro todos los enlaces/fuentes distintos (1080p, 4K, latino, DAZN 1/2/3...).
+            const groups = new Map();
+            const order = [];
             for (const it of raw) {
-                const kTitle = 't:' + this._slug(it.title);
-                const kUid = it.uid ? 'u:' + it.uid : null;
-                if (seen.has(kTitle) || (kUid && seen.has(kUid))) continue;
-                seen.add(kTitle); if (kUid) seen.add(kUid);
-                out.push(it);
+                const key = this._movieKey(it.title);
+                if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+                groups.get(key).push(it);
+            }
+            const out = [];
+            for (const key of order) {
+                const items = groups.get(key);
+                // Base: el post que tenga carátula propia (si no, el primero)
+                const base = items.find(x => x.hasThumb) || items[0];
+
+                // Reunir todas las fuentes sin repetir
+                const sources = [];
+                const seenSig = new Set();
+                const seenUid = new Set();
+                for (const it of items) {
+                    if (it.uid) { if (seenUid.has(it.uid)) continue; seenUid.add(it.uid); }
+                    const subs = this._movieSources(it);
+                    subs.forEach(s => {
+                        const sig = s.aceUrl || s.streamUrl || s.externalUrl || s.label;
+                        if (!sig || seenSig.has(sig)) return;
+                        seenSig.add(sig);
+                        // Etiqueta legible cuando el post es una sola fuente (vídeo subido)
+                        if (subs.length === 1) {
+                            const q = this._qualityTag(it.title);
+                            s.label = q || (items.length > 1 ? 'Opción ' + (sources.length + 1) : (s.label || it.title));
+                        }
+                        sources.push(s);
+                    });
+                }
+
+                const merged = Object.assign({}, base);
+                if (sources.length > 1) {
+                    // Mostrar selector de fuentes en la ficha (no reproducir directo)
+                    merged.links = sources;
+                    merged.aceUrl = ''; merged.streamUrl = ''; merged.externalUrl = '';
+                }
+                out.push(merged);
             }
             return out;
         }

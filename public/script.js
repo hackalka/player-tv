@@ -98,6 +98,17 @@ const Store = {
     set covers(v) { this._set('tvp_covers', v); },
     setCover(id, url) { const c = this.covers; if (url) c[id] = url; else delete c[id]; this.covers = c; },
     getCover(id) { return this.covers[id] || ''; },
+    // Overrides de ficha (admin): título, sinopsis, fondo, tráiler — compartidos
+    get overrides() { return this._get('tvp_overrides', {}); },
+    set overrides(v) { this._set('tvp_overrides', v); },
+    getOverride(id) { return this.overrides[id] || {}; },
+    setOverride(id, patch) {
+        const o = this.overrides;
+        const cur = Object.assign({}, o[id], patch);
+        Object.keys(cur).forEach(k => { if (cur[k] === '' || cur[k] == null) delete cur[k]; });
+        if (Object.keys(cur).length) o[id] = cur; else delete o[id];
+        this.overrides = o;
+    },
 };
 
 /* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
@@ -155,7 +166,16 @@ const CloudStore = {
             if (doc.exists && doc.data().covers) Store.covers = Object.assign({}, doc.data().covers, Store.covers);
         } catch {}
     },
-    async saveCovers() { if (!this.db) return; try { await this.db.collection('shared').doc('covers').set({ covers: Store.covers }, { merge: true }); } catch {} }
+    async saveCovers() { if (!this.db) return; try { await this.db.collection('shared').doc('covers').set({ covers: Store.covers }, { merge: true }); } catch {} },
+    // Overrides de ficha (admin) — compartidos para todos los usuarios
+    async syncOverrides() {
+        if (!this.db) return;
+        try {
+            const doc = await this.db.collection('shared').doc('overrides').get();
+            if (doc.exists && doc.data().overrides) Store.overrides = Object.assign({}, doc.data().overrides, Store.overrides);
+        } catch {}
+    },
+    async saveOverrides() { if (!this.db) return; try { await this.db.collection('shared').doc('overrides').set({ overrides: Store.overrides }, { merge: true }); } catch {} }
 };
 
 const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
@@ -193,6 +213,7 @@ const el = {
     modalRating: $('#modal-rating'),
     trailerIframe: $('#trailer-iframe'),
     trailerMute: $('#trailer-mute'),
+    trailerBtn: $('#trailer-btn'),
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
@@ -216,7 +237,14 @@ const el = {
     chatHeaderMeta: $('#chat-header-meta'),
     loadingScreen: $('#loading-screen'),
     loadingText: $('#loading-text'),
-    loginModal: $('#login-modal')
+    loginModal: $('#login-modal'),
+    adminPanelBtn: $('#admin-panel-btn'),
+    adminPanel: $('#admin-panel'),
+    adminStats: $('#admin-stats'),
+    adminFilters: $('#admin-filters'),
+    adminList: $('#admin-list'),
+    adminTools: $('#admin-tools'),
+    adminEditor: $('#admin-editor')
 };
 
 /* ===== NETFLIX ===== */
@@ -324,15 +352,17 @@ const Netflix = {
         const card = document.createElement('div');
         card.className = 'card focusable' + (Store.isWatched(item.id) ? ' watched' : '');
         card.tabIndex = 0;
-        const img = Store.getCover(item.id) || item.thumbUrl || placeholderImage(item.id, item.title || item.epTitle);
+        const ov = Store.getOverride(item.id);
+        const title = ov.title || item.title || item.epTitle || '';
+        const img = Store.getCover(item.id) || ov.backdrop || item.thumbUrl || placeholderImage(item.id, title);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
             ${kind === 'top' && item._rank ? `<div class="card-rank">${item._rank}</div>` : ''}
-            <img class="card-image" src="${img}" alt="${escapeHtml(item.title || '')}" loading="lazy"
-                 onerror="this.src='${placeholderImage(item.id, item.title)}'">
+            <img class="card-image" src="${img}" alt="${escapeHtml(title)}" loading="lazy"
+                 onerror="this.src='${placeholderImage(item.id, title)}'">
             ${Store.isWatched(item.id) ? '<div class="card-watched">VISTO</div>' : ''}
             <div class="card-overlay">
-                <h3 class="card-title">${escapeHtml(item.title || '')}</h3>
+                <h3 class="card-title">${escapeHtml(title)}</h3>
                 <div class="card-meta">
                     ${item.year ? `<span>${escapeHtml(item.year)}</span>` : ''}
                     ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.links && item.links.length > 1 ? `<span class="badge-series">${item.links.length} ENLACES</span>` : (item.duration && kind !== 'continue' ? `<span>${escapeHtml(item.duration)}</span>` : ''))}
@@ -374,9 +404,12 @@ const Detail = {
     primary: null,
     open(item, opts = {}) {
         this.current = item;
+        const ov = Store.getOverride(item.id);
         const eps = item.episodes || [];
         const hasLinks = !!(item.links && item.links.length);
-        if (item.tmdbLogo) {
+        if (ov.title) {
+            el.modalTitle.innerText = ov.title;
+        } else if (item.tmdbLogo) {
             el.modalTitle.innerHTML = `<img class="tmdb-logo" src="${item.tmdbLogo}" alt="${escapeHtml(item.title)}" onerror="this.parentNode.innerText=this.alt">`;
         } else {
             el.modalTitle.innerText = item.title;
@@ -386,7 +419,7 @@ const Detail = {
             : (item.tmdbRuntime ? this._fmtRuntime(item.tmdbRuntime)
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
             : (item.duration || (eps[0] && eps[0].duration) || item.size || '')));
-        el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        el.modalDescription.innerText = ov.desc || item.description || 'Sin descripción disponible.';
         if (el.modalRating) el.modalRating.innerText = (item.meta && item.meta.rating) ? ('★ ' + item.meta.rating) : '';
         if (el.detailGenres) {
             const gs = (item.meta && item.meta.genres) ? item.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
@@ -402,18 +435,24 @@ const Detail = {
             el.detailFinancials.hidden = bits.length === 0;
         }
         const cover = Store.getCover(item.id);
-        const backdrop = cover || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const backdrop = cover || ov.backdrop || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         const poster = cover || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
 
         // Trailer YouTube (autoplay muted) — Netflix style con detección de errores
+        const trailerKey = ov.trailer || item.trailerKey;
         Detail._stopTrailer();
-        if (item.trailerKey && el.trailerIframe) {
+        Detail._currentTrailer = trailerKey || '';
+        if (el.trailerBtn) {
+            el.trailerBtn.hidden = !trailerKey;
+            el.trailerBtn.onclick = () => { if (Detail._currentTrailer) Detail._loadTrailer(Detail._currentTrailer, true); };
+        }
+        if (trailerKey && el.trailerIframe) {
             Detail._trailerTimer = setTimeout(() => {
                 if (el.playerModal.hidden) return;
-                Detail._loadTrailer(item.trailerKey);
+                Detail._loadTrailer(trailerKey);
             }, 1500);
         }
 
@@ -626,7 +665,8 @@ const Detail = {
         if (el.trailerIframe) { el.trailerIframe.hidden = true; el.trailerIframe.src = 'about:blank'; }
         if (el.trailerMute) el.trailerMute.hidden = true;
     },
-    _loadTrailer(key) {
+    _loadTrailer(key, manual) {
+        if (manual) Detail._stopTrailer();
         // Asegurarse de que la API de YouTube está cargada
         const tryCreate = () => {
             if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
@@ -636,14 +676,15 @@ const Detail = {
                     videoId: key,
                     host: 'https://www.youtube-nocookie.com',
                     playerVars: {
-                        autoplay: 1, mute: 1, controls: 0, showinfo: 0, modestbranding: 1,
+                        autoplay: 1, mute: manual ? 0 : 1, controls: manual ? 1 : 0, showinfo: 0, modestbranding: 1,
                         rel: 0, loop: 1, playlist: key, playsinline: 1, iv_load_policy: 3, disablekb: 1, fs: 0
                     },
                     events: {
                         onReady: (e) => {
-                            try { e.target.mute(); e.target.playVideo(); } catch {}
+                            try { if (manual) { e.target.unMute(); } else { e.target.mute(); } e.target.playVideo(); } catch {}
                             el.trailerMute.hidden = false;
-                            el.trailerMute.innerText = '🔇'; el.trailerMute.dataset.muted = '1';
+                            el.trailerMute.innerText = manual ? '🔊' : '🔇';
+                            el.trailerMute.dataset.muted = manual ? '0' : '1';
                         },
                         onError: (e) => {
                             // 101 / 150 / 153 = embed deshabilitado o configuración no válida
@@ -943,7 +984,201 @@ const Admin = {
         el.navTelegram.hidden = !a;
         if (el.viewSwitch) el.viewSwitch.hidden = !a;
         el.adminRefresh.hidden = !a;
+        if (el.adminPanelBtn) el.adminPanelBtn.hidden = !a;
         el.adminLock.hidden = false; // botón de cerrar sesión, visible al estar logado
+    }
+};
+
+/* ===== PANEL DE ADMINISTRACIÓN (auditoría + edición de fichas) ===== */
+const AdminPanel = {
+    _filter: 'all',
+    _editId: null,
+    open() {
+        if (!state.isAdmin || !el.adminPanel) return;
+        el.adminPanel.hidden = false;
+        el.body.style.overflow = 'hidden';
+        this.showTab('overview');
+        this.renderStats();
+        this.renderFilters();
+        this.renderList();
+        this.renderTools();
+        TVNav.refresh();
+    },
+    close() {
+        if (!el.adminPanel) return;
+        this.closeEditor();
+        el.adminPanel.hidden = true;
+        el.body.style.overflow = '';
+        TVNav.refresh();
+    },
+    showTab(tab) {
+        $$('.admin-tab', el.adminPanel).forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        $$('.admin-pane', el.adminPanel).forEach(p => p.hidden = p.dataset.pane !== tab);
+        TVNav.refresh();
+    },
+    // ---- diagnóstico de cada item ----
+    _audit(it) {
+        const ov = Store.getOverride(it.id);
+        const hasCover = !!(Store.getCover(it.id) || ov.backdrop || it.thumbUrl);
+        const hasTmdb = !!it.tmdbId;
+        const hasSynopsis = !!(ov.desc || (it.description && it.description.length > 20));
+        const hasTrailer = !!(ov.trailer || it.trailerKey);
+        const hasVideo = !!(it.streamUrl || it.aceUrl || it.externalUrl || (it.links && it.links.length) || (it.episodes && it.episodes.length));
+        return { hasCover, hasTmdb, hasSynopsis, hasTrailer, hasVideo };
+    },
+    _problems(it) {
+        const a = this._audit(it);
+        const p = [];
+        if (!a.hasCover) p.push('cover');
+        if (!a.hasTmdb) p.push('tmdb');
+        if (!a.hasSynopsis) p.push('synopsis');
+        if (!a.hasTrailer) p.push('trailer');
+        if (!a.hasVideo) p.push('video');
+        return p;
+    },
+    renderStats() {
+        const items = state.allItems;
+        const total = items.length;
+        const series = items.filter(i => i.isSeries || (i.episodes && i.episodes.length > 1)).length;
+        const movies = total - series;
+        let noCover = 0, noTmdb = 0, noSyn = 0, noTrailer = 0, noVideo = 0;
+        items.forEach(it => {
+            const a = this._audit(it);
+            if (!a.hasCover) noCover++;
+            if (!a.hasTmdb) noTmdb++;
+            if (!a.hasSynopsis) noSyn++;
+            if (!a.hasTrailer) noTrailer++;
+            if (!a.hasVideo) noVideo++;
+        });
+        const cats = state.catalog.categories.filter(c => c.items && c.items.length);
+        const card = (label, val, warn) => `<div class="stat-card${warn && val ? ' warn' : ''}"><div class="stat-val">${val}</div><div class="stat-label">${escapeHtml(label)}</div></div>`;
+        el.adminStats.innerHTML =
+            card('Total contenidos', total) +
+            card('Películas', movies) +
+            card('Series', series) +
+            card('Temas (categorías)', cats.length) +
+            card('Sin carátula', noCover, true) +
+            card('Sin ficha TMDB', noTmdb, true) +
+            card('Sin sinopsis', noSyn, true) +
+            card('Sin tráiler', noTrailer, true) +
+            card('Sin vídeo/enlace', noVideo, true) +
+            `<div class="stat-card"><div class="stat-val">${state.userName ? '✓' : '—'}</div><div class="stat-label">Admin: ${escapeHtml(state.userName || '')}</div></div>`;
+    },
+    renderFilters() {
+        const defs = [
+            ['all', 'Todos'], ['problems', '⚠ Con incidencias'],
+            ['cover', 'Sin carátula'], ['tmdb', 'Sin TMDB'],
+            ['synopsis', 'Sin sinopsis'], ['trailer', 'Sin tráiler'], ['video', 'Sin vídeo']
+        ];
+        el.adminFilters.innerHTML = defs.map(([k, l]) =>
+            `<button class="admin-chip focusable${this._filter === k ? ' active' : ''}" data-f="${k}" tabindex="0">${escapeHtml(l)}</button>`).join('');
+        $$('.admin-chip', el.adminFilters).forEach(b => b.onclick = () => { this._filter = b.dataset.f; this.renderFilters(); this.renderList(); });
+    },
+    _filteredItems() {
+        const items = state.allItems.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        if (this._filter === 'all') return items;
+        if (this._filter === 'problems') return items.filter(it => this._problems(it).length);
+        return items.filter(it => this._problems(it).includes(this._filter));
+    },
+    renderList() {
+        const items = this._filteredItems();
+        if (!items.length) { el.adminList.innerHTML = '<div class="admin-empty">No hay contenidos en este filtro.</div>'; return; }
+        const dot = (ok, txt) => `<span class="admin-flag ${ok ? 'ok' : 'bad'}" title="${txt}">${ok ? '✓' : '✗'} ${txt}</span>`;
+        el.adminList.innerHTML = items.slice(0, 300).map(it => {
+            const a = this._audit(it);
+            const ov = Store.getOverride(it.id);
+            const img = Store.getCover(it.id) || ov.backdrop || it.thumbUrl || placeholderImage(it.id, it.title);
+            const title = ov.title || it.title || '';
+            return `<div class="admin-row focusable" data-id="${escapeHtml(String(it.id))}" tabindex="0">
+                <img class="admin-row-img" src="${img}" alt="" onerror="this.src='${placeholderImage(it.id, title)}'">
+                <div class="admin-row-info">
+                    <div class="admin-row-title">${escapeHtml(title)} ${it.year ? `<span class="admin-row-year">(${escapeHtml(it.year)})</span>` : ''}</div>
+                    <div class="admin-flags">
+                        ${dot(a.hasCover, 'Carátula')}${dot(a.hasTmdb, 'TMDB')}${dot(a.hasSynopsis, 'Sinopsis')}${dot(a.hasTrailer, 'Tráiler')}${dot(a.hasVideo, 'Vídeo')}
+                    </div>
+                </div>
+                <button class="admin-row-edit focusable" tabindex="0">✎ Editar</button>
+            </div>`;
+        }).join('');
+        $$('.admin-row', el.adminList).forEach(row => {
+            const it = state.itemsById[row.dataset.id];
+            row.querySelector('.admin-row-edit').onclick = (e) => { e.stopPropagation(); this.editItem(it); };
+            row.onclick = () => this.editItem(it);
+        });
+        TVNav.refresh();
+    },
+    renderTools() {
+        el.adminTools.innerHTML = `
+            <button class="btn btn-play focusable" id="tool-refresh" tabindex="0">🔄 Actualizar catálogo (Telegram)</button>
+            <button class="btn btn-fav focusable" id="tool-cache" tabindex="0">🧹 Borrar caché local</button>
+            <button class="btn btn-fav focusable" id="tool-chat" tabindex="0">💬 Editar posts de Telegram</button>
+            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo de Telegram y refresca TMDB. «Borrar caché» limpia la caché del navegador (no borra favoritos). «Editar posts» abre la vista de chat para editar/borrar mensajes del grupo.</p>`;
+        const r = $('#tool-refresh', el.adminTools); if (r) r.onclick = async () => { r.disabled = true; r.innerText = 'Actualizando...'; await Admin.refresh(); this.renderStats(); this.renderList(); r.disabled = false; r.innerText = '🔄 Actualizar catálogo (Telegram)'; };
+        const c = $('#tool-cache', el.adminTools); if (c) c.onclick = () => { try { sessionStorage.removeItem('tvp_catalog'); } catch {} alert('Caché local borrada. Recarga para volver a leer del servidor.'); };
+        const ch = $('#tool-chat', el.adminTools); if (ch) ch.onclick = () => { this.close(); App.switchView('telegram'); };
+    },
+    // ---- editor de ficha ----
+    editItem(it) {
+        if (!it) return;
+        this._editId = it.id;
+        const ov = Store.getOverride(it.id);
+        $('#admin-editor-title').innerText = 'Editar: ' + (ov.title || it.title || '');
+        $('#edit-title').value = ov.title || '';
+        $('#edit-desc').value = ov.desc || '';
+        $('#edit-cover').value = Store.getCover(it.id) || '';
+        $('#edit-backdrop').value = ov.backdrop || '';
+        $('#edit-trailer').value = ov.trailer || it.trailerKey || '';
+        this._editPlaceholders(it);
+        el.adminEditor.hidden = false;
+        TVNav.refresh();
+        setTimeout(() => $('#edit-title').focus(), 50);
+    },
+    _editPlaceholders(it) {
+        $('#edit-title').placeholder = it.title || '';
+        $('#edit-desc').placeholder = (it.description || 'Sin sinopsis').slice(0, 120);
+    },
+    _ytId(v) {
+        const s = String(v || '').trim();
+        if (!s) return '';
+        const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{6,})/);
+        return m ? m[1] : s.replace(/[^\w-]/g, '');
+    },
+    closeEditor() { if (el.adminEditor) el.adminEditor.hidden = true; this._editId = null; },
+    save() {
+        const id = this._editId; if (id == null) return;
+        const it = state.itemsById[id];
+        Store.setOverride(id, {
+            title: $('#edit-title').value.trim(),
+            desc: $('#edit-desc').value.trim(),
+            backdrop: $('#edit-backdrop').value.trim(),
+            trailer: this._ytId($('#edit-trailer').value)
+        });
+        Store.setCover(id, $('#edit-cover').value.trim());
+        CloudStore.saveOverrides();
+        CloudStore.saveCovers();
+        this.closeEditor();
+        this.renderStats();
+        this.renderList();
+        Netflix.render();
+        if (it) { /* refrescar ficha si estuviera abierta no es necesario */ }
+    },
+    reset() {
+        const id = this._editId; if (id == null) return;
+        if (!confirm('¿Quitar todos los cambios manuales de esta ficha?')) return;
+        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '' });
+        Store.setCover(id, '');
+        CloudStore.saveOverrides();
+        CloudStore.saveCovers();
+        this.closeEditor();
+        this.renderStats();
+        this.renderList();
+        Netflix.render();
+    },
+    openItem() {
+        const id = this._editId; const it = id != null && state.itemsById[id];
+        if (!it) return;
+        this.close();
+        Detail.open(it);
     }
 };
 
@@ -1087,9 +1322,11 @@ const App = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close',
+    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
+        if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
+        if (el.adminPanel && !el.adminPanel.hidden) return el.adminPanel;
         if (!el.playerModal.hidden) return el.playerModal;
         if (!el.searchOverlay.hidden) return el.searchOverlay;
         return document;
@@ -1134,8 +1371,11 @@ const TVNav = {
                 const a = document.activeElement;
                 if (a && a !== el.searchInput && a.click) { e.preventDefault(); a.click(); }
             } else if (k === 'Backspace' || k === 'GoBack' || k === 'BrowserBack') {
-                if (document.activeElement === el.searchInput) return;
-                if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
+                const ae = document.activeElement;
+                if (ae === el.searchInput || (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA'))) return;
+                if (el.adminEditor && !el.adminEditor.hidden) { e.preventDefault(); AdminPanel.closeEditor(); }
+                else if (el.adminPanel && !el.adminPanel.hidden) { e.preventDefault(); AdminPanel.close(); }
+                else if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
                 else if (!el.searchOverlay.hidden) { e.preventDefault(); App.closeSearch(); }
             }
         });
@@ -1168,6 +1408,7 @@ async function boot() {
         await CloudStore.syncProgress();
         await CloudStore.syncWatched();
         await CloudStore.syncCovers();
+        await CloudStore.syncOverrides();
 
         el.loadingText.innerText = 'Cargando catálogo...';
         // 1) Mostrar caché del navegador inmediatamente (si existe y es de hoy)
@@ -1242,10 +1483,23 @@ function wireUi() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (!el.searchOverlay.hidden) App.closeSearch();
+        if (el.adminEditor && !el.adminEditor.hidden) AdminPanel.closeEditor();
+        else if (el.adminPanel && !el.adminPanel.hidden) AdminPanel.close();
+        else if (!el.searchOverlay.hidden) App.closeSearch();
         else if (!el.playerModal.hidden) Detail.close();
     });
     if (el.trailerMute) el.trailerMute.onclick = () => Detail.toggleTrailerSound();
+
+    // ----- Panel de administración -----
+    if (el.adminPanelBtn) el.adminPanelBtn.onclick = () => AdminPanel.open();
+    if (el.adminPanel) {
+        $$('[data-admin-close]', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.close());
+        $$('.admin-tab', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.showTab(b.dataset.tab));
+    }
+    const eClose = $('#admin-editor-close'); if (eClose) eClose.onclick = () => AdminPanel.closeEditor();
+    const eSave = $('#edit-save'); if (eSave) eSave.onclick = () => AdminPanel.save();
+    const eReset = $('#edit-reset'); if (eReset) eReset.onclick = () => AdminPanel.reset();
+    const eOpen = $('#edit-open'); if (eOpen) eOpen.onclick = () => AdminPanel.openItem();
 
     // Atajos de teclado del reproductor
     document.addEventListener('keydown', (e) => {

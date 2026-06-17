@@ -41,6 +41,9 @@
             </button>
         </div>
         <div class="navbar-right">
+            <button class="icon-btn" id="admin-panel-btn" aria-label="Panel de administración" hidden>
+                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
+            </button>
             <button class="icon-btn" id="admin-refresh" aria-label="Actualizar catálogo" hidden>
                 <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M17.65 6.35A8 8 0 1 0 19.73 14h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </button>
@@ -124,6 +127,10 @@
                             <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
                             Reproducir
                         </button>
+                        <button class="btn btn-fav focusable" id="trailer-btn" aria-label="Reproducir tráiler" hidden>
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81zM10 15V9l5.2 3-5.2 3z"/></svg>
+                            <span>Tráiler</span>
+                        </button>
                         <button class="btn btn-fav focusable" id="fav-btn" aria-label="Añadir a favoritos">
                             <span class="fav-ico">★</span> <span class="fav-txt">Añadir a favoritos</span>
                         </button>
@@ -204,6 +211,60 @@
                 <button id="btn-verify-password" class="btn btn-play login-action" type="button">Entrar</button>
             </div>
             <p id="login-status" class="boot-status"></p>
+        </div>
+    </div>
+
+    <!-- ===== PANEL DE ADMINISTRACIÓN ===== -->
+    <div class="modal admin-modal" id="admin-panel" hidden>
+        <div class="modal-overlay" data-admin-close></div>
+        <div class="admin-card">
+            <header class="admin-header">
+                <h2 class="admin-title">Panel de administración</h2>
+                <button class="modal-close admin-close-btn" data-admin-close aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </header>
+            <nav class="admin-tabs">
+                <button class="admin-tab active focusable" data-tab="overview" tabindex="0">📊 Resumen</button>
+                <button class="admin-tab focusable" data-tab="audit" tabindex="0">🔍 Auditoría</button>
+                <button class="admin-tab focusable" data-tab="tools" tabindex="0">🛠 Herramientas</button>
+            </nav>
+            <div class="admin-body">
+                <section class="admin-pane" data-pane="overview">
+                    <div class="admin-stats" id="admin-stats"></div>
+                </section>
+                <section class="admin-pane" data-pane="audit" hidden>
+                    <div class="admin-filters" id="admin-filters"></div>
+                    <div class="admin-list" id="admin-list"></div>
+                </section>
+                <section class="admin-pane" data-pane="tools" hidden>
+                    <div class="admin-tools" id="admin-tools"></div>
+                </section>
+            </div>
+        </div>
+        <!-- Editor de ficha (sobre el panel) -->
+        <div class="admin-editor" id="admin-editor" hidden>
+            <div class="admin-editor-card">
+                <header class="admin-editor-head">
+                    <h3 id="admin-editor-title">Editar ficha</h3>
+                    <button class="modal-close" id="admin-editor-close" aria-label="Cerrar">
+                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </header>
+                <div class="admin-editor-body">
+                    <label class="admin-field"><span>Título</span><input id="edit-title" class="admin-input" type="text"></label>
+                    <label class="admin-field"><span>Sinopsis</span><textarea id="edit-desc" class="admin-input" rows="4"></textarea></label>
+                    <label class="admin-field"><span>Carátula (URL del póster)</span><input id="edit-cover" class="admin-input" type="url" placeholder="https://..."></label>
+                    <label class="admin-field"><span>Fondo / backdrop (URL)</span><input id="edit-backdrop" class="admin-input" type="url" placeholder="https://..."></label>
+                    <label class="admin-field"><span>Tráiler de YouTube (ID o URL)</span><input id="edit-trailer" class="admin-input" type="text" placeholder="dQw4w9WgXcQ"></label>
+                    <div class="admin-editor-preview" id="edit-preview"></div>
+                </div>
+                <footer class="admin-editor-foot">
+                    <button class="btn btn-play" id="edit-save">Guardar</button>
+                    <button class="btn btn-fav" id="edit-reset">Restablecer</button>
+                    <button class="btn btn-fav" id="edit-open">Ver ficha</button>
+                </footer>
+            </div>
         </div>
     </div>
 
