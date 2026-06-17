@@ -580,6 +580,27 @@ const ExternalPlayers = {
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
         box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
+    },
+
+    // Panel cuando se intenta abrir externamente una URL concreta (acestream / stream del servidor)
+    renderForUrl(url, playable, info) {
+        const box = el.playerOptions; if (!box) return;
+        const isAce = info && info.isAce;
+        const items = [];
+        if (isAce) {
+            items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(url)}">▶ Abrir en AceStream</a>`);
+            const id = (url.match(/[0-9a-fA-F]{40}/) || [''])[0];
+            if (id) items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:#Intent;scheme=acestream;package=org.acestream.media;S.content_id=${id};end">AceStream (Android/TV)</a>`);
+        } else {
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(url)}">▶ Abrir en VLC</a>`);
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:${escapeHtml(url)}#Intent;type=video/*;action=android.intent.action.VIEW;end">Elegir reproductor (Android/TV)</a>`);
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir en pestaña</a>`);
+        }
+        const label = isAce
+            ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
+            : `Formato${info && info.ext ? ' ' + info.ext : ''} no compatible con el navegador. Abrir con tu reproductor:`;
+        box.hidden = false;
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
     }
 };
 
@@ -592,38 +613,93 @@ const Player = {
         this.current = { playable, parent };
         if (parent && parent.episodes && parent.episodes.length > 1) Store.setLastEp(parent.id, playable.id);
 
-        // AceStream: no se reproduce dentro; mostrar opciones
-        if (playable.aceUrl && !playable.streamUrl) {
-            ExternalPlayers.render(playable);
-            el.playerStatus.hidden = false;
-            el.playerStatus.innerText = 'Este contenido es AceStream. Usa el botón "AceStream" para abrirlo.';
+        // 1) AceStream: nunca dentro -> abrir reproductor externo (acestream://)
+        if (playable.aceUrl) {
+            this._openExternal(playable.aceUrl, playable);
             return;
         }
+        // 2) Vídeo de Telegram (streamUrl) -> intentar dentro si es navegador-compatible
+        if (playable.streamUrl && playable.playableInBrowser !== false) {
+            this._playInside(playable, parent);
+            return;
+        }
+        // 3) Vídeo de Telegram NO compatible (mkv/avi) -> reproductor externo con la URL del servidor
+        if (playable.streamUrl) {
+            this._openExternal(absUrl(playable.streamUrl), playable);
+            return;
+        }
+        // 4) Enlace externo http(s): si parece vídeo directo, intentar dentro; si no, abrir externo
+        if (playable.externalUrl) {
+            if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(playable.externalUrl)) {
+                el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true; el.playerStatus.hidden = true;
+                el.playerIframe.hidden = true; el.playerIframe.src = '';
+                el.playerVideo.hidden = false;
+                el.playerVideo.src = playable.externalUrl;
+                el.playerVideo.onerror = () => this._openExternal(playable.externalUrl, playable);
+                el.playerVideo.play().catch(() => {});
+                return;
+            }
+            this._openExternal(playable.externalUrl, playable);
+            return;
+        }
+        // 5) Nada que reproducir
+        this._showError('No hay vídeo asociado a este elemento.', playable);
+    },
+
+    _playInside(playable, parent) {
         el.detailHero.classList.add('playing');
         el.detailBackdrop.hidden = true;
         el.playerStatus.hidden = true;
+        el.playerIframe.hidden = true; el.playerIframe.src = '';
+        el.playerVideo.hidden = false;
+        const v = el.playerVideo;
+        v.src = playable.streamUrl;
+        const resume = (Store.progress[playable.id] || {}).time || 0;
+        try { v.volume = Store.volume; } catch {}
+        v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
+        v.onerror = () => {
+            // Si falla la reproducción interna, ofrecemos reproductor externo con la URL del servidor
+            this._openExternal(absUrl(playable.streamUrl), playable);
+        };
+        v.ontimeupdate = () => this._tick();
+        v.onvolumechange = () => { Store.volume = v.volume; };
+        v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
+        v.play().catch(() => {});
+    },
 
-        if (playable.streamUrl) {
-            el.playerIframe.hidden = true; el.playerIframe.src = '';
-            el.playerVideo.hidden = false;
-            const v = el.playerVideo;
-            v.src = playable.streamUrl;
-            const resume = (Store.progress[playable.id] || {}).time || 0;
-            try { v.volume = Store.volume; } catch {}
-            v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
-            v.onerror = () => this.onPlayError(playable);
-            v.ontimeupdate = () => this._tick();
-            v.onvolumechange = () => { Store.volume = v.volume; };
-            v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
-            v.play().catch(() => {});
-            return;
-        }
-        if (playable.externalUrl) {
-            el.playerVideo.hidden = true;
-            el.playerIframe.hidden = false; el.playerIframe.src = this.embed(playable.externalUrl);
-            return;
-        }
-        this.onPlayError(playable);
+    // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)
+    _openExternal(url, playable) {
+        el.detailHero.classList.remove('playing');
+        try { el.playerVideo.pause(); } catch {}
+        el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src');
+        el.playerIframe.hidden = true; el.playerIframe.src = '';
+        el.detailBackdrop.hidden = false;
+        const isAce = /^acestream:\/\//i.test(url);
+        const isTg = /\/api\/stream\//.test(url);
+        const ext = (playable && playable.ext || '').toUpperCase();
+        // Para acestream y mkv/avi: intentamos abrir directo en el reproductor instalado
+        try {
+            if (isAce) {
+                // Intentar abrir AceStream sin recargar la pestaña
+                window.location.href = url;
+            } else {
+                // VLC/m3u/etc: intent en Android, fallback a abrir en pestaña
+                const ua = navigator.userAgent || '';
+                if (/Android/i.test(ua)) {
+                    window.location.href = 'intent:' + url + '#Intent;type=video/*;action=android.intent.action.VIEW;end';
+                } else {
+                    window.open(url, '_blank');
+                }
+            }
+        } catch {}
+        // Mostrar opciones por si el primer intento no abre nada
+        ExternalPlayers.renderForUrl(url, playable, { isAce, isTg, ext });
+    },
+
+    _showError(msg, playable) {
+        el.detailHero.classList.remove('playing'); el.detailBackdrop.hidden = false;
+        el.playerStatus.hidden = false; el.playerStatus.innerText = msg;
+        if (playable) ExternalPlayers.render(playable);
     },
 
     maybeNext(playable, parent) {
@@ -634,16 +710,6 @@ const Player = {
         if (Detail && Detail.current === parent) { Detail.primary = next; }
         if (typeof ExternalPlayers !== 'undefined') ExternalPlayers.render(next);
         this.play(next, parent);
-    },
-
-    onPlayError(playable) {
-        el.detailHero.classList.remove('playing');
-        el.detailBackdrop.hidden = false;
-        el.playerStatus.hidden = false;
-        el.playerStatus.innerText = playable.playableInBrowser === false
-            ? `Este formato (${(playable.ext || '').toUpperCase()}) no se puede reproducir aquí. Ábrelo con un reproductor externo (abajo).`
-            : 'No se pudo reproducir. Prueba con un reproductor externo (abajo).';
-        ExternalPlayers.render(playable);
     },
 
     _lastSave: 0,
