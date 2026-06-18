@@ -102,6 +102,7 @@ const Store = {
     get overrides() { return this._get('tvp_overrides', {}); },
     set overrides(v) { this._set('tvp_overrides', v); },
     getOverride(id) { return this.overrides[id] || {}; },
+    isHidden(id) { return !!(this.overrides[id] && this.overrides[id].hidden); },
     setOverride(id, patch) {
         const o = this.overrides;
         const cur = Object.assign({}, o[id], patch);
@@ -221,6 +222,8 @@ const el = {
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
+    recoRow: $('#reco-row'),
+    recoTrack: $('#reco-track'),
     sources: $('#sources'),
     sourcesTrack: $('#sources-track'),
     modalTitle: $('#modal-title'),
@@ -249,6 +252,7 @@ const el = {
 
 /* ===== NETFLIX ===== */
 const Netflix = {
+    _vis(items) { return (items || []).filter(it => it && !Store.isHidden(it.id)); },
     render() {
         el.rowsContainer.innerHTML = '';
         const cats = state.catalog.categories.filter(c => c.items && c.items.length);
@@ -259,13 +263,13 @@ const Netflix = {
         // Filas dinámicas: Continuar viendo + Mi lista + categorías
         const cont = Store.continueList();
         if (cont.length) el.rowsContainer.appendChild(this.row('▶ Continuar viendo', cont, 'continue'));
-        const favs = Store.favList();
+        const favs = this._vis(Store.favList());
         if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));
 
-        const novedades = state.allItems.filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
+        const novedades = this._vis(state.allItems).filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
         if (novedades.length) el.rowsContainer.appendChild(this.row('Novedades', novedades));
 
-        const top = state.allItems.filter(it => it.meta && parseFloat(it.meta.rating) > 0)
+        const top = this._vis(state.allItems).filter(it => it.meta && parseFloat(it.meta.rating) > 0)
             .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 10);
         top.forEach((it, i) => it._rank = i + 1);
         if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top 10', top, 'top'));
@@ -290,8 +294,10 @@ const Netflix = {
         }
         let heroPool = [];
         cats.forEach(c => {
-            heroPool = heroPool.concat(c.items.slice(0, 5));
-            el.rowsContainer.appendChild(this.row(`${c.icon || ''} ${c.name}`, c.items));
+            const vis = this._vis(c.items);
+            if (!vis.length) return;
+            heroPool = heroPool.concat(vis.slice(0, 5));
+            el.rowsContainer.appendChild(this.row(`${c.icon || ''} ${c.name}`, vis));
         });
         if (heroPool.length) {
             this.updateHero(heroPool[0]);
@@ -304,6 +310,7 @@ const Netflix = {
     },
 
     row(title, items, kind) {
+        items = (kind === 'upcoming' || kind === 'continue') ? (items || []) : Netflix._vis(items);
         const row = document.createElement('section');
         row.className = 'content-row';
         row.innerHTML = `
@@ -335,11 +342,12 @@ const Netflix = {
     renderCategory(name) {
         const cat = state.catalog.categories.find(c => c.name === name);
         el.rowsContainer.innerHTML = '';
-        if (!cat || !cat.items.length) { el.rowsContainer.innerHTML = '<div class="empty-state">Sin contenido en ' + escapeHtml(name) + '.</div>'; return; }
+        const visItems = cat ? this._vis(cat.items) : [];
+        if (!cat || !visItems.length) { el.rowsContainer.innerHTML = '<div class="empty-state">Sin contenido en ' + escapeHtml(name) + '.</div>'; return; }
         // Fila "Todas" + una fila por cada género
-        el.rowsContainer.appendChild(this.row(`${cat.icon || ''} Todas`, cat.items));
+        el.rowsContainer.appendChild(this.row(`${cat.icon || ''} Todas`, visItems));
         const byGenre = {};
-        cat.items.forEach(it => {
+        visItems.forEach(it => {
             const gs = (it.meta && it.meta.genres) ? it.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
             gs.forEach(g => { (byGenre[g] = byGenre[g] || []).push(it); });
         });
@@ -389,10 +397,17 @@ const Netflix = {
 
     updateHero(item) {
         if (!item) return;
-        el.heroImage.src = Store.getCover(item.id) || item.thumbUrl || placeholderImage(item.id, item.title);
+        const ov = Store.getOverride(item.id);
+        const logo = ov.logo || item.tmdbLogo;
+        el.heroImage.src = Store.getCover(item.id) || ov.backdrop || item.backdropUrl || item.thumbUrl || placeholderImage(item.id, item.title);
         el.heroImage.onerror = () => { el.heroImage.src = placeholderImage(item.id, item.title); };
-        el.heroTitle.innerText = item.title;
-        el.heroDescription.innerText = item.description || '';
+        const title = ov.title || item.title || '';
+        if (logo && !ov.title) {
+            el.heroTitle.innerHTML = `<img class="hero-logo" src="${logo}" alt="${escapeHtml(title)}" onerror="this.parentNode.innerText=this.alt">`;
+        } else {
+            el.heroTitle.innerText = title;
+        }
+        el.heroDescription.innerText = ov.desc || item.description || '';
         el.heroBadge.innerText = item.category || '';
         el.heroPlay.onclick = () => Detail.open(item, { autoplay: true });
         el.heroInfo.onclick = () => Detail.open(item);
@@ -501,6 +516,7 @@ const Detail = {
             };
         }
         if (opts.autoplay) Player.play(primary, item);
+        Detail._loadReco(item, ov);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
     },
@@ -715,6 +731,33 @@ const Detail = {
         }
         tryCreate();
     },
+    resetReco() { if (el.recoRow) { el.recoRow.hidden = true; if (el.recoTrack) el.recoTrack.innerHTML = ''; } },
+    async _loadReco(item, ov) {
+        if (!el.recoRow || !el.recoTrack) return;
+        el.recoRow.hidden = true; el.recoTrack.innerHTML = '';
+        const id = (ov && ov.tmdbId) || item.tmdbId;
+        const type = (((ov && ov.tmdbType) || item.tmdbType) === 'tv') ? 'tv' : 'movie';
+        if (!id) return;
+        let results;
+        try { const r = await api('/api/tmdb/recommendations/' + type + '/' + id); results = r.results || []; }
+        catch { return; }
+        if (!results.length || el.playerModal.hidden) return;
+        el.recoTrack.innerHTML = results.slice(0, 12).map(rc => `
+            <div class="reco-card focusable" tabindex="0" data-title="${escapeHtml(rc.title || '')}">
+                <img class="reco-card-img" src="${rc.poster || placeholderImage(rc.id, rc.title)}" alt="${escapeHtml(rc.title || '')}" loading="lazy" onerror="this.src='${placeholderImage(rc.id, rc.title)}'">
+                <div class="reco-card-cap">${escapeHtml(rc.title || '')}${rc.year ? ` <span>(${escapeHtml(rc.year)})</span>` : ''}</div>
+            </div>`).join('');
+        $$('.reco-card', el.recoTrack).forEach(c => { c.onclick = () => Detail._openByTitle(c.dataset.title); });
+        el.recoRow.hidden = false;
+        TVNav.refresh();
+    },
+    _openByTitle(title) {
+        const q = (title || '').toLowerCase().trim();
+        const found = state.allItems.find(it => !Store.isHidden(it.id) && (it.title || '').toLowerCase().trim() === q)
+            || state.allItems.find(it => !Store.isHidden(it.id) && (it.title || '').toLowerCase().includes(q));
+        if (found) { Detail.open(found); }
+        else { Detail.close(); App.openSearch(); el.searchInput.value = title; App.search(); }
+    },
     toggleTrailerSound() {
         if (!Detail._ytPlayer) return;
         try {
@@ -726,6 +769,7 @@ const Detail = {
     close() {
         Player.flushProgress();
         Detail._stopTrailer();
+        Detail.resetReco();
         el.playerModal.hidden = true;
         el.body.style.overflow = '';
         this.resetVideo();
@@ -1097,7 +1141,7 @@ const AdminPanel = {
             return `<div class="admin-row focusable" data-id="${escapeHtml(String(it.id))}" tabindex="0">
                 <img class="admin-row-img" src="${img}" alt="" onerror="this.src='${placeholderImage(it.id, title)}'">
                 <div class="admin-row-info">
-                    <div class="admin-row-title">${escapeHtml(title)} ${it.year ? `<span class="admin-row-year">(${escapeHtml(it.year)})</span>` : ''}</div>
+                    <div class="admin-row-title">${escapeHtml(title)} ${it.year ? `<span class="admin-row-year">(${escapeHtml(it.year)})</span>` : ''}${Store.isHidden(it.id) ? ' <span class="admin-hidden-badge">OCULTO</span>' : ''}</div>
                     <div class="admin-flags">
                         ${dot(a.hasCover, 'Carátula')}${dot(a.hasTmdb, 'TMDB')}${dot(a.hasSynopsis, 'Sinopsis')}${dot(a.hasTrailer, 'Tráiler')}${dot(a.hasVideo, 'Vídeo')}
                     </div>
@@ -1115,12 +1159,57 @@ const AdminPanel = {
     renderTools() {
         el.adminTools.innerHTML = `
             <button class="btn btn-play focusable" id="tool-refresh" tabindex="0">🔄 Actualizar catálogo (Telegram)</button>
+            <button class="btn btn-play focusable" id="tool-autofix" tabindex="0">✨ Auto-rellenar fichas sin carátula (TMDB)</button>
             <button class="btn btn-fav focusable" id="tool-cache" tabindex="0">🧹 Borrar caché local</button>
             <button class="btn btn-fav focusable" id="tool-chat" tabindex="0">💬 Editar posts de Telegram</button>
-            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo de Telegram y refresca TMDB. «Borrar caché» limpia la caché del navegador (no borra favoritos). «Editar posts» abre la vista de chat para editar/borrar mensajes del grupo.</p>`;
+            <div class="admin-tools-progress" id="autofix-progress" hidden></div>
+            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo de Telegram y refresca TMDB. «Auto-rellenar» busca en TMDB cada título sin carátula y le pone la primera coincidencia (luego puedes repasar en Auditoría). «Borrar caché» limpia la caché del navegador (no borra favoritos). «Editar posts» abre la vista de chat para editar/borrar mensajes del grupo.</p>`;
         const r = $('#tool-refresh', el.adminTools); if (r) r.onclick = async () => { r.disabled = true; r.innerText = 'Actualizando...'; await Admin.refresh(); this.renderStats(); this.renderList(); r.disabled = false; r.innerText = '🔄 Actualizar catálogo (Telegram)'; };
+        const af = $('#tool-autofix', el.adminTools); if (af) af.onclick = () => this.autoFix(af);
         const c = $('#tool-cache', el.adminTools); if (c) c.onclick = () => { try { sessionStorage.removeItem('tvp_catalog'); } catch {} alert('Caché local borrada. Recarga para volver a leer del servidor.'); };
         const ch = $('#tool-chat', el.adminTools); if (ch) ch.onclick = () => { this.close(); App.switchView('telegram'); };
+    },
+    async autoFix(btn) {
+        const prog = $('#autofix-progress');
+        // Solo los que NO tienen carátula NI ficha TMDB
+        const pending = state.allItems.filter(it => { const a = this._audit(it); return !a.hasTmdb && !a.hasCover; });
+        if (!pending.length) { if (prog) { prog.hidden = false; prog.innerText = 'No hay fichas sin carátula. Todo en orden ✓'; } return; }
+        if (!confirm(`Se buscarán en TMDB ${pending.length} fichas sin carátula y se aplicará la primera coincidencia. ¿Continuar?`)) return;
+        if (btn) { btn.disabled = true; }
+        if (prog) prog.hidden = false;
+        let done = 0, fixed = 0;
+        const cap = Math.min(pending.length, 120); // límite de seguridad por pasada
+        for (let i = 0; i < cap; i++) {
+            const it = pending[i];
+            done++;
+            if (prog) prog.innerText = `Procesando ${done}/${cap}... (${fixed} arregladas)`;
+            try {
+                const type = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
+                const sr = await api('/api/admin/tmdb/search?q=' + encodeURIComponent(it.title || '') + (type ? '&type=' + type : ''));
+                const cand = (sr.results || [])[0];
+                if (cand) {
+                    const dr = await api('/api/admin/tmdb/details/' + cand.type + '/' + cand.id);
+                    const info = dr.info;
+                    if (info && info.poster) {
+                        Store.setOverride(it.id, {
+                            desc: info.overview || '', backdrop: info.backdrop || '', trailer: info.trailerKey || '',
+                            rating: info.rating || '', genres: info.genres || '', logo: info.logo || '',
+                            year: info.year || '', runtime: info.runtime || '', tmdbId: info.tmdbId || '', tmdbType: info.type || ''
+                        });
+                        Store.setCover(it.id, info.poster);
+                        fixed++;
+                    }
+                }
+            } catch {}
+            await new Promise(rs => setTimeout(rs, 220)); // no saturar TMDB
+        }
+        CloudStore.saveOverrides();
+        CloudStore.saveCovers();
+        if (prog) prog.innerText = `Listo: ${fixed} fichas arregladas de ${cap} procesadas.` + (pending.length > cap ? ` (Quedan ${pending.length - cap}; vuelve a pulsar para seguir.)` : '');
+        if (btn) btn.disabled = false;
+        this.renderStats();
+        this.renderList();
+        Netflix.render();
     },
     // ---- editor de ficha ----
     editItem(it) {
@@ -1138,6 +1227,7 @@ const AdminPanel = {
         const q = $('#tmdb-query'); if (q) q.value = ov.title || it.title || '';
         const ts = $('#tmdb-type'); if (ts) ts.value = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
         const tr = $('#tmdb-results'); if (tr) tr.innerHTML = '';
+        const hb = $('#edit-hide'); if (hb) hb.innerText = Store.isHidden(it.id) ? '👁 Mostrar' : '🚫 Ocultar';
         this._editPlaceholders(it);
         el.adminEditor.hidden = false;
         TVNav.refresh();
@@ -1188,7 +1278,7 @@ const AdminPanel = {
         this._pendingTmdb = {
             rating: info.rating || '', genres: info.genres || '', logo: info.logo || '',
             year: info.year || '', runtime: info.runtime || '', budget: info.budget || '',
-            revenue: info.revenue || '', tmdbId: info.tmdbId || ''
+            revenue: info.revenue || '', tmdbId: info.tmdbId || '', tmdbType: info.type || ''
         };
         if (cardEl) {
             const note = cardEl.querySelector('.tmdb-card-pick');
@@ -1221,7 +1311,8 @@ const AdminPanel = {
                 rating: this._pendingTmdb.rating, genres: this._pendingTmdb.genres,
                 logo: this._pendingTmdb.logo, year: this._pendingTmdb.year,
                 runtime: this._pendingTmdb.runtime, budget: this._pendingTmdb.budget,
-                revenue: this._pendingTmdb.revenue, tmdbId: this._pendingTmdb.tmdbId
+                revenue: this._pendingTmdb.revenue, tmdbId: this._pendingTmdb.tmdbId,
+                tmdbType: this._pendingTmdb.tmdbType
             });
         }
         Store.setOverride(id, patch);
@@ -1238,7 +1329,7 @@ const AdminPanel = {
     reset() {
         const id = this._editId; if (id == null) return;
         if (!confirm('¿Quitar todos los cambios manuales de esta ficha?')) return;
-        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '', rating: '', genres: '', logo: '', year: '', runtime: '', budget: '', revenue: '', tmdbId: '' });
+        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '', rating: '', genres: '', logo: '', year: '', runtime: '', budget: '', revenue: '', tmdbId: '', tmdbType: '', hidden: '' });
         Store.setCover(id, '');
         CloudStore.saveOverrides();
         CloudStore.saveCovers();
@@ -1253,6 +1344,16 @@ const AdminPanel = {
         if (!it) return;
         this.close();
         Detail.open(it);
+    },
+    toggleHidden() {
+        const id = this._editId; if (id == null) return;
+        const now = !Store.isHidden(id);
+        Store.setOverride(id, { hidden: now ? '1' : '' });
+        CloudStore.saveOverrides();
+        const hb = $('#edit-hide'); if (hb) hb.innerText = now ? '👁 Mostrar' : '🚫 Ocultar';
+        this.renderStats();
+        this.renderList();
+        Netflix.render();
     }
 };
 
@@ -1358,6 +1459,7 @@ const App = {
         const year = el.filterYear.value || '';
         if (!q && !genre && !year) { el.searchResults.innerHTML = ''; return; }
         const res = state.allItems.filter(it => {
+            if (Store.isHidden(it.id)) return false;
             const okText = !q || (it.title || '').toLowerCase().includes(q) ||
                 (it.description || '').toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q);
             const okGenre = !genre || ((it.meta && it.meta.genres) || '').toLowerCase().includes(genre);
@@ -1394,9 +1496,38 @@ const App = {
     closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
 };
 
+/* ===== Búsqueda por voz (Web Speech API) ===== */
+const Voice = {
+    rec: null,
+    supported() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); },
+    init() {
+        const btn = $('#voice-search');
+        if (!btn || !this.supported()) return;
+        btn.hidden = false;
+        btn.onclick = () => this.toggle();
+    },
+    toggle() {
+        const btn = $('#voice-search');
+        if (this.rec) { try { this.rec.stop(); } catch {} return; }
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SR();
+        this.rec = rec;
+        rec.lang = 'es-ES'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+        if (btn) btn.classList.add('listening');
+        rec.onresult = (e) => {
+            let txt = '';
+            for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+            if (el.searchInput) { el.searchInput.value = txt; App.search(); }
+        };
+        const end = () => { this.rec = null; if (btn) btn.classList.remove('listening'); };
+        rec.onerror = end; rec.onend = end;
+        try { rec.start(); } catch { end(); }
+    }
+};
+
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick',
+    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
@@ -1544,6 +1675,7 @@ function wireUi() {
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
     el.searchInput.addEventListener('input', () => App.search());
+    Voice.init();
     el.filterGenre.addEventListener('change', () => App.search());
     el.filterYear.addEventListener('change', () => App.search());
     el.adminRefresh.onclick = () => Admin.refresh();
@@ -1573,6 +1705,7 @@ function wireUi() {
     const eClose = $('#admin-editor-close'); if (eClose) eClose.onclick = () => AdminPanel.closeEditor();
     const eSave = $('#edit-save'); if (eSave) eSave.onclick = () => AdminPanel.save();
     const eReset = $('#edit-reset'); if (eReset) eReset.onclick = () => AdminPanel.reset();
+    const eHide = $('#edit-hide'); if (eHide) eHide.onclick = () => AdminPanel.toggleHidden();
     const eOpen = $('#edit-open'); if (eOpen) eOpen.onclick = () => AdminPanel.openItem();
     const tSearch = $('#tmdb-search'); if (tSearch) tSearch.onclick = () => AdminPanel.tmdbSearch();
     const tQuery = $('#tmdb-query'); if (tQuery) tQuery.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); AdminPanel.tmdbSearch(); } });
