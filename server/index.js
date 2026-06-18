@@ -305,23 +305,32 @@ app.get('/api/stream-link/:channel/:msgId', withUser, async (req, res) => {
 app.get('/api/health', (req, res) => {
     const writable = sessions.canWrite();
     const dir = cfg.dataDir;
-    const isPersistent = !/(^\/tmp\/|tmp[\\/]tvp-data)/i.test(dir) && writable;
+    const mode = sessions.storeMode();
+    const isPersistent = mode === 'postgres' || (!/(^\/tmp\/|tmp[\\/]tvp-data)/i.test(dir) && writable);
     res.json({
         ok: true,
         app: cfg.appName,
+        store: mode,
         dataDir: dir,
         writable,
         persistent: isPersistent,
         sessions: sessions.persistedCount(),
-        hint: isPersistent ? 'OK - las sesiones persisten entre redeploys' : 'DATA_DIR apunta a /tmp (temporal). Crea un Volume en Railway y pon DATA_DIR=/data'
+        hint: isPersistent
+            ? (mode === 'postgres' ? 'OK - sesiones en Postgres (sobreviven a redeploys)' : 'OK - las sesiones persisten entre redeploys')
+            : 'Disco temporal. En Koyeb/Render free: define DATABASE_URL (Postgres) para no perder los logins.'
     });
 });
 
 app.use(express.static(PUBLIC_DIR));
 app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-app.listen(cfg.port, () => {
-    console.log(`🚀 ${cfg.appName} (multi-usuario) en el puerto ${cfg.port}`);
-    console.log('📂 DATA_DIR =', cfg.dataDir, '| escribible:', sessions.canWrite(), '| sesiones guardadas:', sessions.persistedCount());
-    if (!sessions.canWrite()) console.warn('⚠️  DATA_DIR NO es escribible: las sesiones se perderán en cada redeploy. Crea un Volume y pon DATA_DIR a su mount path.');
-});
+(async () => {
+    await sessions.init();
+    app.listen(cfg.port, () => {
+        console.log(`🚀 ${cfg.appName} (multi-usuario) en el puerto ${cfg.port}`);
+        console.log('📂 Persistencia =', sessions.storeMode(), '| DATA_DIR =', cfg.dataDir, '| escribible:', sessions.canWrite(), '| sesiones guardadas:', sessions.persistedCount());
+        if (sessions.storeMode() === 'file' && !sessions.canWrite()) {
+            console.warn('⚠️  Sin Postgres y DATA_DIR NO escribible: los logins se perderán en cada redeploy. Define DATABASE_URL o un disco persistente.');
+        }
+    });
+})();
