@@ -354,6 +354,7 @@ const Netflix = {
         card.tabIndex = 0;
         const ov = Store.getOverride(item.id);
         const title = ov.title || item.title || item.epTitle || '';
+        const year = ov.year || item.year || '';
         const img = Store.getCover(item.id) || ov.backdrop || item.thumbUrl || placeholderImage(item.id, title);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
@@ -364,7 +365,7 @@ const Netflix = {
             <div class="card-overlay">
                 <h3 class="card-title">${escapeHtml(title)}</h3>
                 <div class="card-meta">
-                    ${item.year ? `<span>${escapeHtml(item.year)}</span>` : ''}
+                    ${year ? `<span>${escapeHtml(year)}</span>` : ''}
                     ${item.isSeries ? `<span class="badge-series">${item.episodeCount} CAP</span>` : (item.links && item.links.length > 1 ? `<span class="badge-series">${item.links.length} ENLACES</span>` : (item.duration && kind !== 'continue' ? `<span>${escapeHtml(item.duration)}</span>` : ''))}
                     <span class="badge-hd">HD</span>
                 </div>
@@ -407,30 +408,34 @@ const Detail = {
         const ov = Store.getOverride(item.id);
         const eps = item.episodes || [];
         const hasLinks = !!(item.links && item.links.length);
+        const ovLogo = ov.logo || item.tmdbLogo;
+        const ovRuntime = ov.runtime || item.tmdbRuntime;
         if (ov.title) {
             el.modalTitle.innerText = ov.title;
-        } else if (item.tmdbLogo) {
-            el.modalTitle.innerHTML = `<img class="tmdb-logo" src="${item.tmdbLogo}" alt="${escapeHtml(item.title)}" onerror="this.parentNode.innerText=this.alt">`;
+        } else if (ovLogo) {
+            el.modalTitle.innerHTML = `<img class="tmdb-logo" src="${ovLogo}" alt="${escapeHtml(item.title)}" onerror="this.parentNode.innerText=this.alt">`;
         } else {
             el.modalTitle.innerText = item.title;
         }
-        el.modalYear.innerText = item.year || '';
+        el.modalYear.innerText = ov.year || item.year || '';
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
-            : (item.tmdbRuntime ? this._fmtRuntime(item.tmdbRuntime)
+            : (ovRuntime ? this._fmtRuntime(ovRuntime)
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
             : (item.duration || (eps[0] && eps[0].duration) || item.size || '')));
         el.modalDescription.innerText = ov.desc || item.description || 'Sin descripción disponible.';
-        if (el.modalRating) el.modalRating.innerText = (item.meta && item.meta.rating) ? ('★ ' + item.meta.rating) : '';
+        const ovRating = ov.rating || (item.meta && item.meta.rating);
+        const ovGenres = ov.genres || (item.meta && item.meta.genres);
+        if (el.modalRating) el.modalRating.innerText = ovRating ? ('★ ' + ovRating) : '';
         if (el.detailGenres) {
-            const gs = (item.meta && item.meta.genres) ? item.meta.genres.split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
+            const gs = ovGenres ? String(ovGenres).split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
             el.detailGenres.innerHTML = gs.map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('');
         }
         // Datos financieros (de TMDB) — duración, presupuesto, recaudación
         if (el.detailFinancials) {
             const bits = [];
-            if (item.tmdbRuntime) bits.push('⏱️ ' + this._fmtRuntime(item.tmdbRuntime));
-            if (item.tmdbBudget) bits.push('💰 ' + this._fmtMoney(item.tmdbBudget));
-            if (item.tmdbRevenue) bits.push('📊 ' + this._fmtMoney(item.tmdbRevenue));
+            if (ovRuntime) bits.push('⏱️ ' + this._fmtRuntime(ovRuntime));
+            if (ov.budget || item.tmdbBudget) bits.push('💰 ' + this._fmtMoney(ov.budget || item.tmdbBudget));
+            if (ov.revenue || item.tmdbRevenue) bits.push('📊 ' + this._fmtMoney(ov.revenue || item.tmdbRevenue));
             el.detailFinancials.innerHTML = bits.map(b => `<span>${escapeHtml(b)}</span>`).join('');
             el.detailFinancials.hidden = bits.length === 0;
         }
@@ -1020,7 +1025,7 @@ const AdminPanel = {
     _audit(it) {
         const ov = Store.getOverride(it.id);
         const hasCover = !!(Store.getCover(it.id) || ov.backdrop || it.thumbUrl);
-        const hasTmdb = !!it.tmdbId;
+        const hasTmdb = !!(it.tmdbId || ov.tmdbId);
         const hasSynopsis = !!(ov.desc || (it.description && it.description.length > 20));
         const hasTrailer = !!(ov.trailer || it.trailerKey);
         const hasVideo = !!(it.streamUrl || it.aceUrl || it.externalUrl || (it.links && it.links.length) || (it.episodes && it.episodes.length));
@@ -1121,6 +1126,7 @@ const AdminPanel = {
     editItem(it) {
         if (!it) return;
         this._editId = it.id;
+        this._pendingTmdb = null;
         const ov = Store.getOverride(it.id);
         $('#admin-editor-title').innerText = 'Editar: ' + (ov.title || it.title || '');
         $('#edit-title').value = ov.title || '';
@@ -1128,10 +1134,66 @@ const AdminPanel = {
         $('#edit-cover').value = Store.getCover(it.id) || '';
         $('#edit-backdrop').value = ov.backdrop || '';
         $('#edit-trailer').value = ov.trailer || it.trailerKey || '';
+        // Buscador TMDB
+        const q = $('#tmdb-query'); if (q) q.value = ov.title || it.title || '';
+        const ts = $('#tmdb-type'); if (ts) ts.value = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
+        const tr = $('#tmdb-results'); if (tr) tr.innerHTML = '';
         this._editPlaceholders(it);
         el.adminEditor.hidden = false;
         TVNav.refresh();
         setTimeout(() => $('#edit-title').focus(), 50);
+    },
+    async tmdbSearch() {
+        const box = $('#tmdb-results'); if (!box) return;
+        const q = ($('#tmdb-query').value || '').trim();
+        const type = $('#tmdb-type').value || '';
+        if (!q) { box.innerHTML = '<div class="admin-empty">Escribe un nombre para buscar.</div>'; return; }
+        box.innerHTML = '<div class="admin-empty">Buscando en TMDB...</div>';
+        let results;
+        try { const r = await api('/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '')); results = r.results || []; }
+        catch (e) { box.innerHTML = '<div class="admin-empty">Error: ' + escapeHtml(e.message) + '</div>'; return; }
+        if (!results.length) { box.innerHTML = '<div class="admin-empty">Sin coincidencias en TMDB.</div>'; return; }
+        box.innerHTML = results.map((c, i) => `
+            <div class="tmdb-card focusable" data-i="${i}" tabindex="0">
+                <img class="tmdb-card-img" src="${c.poster || placeholderImage(c.id, c.title)}" alt="" onerror="this.src='${placeholderImage(c.id, c.title)}'">
+                <div class="tmdb-card-info">
+                    <div class="tmdb-card-title">${escapeHtml(c.title)} ${c.year ? `<span>(${escapeHtml(c.year)})</span>` : ''} <span class="tmdb-card-type">${c.type === 'tv' ? 'Serie' : 'Película'}</span></div>
+                    <div class="tmdb-card-meta">${c.rating ? '★ ' + escapeHtml(c.rating) : ''} ${c.genres ? '· ' + escapeHtml(c.genres) : ''}</div>
+                    <div class="tmdb-card-ov">${escapeHtml((c.overview || '').slice(0, 160))}</div>
+                </div>
+                <button class="tmdb-card-pick" tabindex="0">Usar esta</button>
+            </div>`).join('');
+        $$('.tmdb-card', box).forEach(card => {
+            const cand = results[+card.dataset.i];
+            const pick = () => this.pickTmdb(cand, card);
+            card.querySelector('.tmdb-card-pick').onclick = (e) => { e.stopPropagation(); pick(); };
+            card.onclick = pick;
+        });
+        TVNav.refresh();
+    },
+    async pickTmdb(cand, cardEl) {
+        const box = $('#tmdb-results');
+        $$('.tmdb-card', box).forEach(c => c.classList.remove('selected'));
+        if (cardEl) cardEl.classList.add('selected');
+        let info;
+        try { const r = await api('/api/admin/tmdb/details/' + cand.type + '/' + cand.id); info = r.info; }
+        catch (e) { alert('Error al traer la ficha: ' + e.message); return; }
+        if (!info) { alert('No se pudieron obtener los detalles.'); return; }
+        // Rellenar campos visibles
+        if (info.overview) $('#edit-desc').value = info.overview;
+        if (info.poster) $('#edit-cover').value = info.poster;
+        if (info.backdrop) $('#edit-backdrop').value = info.backdrop;
+        if (info.trailerKey) $('#edit-trailer').value = info.trailerKey;
+        // Guardar el resto (se aplica al pulsar Guardar)
+        this._pendingTmdb = {
+            rating: info.rating || '', genres: info.genres || '', logo: info.logo || '',
+            year: info.year || '', runtime: info.runtime || '', budget: info.budget || '',
+            revenue: info.revenue || '', tmdbId: info.tmdbId || ''
+        };
+        if (cardEl) {
+            const note = cardEl.querySelector('.tmdb-card-pick');
+            if (note) note.innerText = '✓ Seleccionada';
+        }
     },
     _editPlaceholders(it) {
         $('#edit-title').placeholder = it.title || '';
@@ -1147,15 +1209,26 @@ const AdminPanel = {
     save() {
         const id = this._editId; if (id == null) return;
         const it = state.itemsById[id];
-        Store.setOverride(id, {
+        const patch = {
             title: $('#edit-title').value.trim(),
             desc: $('#edit-desc').value.trim(),
             backdrop: $('#edit-backdrop').value.trim(),
             trailer: this._ytId($('#edit-trailer').value)
-        });
+        };
+        // Datos extra copiados de TMDB (nota, géneros, logo, año, duración...)
+        if (this._pendingTmdb) {
+            Object.assign(patch, {
+                rating: this._pendingTmdb.rating, genres: this._pendingTmdb.genres,
+                logo: this._pendingTmdb.logo, year: this._pendingTmdb.year,
+                runtime: this._pendingTmdb.runtime, budget: this._pendingTmdb.budget,
+                revenue: this._pendingTmdb.revenue, tmdbId: this._pendingTmdb.tmdbId
+            });
+        }
+        Store.setOverride(id, patch);
         Store.setCover(id, $('#edit-cover').value.trim());
         CloudStore.saveOverrides();
         CloudStore.saveCovers();
+        this._pendingTmdb = null;
         this.closeEditor();
         this.renderStats();
         this.renderList();
@@ -1165,10 +1238,11 @@ const AdminPanel = {
     reset() {
         const id = this._editId; if (id == null) return;
         if (!confirm('¿Quitar todos los cambios manuales de esta ficha?')) return;
-        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '' });
+        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '', rating: '', genres: '', logo: '', year: '', runtime: '', budget: '', revenue: '', tmdbId: '' });
         Store.setCover(id, '');
         CloudStore.saveOverrides();
         CloudStore.saveCovers();
+        this._pendingTmdb = null;
         this.closeEditor();
         this.renderStats();
         this.renderList();
@@ -1322,7 +1396,7 @@ const App = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input',
+    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
@@ -1500,6 +1574,8 @@ function wireUi() {
     const eSave = $('#edit-save'); if (eSave) eSave.onclick = () => AdminPanel.save();
     const eReset = $('#edit-reset'); if (eReset) eReset.onclick = () => AdminPanel.reset();
     const eOpen = $('#edit-open'); if (eOpen) eOpen.onclick = () => AdminPanel.openItem();
+    const tSearch = $('#tmdb-search'); if (tSearch) tSearch.onclick = () => AdminPanel.tmdbSearch();
+    const tQuery = $('#tmdb-query'); if (tQuery) tQuery.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); AdminPanel.tmdbSearch(); } });
 
     // Atajos de teclado del reproductor
     document.addEventListener('keydown', (e) => {

@@ -216,6 +216,16 @@ app.post('/api/admin/delete', withUser, adminOnly, async (req, res) => {
 });
 app.post('/api/admin/refresh', withUser, adminOnly, (req, res) => { invalidateCatalog(); res.json({ ok: true }); });
 
+// Búsqueda manual en TMDB (panel de admin)
+app.get('/api/admin/tmdb/search', withUser, adminOnly, async (req, res) => {
+    try { res.json({ results: await req.user.service.tmdbSearch(String(req.query.q || '').trim(), req.query.type) }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/admin/tmdb/details/:type/:id', withUser, adminOnly, async (req, res) => {
+    try { res.json({ info: await req.user.service.tmdbDetails(req.params.type, req.params.id) }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 /* ===================== MINIATURAS ===================== */
 app.get('/api/thumb/:topicId/:msgId', withUser, (req, res) => {
     serveThumb(res, 'g-' + req.params.topicId + '-' + req.params.msgId,

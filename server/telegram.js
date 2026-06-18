@@ -488,6 +488,86 @@ class TelegramService {
         if (info.revenue) item.tmdbRevenue = info.revenue;
     }
 
+    // Búsqueda manual en TMDB (para el panel de admin): devuelve varias coincidencias
+    async tmdbSearch(query, type) {
+        if ((!this.cfg.tmdbKey && !this.cfg.tmdbToken) || typeof fetch !== 'function' || !query) return [];
+        const gmap = await this._tmdbGenres();
+        const types = type === 'tv' ? ['tv'] : type === 'movie' ? ['movie'] : ['movie', 'tv'];
+        const out = [];
+        for (const t of types) {
+            const url = `https://api.themoviedb.org/3/search/${t}?language=es-ES&include_adult=false&query=${encodeURIComponent(query)}${this._tmdbAuthQuery()}`;
+            try {
+                const r = await fetch(url, { headers: this._tmdbHeaders() });
+                const d = await r.json();
+                (d.results || []).slice(0, 12).forEach(x => {
+                    const date = x.release_date || x.first_air_date || '';
+                    out.push({
+                        id: x.id, type: t,
+                        title: x.title || x.name || '',
+                        year: (String(date).match(/^(\d{4})/) || [])[1] || '',
+                        overview: x.overview || '',
+                        poster: x.poster_path ? ('https://image.tmdb.org/t/p/w300' + x.poster_path) : '',
+                        backdrop: x.backdrop_path ? ('https://image.tmdb.org/t/p/w780' + x.backdrop_path) : '',
+                        rating: x.vote_average ? String(Math.round(x.vote_average * 10) / 10) : '',
+                        genres: (x.genre_ids || []).map(id => gmap[id]).filter(Boolean).join(', '),
+                        popularity: x.popularity || 0
+                    });
+                });
+            } catch {}
+        }
+        out.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        return out.slice(0, 16);
+    }
+
+    // Detalles completos de un título TMDB concreto (para copiar la ficha exacta)
+    async tmdbDetails(type, id) {
+        if ((!this.cfg.tmdbKey && !this.cfg.tmdbToken) || typeof fetch !== 'function') return null;
+        type = type === 'tv' ? 'tv' : 'movie';
+        let det = null;
+        try {
+            const r = await fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-ES&append_to_response=videos,images&include_image_language=es,en,null${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+            det = await r.json();
+        } catch {}
+        if (!det || !det.id) return null;
+        const pickTrailer = (videos) => {
+            if (!videos || !videos.results) return '';
+            const r = videos.results;
+            const t = r.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
+                     r.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
+                     r.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
+                     r.find(v => v.site === 'YouTube');
+            return t ? t.key : '';
+        };
+        let trailerKey = pickTrailer(det.videos);
+        if (!trailerKey) {
+            try {
+                const r3 = await fetch(`https://api.themoviedb.org/3/${type}/${id}/videos?language=en-US${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
+                trailerKey = pickTrailer(await r3.json());
+            } catch {}
+        }
+        let logoUrl = '';
+        if (det.images && det.images.logos && det.images.logos.length) {
+            for (const lang of ['es', 'en', null]) {
+                const found = det.images.logos.find(l => l.iso_639_1 === lang);
+                if (found) { logoUrl = 'https://image.tmdb.org/t/p/w500' + found.file_path; break; }
+            }
+            if (!logoUrl) logoUrl = 'https://image.tmdb.org/t/p/w500' + det.images.logos[0].file_path;
+        }
+        const date = det.release_date || det.first_air_date || '';
+        return {
+            tmdbId: det.id, type,
+            overview: det.overview || '',
+            year: (String(date).match(/^(\d{4})/) || [])[1] || '',
+            rating: det.vote_average ? String(Math.round(det.vote_average * 10) / 10) : '',
+            genres: (det.genres || []).map(g => g.name).filter(Boolean).join(', '),
+            poster: det.poster_path ? ('https://image.tmdb.org/t/p/w500' + det.poster_path) : '',
+            backdrop: det.backdrop_path ? ('https://image.tmdb.org/t/p/w1280' + det.backdrop_path) : '',
+            trailerKey, logo: logoUrl,
+            runtime: det.runtime || (det.episode_run_time && det.episode_run_time[0]) || 0,
+            budget: det.budget || 0, revenue: det.revenue || 0
+        };
+    }
+
     _buildTopicItems(msgs, topic) {
         const raw = msgs
             // Mantenemos cualquier mensaje que tenga: media, una URL, acestream, o texto con TÍTULO real (>= 4 chars no espacios)

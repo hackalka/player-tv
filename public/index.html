@@ -252,6 +252,18 @@
                     </button>
                 </header>
                 <div class="admin-editor-body">
+                    <div class="tmdb-search-box">
+                        <div class="tmdb-search-row">
+                            <input id="tmdb-query" class="admin-input" type="text" placeholder="Nombre a buscar en TMDB">
+                            <select id="tmdb-type" class="admin-input tmdb-type-sel">
+                                <option value="">Auto</option>
+                                <option value="movie">Película</option>
+                                <option value="tv">Serie</option>
+                            </select>
+                            <button class="btn btn-play tmdb-search-btn" id="tmdb-search">🔎 Buscar en TMDB</button>
+                        </div>
+                        <div class="tmdb-results" id="tmdb-results"></div>
+                    </div>
                     <label class="admin-field"><span>Título</span><input id="edit-title" class="admin-input" type="text"></label>
                     <label class="admin-field"><span>Sinopsis</span><textarea id="edit-desc" class="admin-input" rows="4"></textarea></label>
                     <label class="admin-field"><span>Carátula (URL del póster)</span><input id="edit-cover" class="admin-input" type="url" placeholder="https://..."></label>

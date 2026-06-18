@@ -1128,3 +1128,24 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
     .admin-row-edit { padding: 8px 10px; font-size: .85rem; }
     .admin-row-img { width: 38px; height: 56px; }
 }
+
+
+/* ===== Buscador TMDB en el editor del admin ===== */
+.tmdb-search-box { background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 12px; }
+.tmdb-search-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tmdb-search-row .admin-input { flex: 1; min-width: 140px; }
+.tmdb-type-sel { flex: 0 0 110px; }
+.tmdb-search-btn { white-space: nowrap; }
+.tmdb-results { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 320px; overflow-y: auto; }
+.tmdb-card { display: flex; gap: 10px; align-items: center; background: var(--netflix-card-bg); border-radius: 8px; padding: 8px; border: 2px solid transparent; cursor: pointer; }
+.tmdb-card:hover { background: #3a3a3a; }
+.tmdb-card.selected { border-color: var(--netflix-red); }
+.tmdb-card-img { width: 50px; height: 75px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: #111; }
+.tmdb-card-info { flex: 1; min-width: 0; }
+.tmdb-card-title { color: #fff; font-weight: 600; font-size: .95rem; }
+.tmdb-card-title span { color: var(--netflix-light-gray); font-weight: 400; }
+.tmdb-card-type { font-size: .72rem; background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+.tmdb-card-meta { color: var(--netflix-light-gray); font-size: .8rem; margin: 3px 0; }
+.tmdb-card-ov { color: #c7c7c7; font-size: .8rem; line-height: 1.35; max-height: 3.4em; overflow: hidden; }
+.tmdb-card-pick { flex-shrink: 0; background: var(--netflix-white); color: var(--netflix-black); border: none; border-radius: 4px; padding: 8px 12px; font-family: inherit; font-weight: 600; cursor: pointer; }
+.tmdb-card-pick:hover { background: rgba(255,255,255,.78); }
