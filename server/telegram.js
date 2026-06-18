@@ -289,7 +289,11 @@ class TelegramService {
         t = t.replace(/\b(2160p|1080p|720p|480p|4k|uhd|fhd|hdr|hd|bluray|brrip|bdrip|webrip|web-?dl|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|latino|castellano|espa[ñn]ol|spanish|english|vose|vos|sub(?:s|titulad[oa])?)\b/ig, ' ');
         t = t.replace(/[\[\(].*?[\]\)]/g, ' ');
         t = t.replace(/\b(19|20)\d{2}\b/g, ' ');
-        return 't:' + this._slug(t);
+        const slug = this._slug(t);
+        // Si tras limpiar no queda nada útil (p. ej. el título era solo un año), usar el título
+        // original para NO fusionar películas distintas por error.
+        if (!slug || slug === 'x' || slug.length < 2) return 't:' + this._slug(title);
+        return 't:' + slug;
     }
 
     // Etiqueta de calidad/idioma para distinguir versiones de la misma película
@@ -495,7 +499,7 @@ class TelegramService {
                 if (/acestream/i.test(t)) return true;
                 // Posts solo de texto que parezcan ficha (línea con título): se quedan
                 const firstLine = (t.split('\n')[0] || '').trim();
-                if (firstLine.length >= 4 && firstLine.length <= 120) return true;
+                if (firstLine.length >= 3 && firstLine.length <= 280) return true;
                 return false;
             })
             .map(m => this.buildItem(m, topic));
