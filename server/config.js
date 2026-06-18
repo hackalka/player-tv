@@ -35,5 +35,10 @@ module.exports = {
     tmdbToken: (process.env.TMDB_TOKEN || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjYmIxZmEwN2M4ODYyNmY1YzU3ZDU2ZTQ4ZDhjZTcwNCIsIm5iZiI6MTc3MTc3OTI0OS43NDMsInN1YiI6IjY5OWIzNGIxMjE0MTY1ZDNmNGIyOGY1NiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.PPzm5Z0TpX6EhkaeVpi-Nhzy1tMvjpcMOKbAy16R3fc').trim(),
 
     // Carpeta de datos (sesiones de usuario persistidas + caché de miniaturas)
-    dataDir: process.env.DATA_DIR || path.join(os.tmpdir(), 'tvp-data')
+    dataDir: process.env.DATA_DIR || path.join(os.tmpdir(), 'tvp-data'),
+
+    // (Opcional) Postgres para persistir las sesiones de usuario entre redeploys.
+    // Recomendado en Koyeb/Render free (disco efímero). Si está vacío, se usa
+    // el fichero sessions.json dentro de DATA_DIR.
+    databaseUrl: process.env.DATABASE_URL || ''
 };

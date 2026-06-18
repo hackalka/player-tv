@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { TelegramService } = require('./telegram');
+const { SessionStore } = require('./store');
 
 /**
  * Gestiona una sesión de Telegram POR usuario.
@@ -17,15 +18,23 @@ class SessionManager {
         this.cfg = cfg;
         this.users = new Map();
         this.logins = new Map();
+        this.store = new SessionStore(cfg);
         this.storeFile = path.join(cfg.dataDir, 'sessions.json');
         try { fs.mkdirSync(cfg.dataDir, { recursive: true }); } catch {}
-        this.persisted = this._load();
+        this.persisted = {}; // se rellena en init()
         const t = setInterval(() => this._cleanupLogins(), 60000);
         if (t.unref) t.unref();
     }
 
-    _load() { try { const d = JSON.parse(fs.readFileSync(this.storeFile, 'utf8')); console.log('[sessions] Cargadas ' + Object.keys(d).length + ' sesiones desde ' + this.storeFile); return d; } catch (e) { console.log('[sessions] Sin sesiones previas en ' + this.storeFile); return {}; } }
-    _save() { try { fs.writeFileSync(this.storeFile, JSON.stringify(this.persisted)); console.log('[sessions] Guardadas ' + Object.keys(this.persisted).length + ' sesiones en ' + this.storeFile); } catch (e) { console.warn('[sessions] ERROR al guardar:', e.message); } }
+    /** Carga las sesiones persistidas (Postgres o fichero) antes de aceptar trafico. */
+    async init() {
+        try { await this.store.init(); } catch (e) { console.warn('[sessions] store.init:', e.message); }
+        this.persisted = await this.store.loadAll();
+        console.log('[sessions] Modo de persistencia: ' + this.store.mode() + ' | sesiones: ' + this.persistedCount());
+    }
+
+    _save() { try { this.store.saveAll(this.persisted); } catch (e) { console.warn('[sessions] ERROR al guardar:', e.message); } }
+    storeMode() { return this.store.mode(); }
     persistedCount() { return Object.keys(this.persisted || {}).length; }
     canWrite() { try { const p = path.join(this.cfg.dataDir, '.wtest'); fs.writeFileSync(p, '1'); fs.unlinkSync(p); return true; } catch { return false; } }
 
