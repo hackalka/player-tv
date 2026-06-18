@@ -665,3 +665,154 @@ body {
         display: none;
     }
 }
+
+
+/* ===== ADMIN: BOTON NAVBAR ===== */
+.admin-btn {
+    background: transparent;
+    border: none;
+    color: var(--netflix-white);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast), transform var(--transition-fast);
+}
+.admin-btn:hover {
+    color: var(--netflix-red);
+    transform: rotate(20deg);
+}
+
+/* ===== ADMIN: PANEL ===== */
+.admin-box {
+    max-width: 640px;
+    width: 92%;
+    background: var(--netflix-dark-gray);
+    border-radius: 8px;
+    padding: 28px;
+    position: relative;
+    max-height: 86vh;
+    overflow-y: auto;
+}
+.admin-whoami {
+    color: var(--netflix-light-gray);
+    font-size: 0.9rem;
+    margin: 8px 0 20px;
+    line-height: 1.5;
+}
+.admin-whoami code {
+    background: rgba(255, 255, 255, 0.12);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--netflix-white);
+}
+.admin-label {
+    display: block;
+    color: var(--netflix-light-gray);
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+.admin-input {
+    width: 100%;
+    padding: 12px 14px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: var(--netflix-white);
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+.admin-input:focus {
+    outline: none;
+    border-color: var(--netflix-red);
+}
+.admin-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.btn-sm {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--netflix-white);
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: background var(--transition-fast);
+}
+.btn-sm:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+.admin-group-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #333;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+.admin-group-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #2a2a2a;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+.admin-group-row:last-child {
+    border-bottom: none;
+}
+.admin-group-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.admin-group-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--netflix-red);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.admin-group-title {
+    flex: 1;
+    color: var(--netflix-white);
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.admin-group-id {
+    color: var(--netflix-gray);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.admin-hint {
+    color: var(--netflix-gray);
+    font-size: 0.9rem;
+    padding: 16px;
+    text-align: center;
+}
+.admin-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.admin-status {
+    color: var(--netflix-light-gray);
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+/* ===== TARJETA: BOTON REENVIAR ===== */
+.card-action-btn.forward-btn.done {
+    background: #2ecc71;
+    border-color: #2ecc71;
+    color: #fff;
+}
