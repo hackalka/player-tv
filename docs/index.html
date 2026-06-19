@@ -314,10 +314,16 @@
             for (const s of SOURCES) {
                 try {
                     const tg = await import(s.tg);
-                    const se = await import(s.se);
                     const T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
                     const Api = tg.Api || (tg.default && tg.default.Api);
-                    const StringSession = se.StringSession || (se.default && se.default.StringSession);
+                    // IMPORTANTE: StringSession debe venir del MISMO modulo que TelegramClient
+                    // (si se importa del submodulo /sessions, esm.sh duplica GramJS y falla el instanceof)
+                    let StringSession = (tg.sessions && tg.sessions.StringSession) || tg.StringSession
+                        || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
+                    if (!StringSession) {
+                        const se = await import(s.se);
+                        StringSession = se.StringSession || (se.default && se.default.StringSession);
+                    }
                     if (T && Api && StringSession) {
                         window.telegram = { TelegramClient: T, Api, sessions: { StringSession } };
                         try { const b = await import(s.bi); window.bigInt = window.bigInt || b.default || b; } catch (e) { }
