@@ -296,6 +296,15 @@
         </div>
     </div>
 
+    <!-- Import map: sustituye el 'crypto' de Node por crypto-browserify (createHash real) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "crypto": "https://esm.sh/crypto-browserify@3.12.1",
+        "node:crypto": "https://esm.sh/crypto-browserify@3.12.1"
+      }
+    }
+    </script>
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     <!-- Polyfill de Buffer (Node) para el navegador, ANTES de cargar GramJS -->
@@ -310,6 +319,8 @@
             // inicializacion (circular deps) que rompen connect(); por eso PROBAMOS cada
             // uno conectando de verdad y nos quedamos con el primero que funcione.
             var ESM = [
+                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&external=crypto,node:crypto',
+                'https://esm.sh/telegram@2.26.22?target=es2022&external=crypto,node:crypto',
                 'https://esm.sh/telegram@2.26.22?bundle&target=es2022',
                 'https://esm.sh/telegram@2.26.22?bundle-deps',
                 'https://esm.sh/telegram@2.26.22?target=esnext',
