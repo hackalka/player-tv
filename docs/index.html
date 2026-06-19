@@ -300,8 +300,8 @@
     <script type="importmap">
     {
       "imports": {
-        "crypto": "https://esm.sh/crypto-browserify@3.12.1",
-        "node:crypto": "https://esm.sh/crypto-browserify@3.12.1"
+        "crypto": "https://esm.sh/crypto-browserify@3.12.1?target=es2022",
+        "node:crypto": "https://esm.sh/crypto-browserify@3.12.1?target=es2022"
       }
     }
     </script>
@@ -368,8 +368,10 @@
                 }
             }
             var UMD = [
-                'https://cdn.jsdelivr.net/npm/telegram@2.26.22/dist/index.js',
-                'https://unpkg.com/telegram@2.26.22/dist/index.js'
+                'https://cdn.jsdelivr.net/npm/telegram@2.19.10/browser/telegram.js',
+                'https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js',
+                'https://unpkg.com/telegram@2.19.10/browser/telegram.js',
+                'https://cdn.jsdelivr.net/npm/telegram@2.15.5/browser/telegram.js'
             ];
             function loadScript(src) {
                 return new Promise(function (res, rej) {
