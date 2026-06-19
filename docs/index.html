@@ -310,10 +310,10 @@
             // inicializacion (circular deps) que rompen connect(); por eso PROBAMOS cada
             // uno conectando de verdad y nos quedamos con el primero que funcione.
             var ESM = [
-                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&node-compat=true',
                 'https://esm.sh/telegram@2.26.22?bundle&target=es2022',
                 'https://esm.sh/telegram@2.26.22?bundle-deps',
                 'https://esm.sh/telegram@2.26.22?target=esnext',
+                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&node-compat=true',
                 'https://esm.sh/telegram@2.26.22'
             ];
             async function polyfills() {
@@ -338,18 +338,21 @@
                     || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
                 return (T && Api && SS) ? { TelegramClient: T, Api: Api, sessions: { StringSession: SS } } : null;
             }
+            function tmo(ms) { return new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); }); }
             async function connects(lib) {
+                var c;
                 try {
                     var cfg = window.TVP_CONFIG || {};
-                    var c = new lib.TelegramClient(new lib.sessions.StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 1, useWSS: true });
-                    await Promise.race([
-                        c.connect(),
-                        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, 15000); })
-                    ]);
+                    c = new lib.TelegramClient(new lib.sessions.StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 1, useWSS: true });
+                    await Promise.race([c.connect(), tmo(15000)]);
+                    // PRUEBA REAL: una llamada que obliga al handshake + crypto (createHash).
+                    // Si crypto esta roto (unenv), falla aqui; si va, devuelve la config.
+                    await Promise.race([c.invoke(new lib.Api.help.GetConfig()), tmo(15000)]);
                     try { await c.disconnect(); } catch (e) { }
                     return true;
                 } catch (e) {
                     console.warn('[tg-loader] prueba de conexion fallo:', e && e.message);
+                    try { if (c) await c.disconnect(); } catch (e2) { }
                     return false;
                 }
             }
