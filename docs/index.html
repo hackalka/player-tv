@@ -299,45 +299,68 @@
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     <script>
-        // Promesa que resuelve cuando GramJS esta listo (la resuelve el modulo de abajo)
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
-    </script>
-    <script type="module">
-        // GramJS ya NO publica browser/telegram.js. Lo cargamos como modulo ES
-        // desde CDNs que compilan npm para el navegador (con polyfills de Node).
-        (async () => {
-            const SOURCES = [
-                { tg: 'https://esm.sh/telegram@2.26.22', se: 'https://esm.sh/telegram@2.26.22/sessions', bi: 'https://esm.sh/big-integer@1.6.52' },
-                { tg: 'https://cdn.jsdelivr.net/npm/telegram@2.26.22/+esm', se: 'https://cdn.jsdelivr.net/npm/telegram@2.26.22/sessions/+esm', bi: 'https://cdn.jsdelivr.net/npm/big-integer@1.6.52/+esm' },
-                { tg: 'https://esm.run/telegram@2.26.22', se: 'https://esm.run/telegram@2.26.22/sessions', bi: 'https://esm.run/big-integer@1.6.52' }
+        (function () {
+            // 1) PREFERIDO: bundle UMD oficial de GramJS (repo GitHub via jsDelivr).
+            //    Define window.telegram completo y usa el transporte de navegador (sin bug de orden).
+            var UMD = [
+                'https://cdn.jsdelivr.net/gh/gram-js/gramjs/browser/telegram.js',
+                'https://cdn.jsdelivr.net/gh/gram-js/gramjs@2.26.22/browser/telegram.js',
+                'https://cdn.jsdelivr.net/gh/gram-js/gramjs@2.22.2/browser/telegram.js'
             ];
-            for (const s of SOURCES) {
-                try {
-                    const tg = await import(s.tg);
-                    const T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
-                    const Api = tg.Api || (tg.default && tg.default.Api);
-                    // IMPORTANTE: StringSession debe venir del MISMO modulo que TelegramClient
-                    // (si se importa del submodulo /sessions, esm.sh duplica GramJS y falla el instanceof)
-                    let StringSession = (tg.sessions && tg.sessions.StringSession) || tg.StringSession
-                        || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
-                    if (!StringSession) {
-                        const se = await import(s.se);
-                        StringSession = se.StringSession || (se.default && se.default.StringSession);
-                    }
-                    if (T && Api && StringSession) {
-                        window.telegram = { TelegramClient: T, Api, sessions: { StringSession } };
-                        try { const b = await import(s.bi); window.bigInt = window.bigInt || b.default || b; } catch (e) { }
-                        console.log('[tg-loader] GramJS cargado via', s.tg);
-                        window.__tgResolve(window.telegram);
-                        return;
-                    }
-                    console.warn('[tg-loader] import OK pero faltan exports en', s.tg, Object.keys(tg));
-                } catch (e) {
-                    console.warn('[tg-loader] FALLO import', s.tg, e && e.message);
-                }
+            // 2) RESPALDO: CDNs que compilan el paquete a ESM (pueden fallar al conectar).
+            var ESM = [
+                { tg: 'https://esm.sh/telegram@2.26.22', bi: 'https://esm.sh/big-integer@1.6.52' },
+                { tg: 'https://cdn.jsdelivr.net/npm/telegram@2.26.22/+esm', bi: 'https://cdn.jsdelivr.net/npm/big-integer@1.6.52/+esm' }
+            ];
+            function loadScript(src) {
+                return new Promise(function (res, rej) {
+                    var s = document.createElement('script'); s.src = src; s.async = false;
+                    s.onload = function () { res(); }; s.onerror = function () { rej(new Error(src)); };
+                    document.head.appendChild(s);
+                });
             }
-            console.error('[tg-loader] Ningun CDN ESM de GramJS funciono');
-            window.__tgReject(new Error('No se pudo cargar GramJS'));
+            function waitGlobal() {
+                return new Promise(function (res) {
+                    var n = 0; (function chk() { if (window.telegram && window.telegram.TelegramClient) return res(true); if (n++ > 50) return res(false); setTimeout(chk, 100); })();
+                });
+            }
+            async function tryUMD() {
+                for (var i = 0; i < UMD.length; i++) {
+                    try { await loadScript(UMD[i]); } catch (e) { console.warn('[tg-loader] UMD FALLO', UMD[i]); continue; }
+                    if (await waitGlobal()) { console.log('[tg-loader] GramJS UMD cargado via', UMD[i]); return true; }
+                    console.warn('[tg-loader] UMD cargó pero sin window.telegram', UMD[i]);
+                }
+                return false;
+            }
+            async function tryESM() {
+                for (var i = 0; i < ESM.length; i++) {
+                    var s = ESM[i];
+                    try {
+                        var tg = await import(s.tg);
+                        var T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
+                        var Api = tg.Api || (tg.default && tg.default.Api);
+                        var SS = (tg.sessions && tg.sessions.StringSession) || tg.StringSession || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
+                        if (T && Api && SS) {
+                            window.telegram = { TelegramClient: T, Api: Api, sessions: { StringSession: SS } };
+                            try { var b = await import(s.bi); window.bigInt = window.bigInt || b.default || b; } catch (e) { }
+                            console.log('[tg-loader] GramJS ESM cargado via', s.tg);
+                            return true;
+                        }
+                        console.warn('[tg-loader] ESM sin exports en', s.tg);
+                    } catch (e) { console.warn('[tg-loader] ESM FALLO', s.tg, e && e.message); }
+                }
+                return false;
+            }
+            (async function () {
+                try {
+                    if (await tryUMD()) return window.__tgResolve(window.telegram);
+                    console.warn('[tg-loader] UMD no disponible, probando ESM...');
+                    if (await tryESM()) return window.__tgResolve(window.telegram);
+                    console.error('[tg-loader] No se pudo cargar GramJS por ningun metodo');
+                    window.__tgReject(new Error('No se pudo cargar GramJS'));
+                } catch (e) { window.__tgReject(e); }
+            })();
         })();
     </script>
     <!-- Capa cliente (reemplaza al servidor) -->
