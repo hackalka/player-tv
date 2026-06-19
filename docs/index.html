@@ -298,13 +298,19 @@
 
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
+    <!-- Polyfill de Buffer (Node) para el navegador, ANTES de cargar GramJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js" crossorigin="anonymous"></script>
     <script>
+        try { window.Buffer = window.Buffer || (window.buffer && window.buffer.Buffer); } catch (e) { }
+        if (!window.global) window.global = window;
+        if (!window.process) window.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
         (function () {
             // Varios CDN que compilan GramJS para navegador. Algunos tienen bugs de
             // inicializacion (circular deps) que rompen connect(); por eso PROBAMOS cada
             // uno conectando de verdad y nos quedamos con el primero que funcione.
             var ESM = [
+                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&node-compat=true',
                 'https://esm.sh/telegram@2.26.22?bundle&target=es2022',
                 'https://esm.sh/telegram@2.26.22?bundle-deps',
                 'https://esm.sh/telegram@2.26.22?target=esnext',
