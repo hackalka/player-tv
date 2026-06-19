@@ -298,7 +298,32 @@
 
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js"></script>
+    <script>
+        // Carga GramJS con fallback de CDN y expone una promesa window.__tgReady
+        window.__tgReady = (function () {
+            function load(src) {
+                return new Promise(function (res, rej) {
+                    var s = document.createElement('script');
+                    s.src = src; s.async = false;
+                    s.onload = res; s.onerror = function () { rej(new Error('fallo ' + src)); };
+                    document.head.appendChild(s);
+                });
+            }
+            function waitGlobal() {
+                return new Promise(function (res, rej) {
+                    var n = 0;
+                    (function chk() {
+                        if (window.telegram && window.telegram.TelegramClient) return res(window.telegram);
+                        if (n++ > 150) return rej(new Error('GramJS no se cargó'));
+                        setTimeout(chk, 100);
+                    })();
+                });
+            }
+            return load('https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js')
+                .catch(function () { return load('https://unpkg.com/telegram/browser/telegram.js'); })
+                .then(waitGlobal);
+        })();
+    </script>
     <!-- Capa cliente (reemplaza al servidor) -->
     <script src="tg-config.js"></script>
     <script src="tg-service.js"></script>

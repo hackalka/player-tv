@@ -34,10 +34,19 @@
         });
     }
 
+    // Espera a que GramJS (window.telegram) este cargado
+    async function whenReady() {
+        try { if (window.__tgReady) await window.__tgReady; } catch (e) { /* fallthrough */ }
+        if (!window.telegram || !window.telegram.TelegramClient) {
+            throw new Error('No se pudo cargar la librería de Telegram. Revisa tu conexión y recarga la página.');
+        }
+    }
+
     async function ensureClient() {
         if (_client) return _client;
         if (_clientPromise) return _clientPromise;
         _clientPromise = (async () => {
+            await whenReady();
             let str = '';
             try { str = localStorage.getItem(SS_KEY) || ''; } catch {}
             if (!str) return null;
@@ -67,12 +76,14 @@
 
     /* ---------------- LOGIN ---------------- */
     async function loginStart() {
+        await whenReady();
         _loginClient = newClient('');
         await _loginClient.connect();
         _login = {};
         return json({ loginId: 'local' });
     }
     async function loginSendCode(body) {
+        await whenReady();
         const phone = String(body.phone || '').trim();
         if (!phone) return json({ error: 'Escribe tu número con prefijo (ej: +34...).' }, 400);
         if (!_loginClient) { _loginClient = newClient(''); await _loginClient.connect(); }

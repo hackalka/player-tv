@@ -6,11 +6,16 @@
  * =================================================================== */
 (function () {
     'use strict';
-    const Api = window.telegram.Api;
-    const bigInt = window.bigInt || (window.telegram && window.telegram.bigInt);
+    let Api = null;
+    let bigInt = null;
+    function _libs() {
+        Api = window.telegram.Api;
+        bigInt = window.bigInt || (window.telegram && window.telegram.bigInt);
+    }
 
     class TelegramService {
         constructor(client, cfg) {
+            _libs();
             this.client = client;
             this.cfg = cfg;
             this.Api = Api;
