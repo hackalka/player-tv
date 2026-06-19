@@ -34,6 +34,13 @@
         });
     }
 
+    function withTimeout(promise, ms, msg) {
+        return Promise.race([
+            promise,
+            new Promise((_, rej) => setTimeout(() => rej(new Error(msg || ('Tiempo de espera agotado (' + ms + 'ms)'))), ms))
+        ]);
+    }
+
     // Espera a que GramJS (window.telegram) este cargado
     async function whenReady() {
         try { if (window.__tgReady) await window.__tgReady; } catch (e) { /* fallthrough */ }
@@ -77,8 +84,11 @@
     /* ---------------- LOGIN ---------------- */
     async function loginStart() {
         await whenReady();
+        console.log('[tg] login: creando cliente...');
         _loginClient = newClient('');
-        await _loginClient.connect();
+        console.log('[tg] login: conectando con Telegram (WebSocket)...');
+        await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram (WebSocket). Puede ser bloqueo de red o el transporte del navegador.');
+        console.log('[tg] login: CONECTADO.');
         _login = {};
         return json({ loginId: 'local' });
     }
@@ -86,8 +96,10 @@
         await whenReady();
         const phone = String(body.phone || '').trim();
         if (!phone) return json({ error: 'Escribe tu número con prefijo (ej: +34...).' }, 400);
-        if (!_loginClient) { _loginClient = newClient(''); await _loginClient.connect(); }
-        const r = await _loginClient.sendCode({ apiId: cfg.apiId, apiHash: cfg.apiHash }, phone);
+        if (!_loginClient) { _loginClient = newClient(''); await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram.'); }
+        console.log('[tg] login: enviando código a', phone);
+        const r = await withTimeout(_loginClient.sendCode({ apiId: cfg.apiId, apiHash: cfg.apiHash }, phone), 25000, 'Telegram no respondió al enviar el código.');
+        console.log('[tg] login: código enviado, revisa Telegram.');
         _login = { phone, hash: r.phoneCodeHash };
         return json({ ok: true });
     }
