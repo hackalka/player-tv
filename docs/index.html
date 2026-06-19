@@ -299,29 +299,34 @@
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     <script>
-        // Carga GramJS con fallback de CDN y expone una promesa window.__tgReady
+        // Carga GramJS probando varios CDN; deja diagnostico en consola.
         window.__tgReady = (function () {
+            var URLS = [
+                'https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js',
+                'https://unpkg.com/telegram/browser/telegram.js',
+                'https://cdn.jsdelivr.net/npm/telegram@2.26.22/browser/telegram.js',
+                'https://unpkg.com/telegram@2.26.22/browser/telegram.js'
+            ];
             function load(src) {
                 return new Promise(function (res, rej) {
                     var s = document.createElement('script');
                     s.src = src; s.async = false;
-                    s.onload = res; s.onerror = function () { rej(new Error('fallo ' + src)); };
+                    s.onload = function () { console.log('[tg-loader] cargado:', src); res(); };
+                    s.onerror = function () { console.warn('[tg-loader] FALLO:', src); rej(new Error(src)); };
                     document.head.appendChild(s);
                 });
             }
-            function waitGlobal() {
-                return new Promise(function (res, rej) {
-                    var n = 0;
-                    (function chk() {
-                        if (window.telegram && window.telegram.TelegramClient) return res(window.telegram);
-                        if (n++ > 150) return rej(new Error('GramJS no se cargó'));
-                        setTimeout(chk, 100);
-                    })();
-                });
+            function ready() { return !!(window.telegram && window.telegram.TelegramClient); }
+            async function run() {
+                for (var i = 0; i < URLS.length; i++) {
+                    try { await load(URLS[i]); } catch (e) { continue; }
+                    // esperar hasta 5s a que aparezca el global
+                    for (var n = 0; n < 50; n++) { if (ready()) { console.log('[tg-loader] window.telegram OK'); return window.telegram; } await new Promise(r => setTimeout(r, 100)); }
+                    console.warn('[tg-loader] el script cargó pero no definió window.telegram:', URLS[i]);
+                }
+                throw new Error('Ningun CDN de GramJS funciono');
             }
-            return load('https://cdn.jsdelivr.net/npm/telegram/browser/telegram.js')
-                .catch(function () { return load('https://unpkg.com/telegram/browser/telegram.js'); })
-                .then(waitGlobal);
+            return run();
         })();
     </script>
     <!-- Capa cliente (reemplaza al servidor) -->
