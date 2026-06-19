@@ -306,13 +306,25 @@
             // uno conectando de verdad y nos quedamos con el primero que funcione.
             var ESM = [
                 'https://esm.sh/telegram@2.26.22?bundle&target=es2022',
-                'https://cdn.skypack.dev/telegram@2.26.22',
-                'https://esm.run/telegram@2.26.22',
                 'https://esm.sh/telegram@2.26.22?bundle-deps',
                 'https://esm.sh/telegram@2.26.22?target=esnext',
-                'https://esm.sh/telegram@2.19.10',
                 'https://esm.sh/telegram@2.26.22'
             ];
+            async function polyfills() {
+                if (!globalThis.global) globalThis.global = globalThis;
+                if (!globalThis.process) globalThis.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
+                if (!globalThis.Buffer) {
+                    var SRC = ['https://esm.sh/buffer@6.0.3', 'https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm'];
+                    for (var i = 0; i < SRC.length; i++) {
+                        try {
+                            var m = await import(SRC[i]);
+                            var B = m.Buffer || (m.default && m.default.Buffer);
+                            if (B) { globalThis.Buffer = B; window.Buffer = B; console.log('[tg-loader] Buffer polyfill OK'); break; }
+                        } catch (e) { }
+                    }
+                    if (!globalThis.Buffer) console.warn('[tg-loader] no se pudo cargar el polyfill de Buffer');
+                }
+            }
             function pick(tg) {
                 var T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
                 var Api = tg.Api || (tg.default && tg.default.Api);
@@ -336,6 +348,7 @@
                 }
             }
             (async function () {
+                await polyfills();
                 for (var i = 0; i < ESM.length; i++) {
                     var url = ESM[i];
                     try {
