@@ -356,8 +356,38 @@
                     return false;
                 }
             }
+            var UMD = [
+                'https://cdn.jsdelivr.net/npm/telegram@2.26.22/dist/index.js',
+                'https://unpkg.com/telegram@2.26.22/dist/index.js'
+            ];
+            function loadScript(src) {
+                return new Promise(function (res, rej) {
+                    var s = document.createElement('script'); s.src = src; s.async = false;
+                    s.onload = function () { res(); }; s.onerror = function () { rej(new Error(src)); };
+                    document.head.appendChild(s);
+                });
+            }
+            function waitGlobal(ms) {
+                return new Promise(function (res) {
+                    var n = Math.ceil((ms || 5000) / 100);
+                    (function chk() { if (window.telegram && window.telegram.TelegramClient) return res(true); if (n-- <= 0) return res(false); setTimeout(chk, 100); })();
+                });
+            }
             (async function () {
                 await polyfills();
+                // 1) UMD clasico (dist/index.js): expondria window.telegram con crypto nativo del navegador
+                for (var u = 0; u < UMD.length; u++) {
+                    try { await loadScript(UMD[u]); }
+                    catch (e) { console.warn('[tg-loader] UMD no carga', UMD[u]); continue; }
+                    if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', UMD[u]); continue; }
+                    console.log('[tg-loader] UMD importado:', UMD[u], '— probando conexion...');
+                    if (await connects(window.telegram)) {
+                        console.log('[tg-loader] ✅ GramJS FUNCIONA (UMD) via', UMD[u]);
+                        return window.__tgResolve(window.telegram);
+                    }
+                    console.warn('[tg-loader] UMD importó pero no conecta:', UMD[u]);
+                }
+                // 2) Fallback ESM (esm.sh) — puede traer crypto roto (unenv)
                 for (var i = 0; i < ESM.length; i++) {
                     var url = ESM[i];
                     try {
@@ -376,7 +406,7 @@
                         console.warn('[tg-loader] FALLO import', url, e && e.message);
                     }
                 }
-                console.error('[tg-loader] Ningun CDN de GramJS funciono para conectar');
+                console.error('[tg-loader] Ningun metodo de GramJS funciono para conectar');
                 window.__tgReject(new Error('No se pudo cargar GramJS'));
             })();
         })();
