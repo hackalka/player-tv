@@ -25,6 +25,9 @@
         });
     }
     function newClient(sessionStr) {
+        if (!window.telegram || !window.telegram.TelegramClient) {
+            throw new Error('No se pudo cargar la librería de Telegram. Revisa tu conexión y recarga la página.');
+        }
         const { TelegramClient, sessions } = window.telegram;
         return new TelegramClient(new sessions.StringSession(sessionStr || ''), cfg.apiId, cfg.apiHash, {
             connectionRetries: 5, useWSS: true, autoReconnect: true
