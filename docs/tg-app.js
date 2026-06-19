@@ -11,6 +11,10 @@
     const cfg = window.TVP_CONFIG;
     const SS_KEY = 'tvp_session';
 
+    // Captura errores que de otro modo se "tragan", para diagnosticar
+    window.addEventListener('unhandledrejection', (e) => console.error('[tg] promesa no manejada:', e.reason && (e.reason.stack || e.reason.message || e.reason)));
+    window.addEventListener('error', (e) => console.error('[tg] error global:', e.message, e.filename, e.lineno));
+
     let _client = null;          // cliente autorizado
     let _clientPromise = null;
     let _service = null;
@@ -85,9 +89,19 @@
     async function loginStart() {
         await whenReady();
         console.log('[tg] login: creando cliente...');
-        _loginClient = newClient('');
-        console.log('[tg] login: conectando con Telegram (WebSocket)...');
-        await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram (WebSocket). Puede ser bloqueo de red o el transporte del navegador.');
+        try {
+            _loginClient = newClient('');
+        } catch (e) {
+            console.error('[tg] login: ERROR al CREAR el cliente:', e && (e.stack || e.message));
+            throw e;
+        }
+        console.log('[tg] login: cliente creado. Conectando con Telegram (WebSocket)...');
+        try {
+            await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram (WebSocket).');
+        } catch (e) {
+            console.error('[tg] login: ERROR al CONECTAR:', e && (e.stack || e.message));
+            throw e;
+        }
         console.log('[tg] login: CONECTADO.');
         _login = {};
         return json({ loginId: 'local' });
