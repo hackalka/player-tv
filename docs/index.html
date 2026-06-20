@@ -314,18 +314,6 @@
         try { window.Buffer = window.Buffer || (window.buffer && window.buffer.Buffer); } catch (e) { }
         if (!window.global) window.global = window;
         if (!window.process) window.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
-        // Silencia el ruido del bucle interno de GramJS (_updateLoop TIMEOUT no es un error)
-        (function () {
-            var ce = console.error.bind(console);
-            console.error = function () {
-                try {
-                    var s = '';
-                    for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; s += (a && a.message) ? a.message : String(a); s += ' '; }
-                    if (/_updateLoop|^Error:\s*TIMEOUT$/i.test(s)) return; // ignorar
-                } catch (e) { }
-                ce.apply(console, arguments);
-            };
-        })();
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
         (function () {
             // Varios CDN que compilan GramJS para navegador. Algunos tienen bugs de
