@@ -1,8 +1,8 @@
 name: Build GramJS browser bundle
 
-# Compila el bundle de navegador OFICIAL de GramJS (con Web Crypto, sin el
-# crypto de Node) y lo deja en docs/telegram-browser.js para que Cloudflare
-# Pages lo sirva como archivo estatico.
+# Genera docs/telegram-browser.js a partir de la version "browser" de GramJS
+# publicada en npm (telegram@browser), que YA usa Web Crypto y los constructores
+# TL al dia. Empaquetada con esbuild en formato IIFE (window.telegram).
 
 on:
   workflow_dispatch:
@@ -24,35 +24,71 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Clonar el codigo fuente de GramJS
-        run: git clone --depth 1 https://github.com/gram-js/gramjs gramjs-src
-
-      - name: Compilar el bundle de navegador
-        working-directory: gramjs-src
+      - name: Instalar telegram@browser + esbuild + polyfills
         run: |
-          npm install --no-audit --no-fund --legacy-peer-deps --include=dev
-          # Forzar modo produccion en webpack (sin eval, bundle mas pequeno)
-          sed -i 's/process.env.NODE_ENV ?? "development"/"production"/' webpack.config.js
-          node generate_webpack.js
-          # generate_webpack.js compila de forma asincrona; esperamos al archivo
-          for i in $(seq 1 120); do
-            if [ -f browser/telegram.js ]; then echo "Bundle listo"; break; fi
-            sleep 5
-          done
-          ls -la browser/telegram.js
+          mkdir -p build && cd build
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund \
+            telegram@browser \
+            esbuild@0.24.0 \
+            buffer@6.0.3 \
+            process@0.11.10
+          # Comprobacion: que version se instalo
+          node -e "console.log('telegram instalado:', require('./node_modules/telegram/package.json').version)"
+          # Confirmar que el CryptoFile usa Web Crypto (no 'require crypto')
+          head -5 node_modules/telegram/CryptoFile.js || true
 
-      - name: Copiar el bundle a docs/
+      - name: Crear shim global (Buffer, process)
         run: |
-          mkdir -p docs
-          cp gramjs-src/browser/telegram.js docs/telegram-browser.js
-          echo "Tamano del bundle:"; ls -la docs/telegram-browser.js
+          cat > build/shim.js <<'EOF'
+          import { Buffer } from 'buffer';
+          import process from 'process';
+          if (typeof globalThis.Buffer === 'undefined') globalThis.Buffer = Buffer;
+          if (typeof globalThis.process === 'undefined') globalThis.process = process;
+          if (typeof globalThis.global === 'undefined') globalThis.global = globalThis;
+          EOF
+
+      - name: Empaquetar con esbuild (IIFE -> window.telegram)
+        run: |
+          cd build
+          # Crear un alias-vacio para los modulos Node que GramJS no necesita en navegador
+          mkdir -p empty && echo "module.exports = {};" > empty/index.js
+          npx esbuild node_modules/telegram/index.js \
+            --bundle \
+            --outfile=../docs/telegram-browser.js \
+            --format=iife \
+            --global-name=telegram \
+            --platform=browser \
+            --target=es2020 \
+            --minify \
+            --define:process.env.NODE_ENV='"production"' \
+            --inject:./shim.js \
+            --alias:fs=./empty/index.js \
+            --alias:net=./empty/index.js \
+            --alias:tls=./empty/index.js \
+            --alias:dns=./empty/index.js \
+            --alias:http=./empty/index.js \
+            --alias:https=./empty/index.js \
+            --alias:zlib=./empty/index.js \
+            --alias:assert=./empty/index.js \
+            --alias:constants=./empty/index.js \
+            --alias:os=./empty/index.js \
+            --alias:path=./empty/index.js \
+            --alias:util=./empty/index.js \
+            --alias:stream=./empty/index.js \
+            --alias:events=./empty/index.js \
+            --alias:crypto=./empty/index.js \
+            --alias:node-localstorage=./empty/index.js \
+            --alias:socks=./empty/index.js \
+            --log-level=warning
+          ls -la ../docs/telegram-browser.js
 
       - name: Commit del bundle
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/telegram-browser.js
-          git commit -m "build: bundle de navegador de GramJS" || echo "Sin cambios"
+          git commit -m "build: bundle de GramJS desde telegram@browser (TL al dia + Web Crypto)" || echo "Sin cambios"
           git push
