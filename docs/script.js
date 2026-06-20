@@ -219,6 +219,7 @@ const el = {
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
     coverBtn: $('#cover-btn'),
+    videoLinkBtn: $('#video-link-btn'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
@@ -513,6 +514,23 @@ const Detail = {
                 if (state.isAdmin) CloudStore.saveCovers();
                 Detail.open(item);
                 Netflix.render();   // refresca tarjetas
+            };
+        }
+        if (el.videoLinkBtn) {
+            el.videoLinkBtn.hidden = !state.isAdmin;
+            el.videoLinkBtn.onclick = async () => {
+                const ov = Store.getOverride(item.id) || {};
+                const cur = ov.videoUrl || '';
+                const url = prompt(
+                    'Pega el enlace del vídeo para esta ficha (deja vacío para quitar el override).\n\n' +
+                    'Acepta:\n  • URL directa de vídeo (mp4, webm...)\n  • acestream://...\n' +
+                    '  • magnet:...\n  • https://t.me/c/<id>/<msgId> (otro mensaje de Telegram)',
+                    cur
+                );
+                if (url === null) return;
+                Store.setOverride(item.id, { videoUrl: (url || '').trim() });
+                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                Detail.open(item);
             };
         }
         if (opts.autoplay) Player.play(primary, item);
@@ -871,6 +889,42 @@ const Player = {
         this.flushProgress();
         this.current = { playable, parent };
         if (parent && parent.episodes && parent.episodes.length > 1) Store.setLastEp(parent.id, playable.id);
+
+        // Override de admin: si la ficha (parent) o el playable tienen un videoUrl
+        // alternativo guardado, usarlo en vez del original.
+        const ovId = (parent && parent.id) || playable.id;
+        const ov = Store.getOverride(ovId) || {};
+        if (ov.videoUrl) {
+            const u = String(ov.videoUrl).trim();
+            const replaced = Object.assign({}, playable);
+            // acestream:// → reproductor externo AceStream
+            if (/^acestream:/i.test(u)) {
+                replaced.aceUrl = u; replaced.streamUrl = ''; replaced.externalUrl = '';
+                replaced.playableInBrowser = false;
+            }
+            // t.me/c/<id>/<msgId> → stream del propio servidor (versión cliente: SW maneja)
+            else {
+                const mC = u.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
+                const mU = !mC && u.match(/t\.me\/([A-Za-z0-9_]+)\/(?:\d+\/)?(\d+)/i);
+                if (mC) {
+                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent('-100' + mC[1])}/${mC[2]}`;
+                    replaced.externalUrl = u;
+                    replaced.playableInBrowser = true;
+                } else if (mU) {
+                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent(mU[1])}/${mU[2]}`;
+                    replaced.externalUrl = u;
+                    replaced.playableInBrowser = true;
+                } else if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(u)) {
+                    replaced.streamUrl = u; replaced.externalUrl = u;
+                    replaced.playableInBrowser = true;
+                } else {
+                    replaced.externalUrl = u; replaced.streamUrl = '';
+                    replaced.playableInBrowser = false;
+                }
+            }
+            playable = replaced;
+            this.current.playable = replaced;
+        }
 
         // 1) AceStream: nunca dentro -> abrir reproductor externo (acestream://)
         if (playable.aceUrl) {
@@ -1261,6 +1315,7 @@ const AdminPanel = {
         $('#edit-cover').value = Store.getCover(it.id) || '';
         $('#edit-backdrop').value = ov.backdrop || '';
         $('#edit-trailer').value = ov.trailer || it.trailerKey || '';
+        if ($('#edit-video')) $('#edit-video').value = ov.videoUrl || '';
         // Buscador TMDB
         const q = $('#tmdb-query'); if (q) q.value = ov.title || it.title || '';
         const ts = $('#tmdb-type'); if (ts) ts.value = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
@@ -1341,7 +1396,8 @@ const AdminPanel = {
             title: $('#edit-title').value.trim(),
             desc: $('#edit-desc').value.trim(),
             backdrop: $('#edit-backdrop').value.trim(),
-            trailer: this._ytId($('#edit-trailer').value)
+            trailer: this._ytId($('#edit-trailer').value),
+            videoUrl: ($('#edit-video') ? $('#edit-video').value.trim() : (ov.videoUrl || ''))
         };
         // Datos extra copiados de TMDB (nota, géneros, logo, año, duración...)
         if (this._pendingTmdb) {

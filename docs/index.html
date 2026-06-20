@@ -141,6 +141,9 @@
                         <button class="btn btn-fav focusable" id="cover-btn" aria-label="Cambiar carátula" hidden>
                             <span>🖼</span> <span>Cambiar carátula</span>
                         </button>
+                        <button class="btn btn-fav focusable" id="video-link-btn" aria-label="Cambiar enlace del vídeo" hidden>
+                            <span>🔗</span> <span>Cambiar enlace</span>
+                        </button>
                     </div>
                 </div>
                 <div class="player-status" id="player-status" hidden></div>
@@ -282,6 +285,7 @@
                     <label class="admin-field"><span>Título</span><input id="edit-title" class="admin-input" type="text"></label>
                     <label class="admin-field"><span>Sinopsis</span><textarea id="edit-desc" class="admin-input" rows="4"></textarea></label>
                     <label class="admin-field"><span>Carátula (URL del póster)</span><input id="edit-cover" class="admin-input" type="url" placeholder="https://..."></label>
+                    <label class="admin-field"><span>Enlace del vídeo (URL directa, t.me/c/.../msgId, acestream://, magnet:...)</span><input id="edit-video" class="admin-input" type="text" placeholder="https://... · acestream://... · t.me/c/.../123"></label>
                     <label class="admin-field"><span>Fondo / backdrop (URL)</span><input id="edit-backdrop" class="admin-input" type="url" placeholder="https://..."></label>
                     <label class="admin-field"><span>Tráiler de YouTube (ID o URL)</span><input id="edit-trailer" class="admin-input" type="text" placeholder="dQw4w9WgXcQ"></label>
                     <div class="admin-editor-preview" id="edit-preview"></div>

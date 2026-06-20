@@ -981,16 +981,49 @@
             await this.client.deleteMessages(entity, msgIds.map(Number), { revoke: true });
         }
 
-        // Reenviar mensajes de un peer a otro (forward o copy).
+        // Reenviar mensajes de un peer a otro (forward o copy oculto).
+        // asCopy=true → usa Api.messages.ForwardMessages con dropAuthor para
+        // que NO se vea el origen ni el autor (estilo "Copiar y pegar").
         async forwardMessages(fromPeer, msgIds, toPeer, asCopy) {
             const from = await this.resolvePeer(fromPeer);
             const to = await this.resolvePeer(toPeer);
+            if (asCopy) {
+                // RAW API: reenvio anonimizado (sin autor, sin "Reenviado de")
+                const ids = msgIds.map(Number);
+                const randomIds = ids.map(() => bigInt.randBetween('-0x8000000000000000', '0x7fffffffffffffff'));
+                await this.client.invoke(new Api.messages.ForwardMessages({
+                    fromPeer: from, toPeer: to,
+                    id: ids, randomId: randomIds,
+                    dropAuthor: true, dropMediaCaptions: false,
+                    silent: false, background: false, withMyScore: false, noforwards: false
+                }));
+                return;
+            }
             await this.client.forwardMessages(to, {
                 messages: msgIds.map(Number),
                 fromPeer: from,
-                noQuote: !!asCopy,
                 silent: false
             });
+        }
+
+        // Lista los tópicos (foros) de un grupo, con título y datos para mostrar
+        async getGroupTopics(peer) {
+            const entity = await this.resolvePeer(peer);
+            try {
+                const res = await this.client.invoke(new Api.channels.GetForumTopics({
+                    channel: entity, limit: 100, offsetDate: 0, offsetId: 0, offsetTopic: 0
+                }));
+                return (res.topics || [])
+                    .filter(t => t.id !== undefined)
+                    .map(t => ({
+                        id: Number(t.id),
+                        title: t.title || ('Tema ' + t.id),
+                        iconColor: t.iconColor || 0,
+                        unread: t.unreadCount || 0,
+                        closed: !!t.closed,
+                        pinned: !!t.pinned
+                    }));
+            } catch (e) { console.warn('[tg] getGroupTopics fallo:', e.message); return []; }
         }
 
         // Descarga el contenido (thumbnail) de un mensaje cualquiera (Buffer/Uint8Array).

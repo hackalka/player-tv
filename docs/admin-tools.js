@@ -39,6 +39,9 @@
         loaded: false,
         currentPeer: '',
         currentTitle: '',
+        currentTopic: 0,
+        currentTopicTitle: '',
+        topics: [],         // tópicos del grupo actual (si es foro)
         messages: [],
         thumbs: new Map(),
         avatars: new Map(),
@@ -226,6 +229,9 @@
     async function selectChat(peer, title) {
         state.currentPeer = peer;
         state.currentTitle = title;
+        state.currentTopic = 0;
+        state.currentTopicTitle = '';
+        state.topics = [];
         const ch = state.chats.find(x => x.peerId === peer);
         const color = colorFor(title);
         const avurl = state.avatars.get(peer);
@@ -245,6 +251,47 @@
         $('#tg-compose').hidden = false;
         renderList();
         if (!avurl && ch && ch.hasPhoto) loadAvatar(ch);
+        // Si es foro, cargar topicos primero
+        if (ch && ch.isForum) {
+            await loadTopics();
+        } else {
+            $('#tg-topics-bar') && $('#tg-topics-bar').remove();
+            await loadMessages(true);
+        }
+    }
+
+    async function loadTopics() {
+        try {
+            const r = await api(`/api/admin/group/${encodeURIComponent(state.currentPeer)}/topics`);
+            state.topics = r.topics || [];
+        } catch (e) { state.topics = []; }
+        renderTopicsBar();
+        // Auto-seleccionar el primero (general)
+        const first = state.topics[0];
+        if (first) selectTopic(first.id, first.title);
+        else loadMessages(true);
+    }
+
+    function renderTopicsBar() {
+        // Quitar la barra anterior si existe
+        const old = document.getElementById('tg-topics-bar'); if (old) old.remove();
+        if (!state.topics.length) return;
+        const bar = document.createElement('div');
+        bar.id = 'tg-topics-bar';
+        bar.className = 'tg-topics-bar';
+        bar.innerHTML = state.topics.map(t => `
+            <button class="tg-topic${state.currentTopic === t.id ? ' active' : ''}" data-id="${t.id}" data-title="${esc(t.title)}">
+                ${esc(t.title)}${t.unread ? ` <span class="tg-unread">${t.unread > 99 ? '99+' : t.unread}</span>` : ''}
+            </button>`).join('');
+        const head = $('#tg-main-head');
+        head.parentNode.insertBefore(bar, head.nextSibling);
+        $$('#tg-topics-bar .tg-topic').forEach(b => b.addEventListener('click', () => selectTopic(Number(b.dataset.id), b.dataset.title)));
+    }
+
+    async function selectTopic(topicId, title) {
+        state.currentTopic = topicId;
+        state.currentTopicTitle = title;
+        renderTopicsBar();
         await loadMessages(true);
     }
 
@@ -252,7 +299,8 @@
         const body = $('#tg-main-body');
         body.innerHTML = '<div class="tg-loading">Cargando mensajes…</div>';
         try {
-            const r = await api(`/api/admin/group/${encodeURIComponent(state.currentPeer)}/messages?limit=80`);
+            const tparam = state.currentTopic ? '&topic=' + state.currentTopic : '';
+            const r = await api(`/api/admin/group/${encodeURIComponent(state.currentPeer)}/messages?limit=80${tparam}`);
             state.messages = r.messages || [];
             renderMessages();
         } catch (e) {
@@ -270,6 +318,8 @@
             el.querySelector('[data-act="delete"]').addEventListener('click', () => onDelete(Number(el.dataset.id)));
             const rep = el.querySelector('[data-act="replace"]');
             if (rep) rep.addEventListener('click', () => onReplaceFile(Number(el.dataset.id)));
+            const fwd = el.querySelector('[data-act="forward"]');
+            if (fwd) fwd.addEventListener('click', () => onForward(Number(el.dataset.id)));
         });
         body.scrollTop = body.scrollHeight;
         msgs.filter(m => m.hasMedia && m.hasThumb && !state.thumbs.has(m.id)).forEach(loadThumb);
@@ -294,6 +344,7 @@
                 <div class="tg-msg-actions">
                     <button class="msg-act" data-act="edit" title="Editar">✏️</button>
                     ${replaceBtn}
+                    <button class="msg-act" data-act="forward" title="Reenviar / copiar a otro chat">↗</button>
                     <button class="msg-act danger" data-act="delete" title="Borrar">🗑</button>
                 </div>
             </div>
@@ -362,6 +413,80 @@
             $('#tg-text').value = '';
             await loadMessages();
         } catch (e) { alert('No se pudo enviar: ' + e.message); }
+    }
+
+    // ====== REENVIAR / COPIAR ======
+    function buildForwardDialog() {
+        if (document.getElementById('tg-fwd-dialog')) return;
+        const html = `
+        <div id="tg-fwd-dialog" hidden>
+            <div class="tg-fwd-back"></div>
+            <div class="tg-fwd-card">
+                <button class="tg-fwd-close" type="button">×</button>
+                <h3>Reenviar / Copiar a otro chat</h3>
+                <input id="tg-fwd-search" class="tg-search" type="search" placeholder="Buscar destino...">
+                <div class="tg-fwd-list" id="tg-fwd-list"></div>
+                <label class="tg-fwd-opt"><input type="checkbox" id="tg-fwd-copy" checked> <span>Sin mostrar origen ni autor (copia anónima)</span></label>
+                <div class="tg-fwd-info" id="tg-fwd-info">Pulsa un chat de la lista para enviar el mensaje seleccionado.</div>
+            </div>
+        </div>`;
+        const wrap = document.createElement('div'); wrap.innerHTML = html;
+        document.body.appendChild(wrap.firstElementChild);
+        $('#tg-fwd-dialog .tg-fwd-close').addEventListener('click', closeForward);
+        $('#tg-fwd-dialog .tg-fwd-back').addEventListener('click', closeForward);
+        $('#tg-fwd-search').addEventListener('input', renderFwdList);
+    }
+    function closeForward() { const d = document.getElementById('tg-fwd-dialog'); if (d) d.hidden = true; }
+    function renderFwdList() {
+        const list = $('#tg-fwd-list');
+        const q = ($('#tg-fwd-search').value || '').trim().toLowerCase();
+        const items = state.chats.filter(c => {
+            if (c.peerId === state.currentPeer) return false; // no a si mismo
+            if (q && !c.title.toLowerCase().includes(q)) return false;
+            return true;
+        });
+        list.innerHTML = items.slice(0, 80).map(c => {
+            const av = state.avatars.get(c.peerId);
+            const avhtml = av ? `<div class="tg-avatar small" style="background-image:url(${av})"></div>`
+                : `<div class="tg-avatar small" style="background:${colorFor(c.title)}">${esc(initials(c.title))}</div>`;
+            return `<div class="tg-fwd-item" data-peer="${esc(c.peerId)}" data-title="${esc(c.title)}">
+                ${avhtml}
+                <div class="tg-fwd-item-body">
+                    <div>${esc(c.title)}</div>
+                    <div class="tg-fwd-item-sub">${c.isAdmin ? '⭐ ' : ''}${c.isChannel ? 'Canal' : c.isBot ? 'Bot' : c.isPrivate ? 'Privado' : 'Grupo'}</div>
+                </div>
+            </div>`;
+        }).join('');
+        $$('#tg-fwd-dialog .tg-fwd-item').forEach(el => el.addEventListener('click', () => doForward(el.dataset.peer, el.dataset.title)));
+    }
+
+    let _pendingFwdMsgId = 0;
+    async function onForward(msgId) {
+        buildForwardDialog();
+        _pendingFwdMsgId = msgId;
+        $('#tg-fwd-search').value = '';
+        $('#tg-fwd-info').textContent = `Vas a reenviar el mensaje #${msgId}. Elige el chat destino:`;
+        $('#tg-fwd-dialog').hidden = false;
+        renderFwdList();
+    }
+    async function doForward(toPeer, toTitle) {
+        const asCopy = $('#tg-fwd-copy').checked;
+        const info = $('#tg-fwd-info');
+        info.textContent = (asCopy ? 'Copiando' : 'Reenviando') + ' a "' + toTitle + '"...';
+        try {
+            await api('/api/admin/forward', {
+                method: 'POST',
+                body: JSON.stringify({
+                    fromPeer: state.currentPeer,
+                    msgIds: [_pendingFwdMsgId],
+                    toPeer, asCopy
+                })
+            });
+            info.textContent = '✅ Enviado a "' + toTitle + '"';
+            setTimeout(closeForward, 800);
+        } catch (e) {
+            info.textContent = '❌ Error: ' + e.message;
+        }
     }
 
     function showStatus(s) {

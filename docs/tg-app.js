@@ -462,6 +462,12 @@
                 await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], body.toPeer, !!body.asCopy);
                 return json({ ok: true });
             }
+            // Lista de topicos de un grupo foro: /api/admin/group/:peer/topics
+            if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'topics') {
+                const r = await requireService(); if (r.err) return r.err;
+                const peer = decodeURIComponent(parts[2]);
+                return json({ topics: await r.svc.getGroupTopics(peer) });
+            }
 
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);
         } catch (e) {
