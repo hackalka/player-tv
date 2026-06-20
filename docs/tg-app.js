@@ -499,7 +499,16 @@
         if (!msg) return null;
         const info = svc.docInfo(msg);
         if (!info) return null;
-        return { size: info.size, mime: info.mimeType };
+        // Filename real del archivo (para descargas con nombre legible)
+        let filename = '';
+        try {
+            const doc = msg.media && msg.media.document;
+            if (doc) {
+                const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+                if (fn) filename = fn.fileName || '';
+            }
+        } catch { }
+        return { size: info.size, mime: info.mimeType, filename };
     }
     async function swChunk(kind, a, b, start, length) {
         const svc = await ensureService(); if (!svc) return null;

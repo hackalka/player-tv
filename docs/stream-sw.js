@@ -35,6 +35,9 @@ async function handle(event, kind, a, b) {
     const client = await getClient(event.clientId);
     if (!client) return new Response('No client', { status: 503 });
 
+    const url = new URL(event.request.url);
+    const isDownload = url.searchParams.has('download');
+
     // Miniaturas
     if (kind === 'tgthumb' || kind === 'tgthumblink') {
         const buf = await ask(client, { op: 'thumb', kind, a, b }).catch(() => null);
@@ -46,6 +49,22 @@ async function handle(event, kind, a, b) {
     const info = await ask(client, { op: 'info', kind, a, b }).catch(() => null);
     if (!info || !info.size) return new Response('No info', { status: 404 });
     const size = info.size;
+
+    // ---- DESCARGA COMPLETA (un solo blob, con Content-Disposition) ----
+    // Para formatos no reproducibles en el navegador (mkv/avi/etc): el usuario
+    // descarga el archivo entero y lo abre con su reproductor del sistema.
+    if (isDownload) {
+        const buf = await ask(client, { op: 'chunk', kind, a, b, start: 0, length: size }).catch(() => null);
+        if (!buf) return new Response('Download error', { status: 500 });
+        const fn = (info.filename || ('telegram_' + b)).replace(/"/g, '');
+        return new Response(buf, {
+            headers: {
+                'Content-Type': info.mime || 'application/octet-stream',
+                'Content-Length': String(buf.byteLength || size),
+                'Content-Disposition': `attachment; filename="${fn}"`
+            }
+        });
+    }
 
     const range = event.request.headers.get('range');
     let start = 0, end = size - 1;

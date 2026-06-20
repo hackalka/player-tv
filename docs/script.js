@@ -819,13 +819,23 @@ const ExternalPlayers = {
             const id = (url.match(/[0-9a-fA-F]{40}/) || [''])[0];
             if (id) items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:#Intent;scheme=acestream;package=org.acestream.media;S.content_id=${id};end">AceStream (Android/TV)</a>`);
         } else {
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(url)}">▶ Abrir en VLC</a>`);
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:${escapeHtml(url)}#Intent;type=video/*;action=android.intent.action.VIEW;end">Elegir reproductor (Android/TV)</a>`);
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir en pestaña</a>`);
+            // Vídeo de Telegram no compatible con el navegador (mkv/avi/etc.).
+            // En la versión cliente la URL solo funciona DENTRO de la pestaña (la
+            // sirve un Service Worker), así que VLC u otra app externa no la podrían
+            // abrir directamente. La forma fiable: descargar el fichero y abrirlo
+            // con el reproductor del sistema (VLC/MX Player/MPV).
+            const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+            const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (luego ábrelo con VLC/MX Player/MPV)</a>`);
+            // Intentar reproducción interna a la fuerza (a veces el navegador puede)
+            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._forceInternal && Player._forceInternal()">▶ Intentar reproducir aquí igualmente</button>`);
+            // Botones que solo tienen utilidad si la web NO es servida por SW
+            // (por ejemplo en el modo servidor antiguo). No estorban.
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(url)}">Probar VLC (solo modo servidor)</a>`);
         }
         const label = isAce
             ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
-            : `Formato${info && info.ext ? ' ' + info.ext : ''} no compatible con el navegador. Abrir con tu reproductor:`;
+            : `Formato${info && info.ext ? ' ' + info.ext : ''} no compatible con el navegador. Descarga el archivo y ábrelo con tu reproductor (VLC, MX Player, MPV, etc.):`;
         box.hidden = false;
         box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
     }
@@ -893,6 +903,13 @@ const Player = {
         v.onvolumechange = () => { Store.volume = v.volume; };
         v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
         v.play().catch(() => {});
+    },
+
+    // Forzar reproducción interna aunque el formato no esté marcado como compatible.
+    // A veces el navegador SÍ reproduce un mkv si el codec interior es H.264/AAC.
+    _forceInternal() {
+        if (!this.current || !this.current.playable) return;
+        this._playInside(this.current.playable, this.current.parent);
     },
 
     // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)
