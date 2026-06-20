@@ -29,13 +29,40 @@
             if (this.entity) return this.entity;
             const raw = String(this.cfg.groupId).trim();
             const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+
+            // 1) Intento directo
+            try { this.entity = await this.client.getEntity(id); return this.entity; }
+            catch (e) { console.warn('[tg] getEntity directo fallo:', e && e.message); }
+
+            // 2) Tras refrescar dialogos
+            try { await this.client.getDialogs({ limit: 200 }); }
+            catch (e) { console.warn('[tg] getDialogs fallo:', e && e.message); }
+            try { this.entity = await this.client.getEntity(id); return this.entity; }
+            catch (e) { console.warn('[tg] getEntity tras getDialogs fallo:', e && e.message); }
+
+            // 3) Fallback: iterar dialogos buscando manualmente. Usa los datos
+            //    que GramJS YA tiene en cache (sin hacer otra peticion que pueda
+            //    chocar con un TL desconocido).
+            const wantNum = typeof id === 'number' ? id : null;
+            const wantUser = typeof id === 'string' ? id.replace(/^@/, '').toLowerCase() : '';
             try {
-                this.entity = await this.client.getEntity(id);
-            } catch (e) {
-                await this.client.getDialogs({ limit: 200 });
-                this.entity = await this.client.getEntity(id);
-            }
-            return this.entity;
+                for await (const dialog of this.client.iterDialogs({ limit: 500 })) {
+                    try {
+                        const ent = dialog.entity; if (!ent || ent.id == null) continue;
+                        const eid = Number(ent.id.toString());
+                        if (wantNum != null) {
+                            // Telegram representa supergrupos/canales como -100<id>
+                            if (wantNum === eid || wantNum === -1000000000000 - eid || wantNum === -eid) {
+                                this.entity = ent; return this.entity;
+                            }
+                        } else if (wantUser && (ent.username || '').toLowerCase() === wantUser) {
+                            this.entity = ent; return this.entity;
+                        }
+                    } catch (e2) { /* saltar dialogos rotos */ }
+                }
+            } catch (e) { console.warn('[tg] iterDialogs fallo:', e && e.message); }
+
+            throw new Error('Grupo no accesible para tu cuenta. Comprueba el groupId en tg-config.js o que estás suscrito al grupo.');
         }
 
         async isGroupAdmin() {
