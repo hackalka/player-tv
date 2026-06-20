@@ -31,10 +31,8 @@ jobs:
 
       - name: Compilar el bundle de navegador
         working-directory: gramjs-src
-        env:
-          NODE_ENV: production
         run: |
-          npm install --no-audit --no-fund --legacy-peer-deps
+          npm install --no-audit --no-fund --legacy-peer-deps --include=dev
           node generate_webpack.js
           # generate_webpack.js compila de forma asincrona; esperamos al archivo
           for i in $(seq 1 120); do
