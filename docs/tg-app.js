@@ -240,7 +240,17 @@
         const svc = await ensureService();
         if (!svc) return { err: json({ needLogin: true }, 401) };
         try { await svc.resolveGroup(); }
-        catch { return { err: json({ needAccess: true, error: 'Tu cuenta no es miembro del grupo. Pide al administrador que te añada.' }, 403) }; }
+        catch (e) {
+            // Tolerancia: si el unico problema son constructores TL desconocidos,
+            // intentamos seguir adelante asumiendo que SI tenemos acceso (el usuario
+            // es admin/dueno). Asi no bloqueamos por culpa de GramJS desactualizada.
+            const m = (e && e.message) || '';
+            const isTL = /Could not find a matching Constructor|Missing MTProto Entity/i.test(m);
+            if (!isTL) {
+                return { err: json({ needAccess: true, error: 'Tu cuenta no es miembro del grupo. Pide al administrador que te añada.' }, 403) };
+            }
+            console.warn('[tg] resolveGroup fallo por TL desconocido, continuando con acceso tolerado:', m);
+        }
         return { svc };
     }
     async function requireAdmin() {

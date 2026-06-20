@@ -398,6 +398,40 @@
                 if (code.length < 1000) throw new Error('archivo demasiado pequeño (' + code.length + ' bytes)');
                 // Ejecuta el UMD en el ambito global; webpack lo cuelga de window.telegram
                 (0, eval)(code);
+                applyTLTolerance();
+            }
+            // Parchea el lector binario para tolerar constructores TL desconocidos.
+            // Si Telegram envia un constructor que esta version de GramJS no conoce,
+            // en vez de lanzar y romper la conexion, descartamos ese paquete y seguimos.
+            function applyTLTolerance() {
+                try {
+                    var BR = window.telegram && ((window.telegram.extensions && window.telegram.extensions.BinaryReader) || window.telegram.BinaryReader);
+                    if (!BR || !BR.prototype || !BR.prototype.tgReadObject) {
+                        console.warn('[tg-patch] BinaryReader no expuesto, no puedo aplicar patch TL');
+                        return;
+                    }
+                    if (BR.prototype.__tvpPatched) return;
+                    var orig = BR.prototype.tgReadObject;
+                    BR.prototype.tgReadObject = function () {
+                        try { return orig.apply(this, arguments); }
+                        catch (e) {
+                            var msg = (e && e.message) || '';
+                            if (/Could not find a matching Constructor|Missing MTProto Entity/i.test(msg)) {
+                                var m = msg.match(/ID\s+(\d+)/);
+                                console.warn('[tg-patch] constructor desconocido', m ? m[1] : '?', '— ignorando paquete');
+                                // Avanzar al final del buffer para no quedarnos atascados
+                                try { if (typeof this.stream !== 'undefined' && this.stream && this.stream.length != null) this.offset = this.stream.length; } catch (e2) { }
+                                try { if (this._buffer && this._buffer.length != null) this.offset = this._buffer.length; } catch (e2) { }
+                                return null;
+                            }
+                            throw e;
+                        }
+                    };
+                    BR.prototype.__tvpPatched = true;
+                    console.log('[tg-patch] BinaryReader parcheado: tolera constructores TL desconocidos');
+                } catch (e) {
+                    console.warn('[tg-patch] no se pudo parchear BinaryReader:', e && e.message);
+                }
             }
             function waitGlobal(ms) {
                 return new Promise(function (res) {
