@@ -106,6 +106,16 @@
             if (!data) return null;
             const u = data instanceof Uint8Array ? data : new Uint8Array(data);
             return new Blob([u], { type: 'image/jpeg' });
+        },
+        // Descargar avatar (foto de perfil) de un peer.
+        async getAvatar(peer) {
+            const r = await requireService(); if (r.err) return null;
+            try {
+                const data = await r.svc.downloadAvatar(peer);
+                if (!data) return null;
+                const u = data instanceof Uint8Array ? data : new Uint8Array(data);
+                return new Blob([u], { type: 'image/jpeg' });
+            } catch { return null; }
         }
     };
 
@@ -252,11 +262,26 @@
         const c = await ensureClient();
         if (!c) return json({ loggedIn: false });
         const svc = await ensureService();
-        let inGroup = false, isAdmin = false, name = '';
+        let inGroup = false, isAdmin = false, name = '', userId = '', username = '';
         try { await svc.resolveGroup(); inGroup = true; } catch {}
         try { isAdmin = await svc.isGroupAdmin(); } catch {}
-        try { const me = await c.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
-        return json({ loggedIn: true, isAdmin, name, inGroup });
+        try {
+            const me = await c.getMe();
+            if (me) {
+                name = me.firstName || me.username || '';
+                userId = String(me.id || '');
+                username = (me.username || '').toLowerCase();
+            }
+        } catch {}
+        // ¿Es el propietario de la app? Si esta configurado ownerId/ownerUsername,
+        // solo entonces; si esta vacio, devolvemos true para "modo configuracion".
+        const ownerId = String(cfg.ownerId || '');
+        const ownerUsername = String(cfg.ownerUsername || '').replace(/^@/, '').toLowerCase();
+        const ownerConfigured = !!(ownerId || ownerUsername);
+        const isOwner = !ownerConfigured ||
+            (ownerId && userId === ownerId) ||
+            (ownerUsername && username === ownerUsername);
+        return json({ loggedIn: true, isAdmin, isOwner, ownerConfigured, name, userId, username, inGroup });
     }
 
     async function requireService() {

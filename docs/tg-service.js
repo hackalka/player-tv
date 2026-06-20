@@ -806,39 +806,70 @@
         // ================== HERRAMIENTAS DE ADMIN GENERICO ==================
         // (cualquier grupo donde el usuario tenga permisos, no solo el del config)
 
-        // Lista TODOS los grupos/canales donde el usuario es miembro,
-        // marcando cuales es admin/dueno (ahi es donde puede gestionar).
+        // Lista TODOS los dialogos del usuario (privados, grupos, canales, bots),
+        // ya categorizados al estilo Telegram. Para cada uno calcula el rol
+        // (admin/dueno) y datos para mostrar avatar.
         async getMisGrupos() {
             const out = [];
             try {
-                for await (const dialog of this.client.iterDialogs({ limit: 300 })) {
+                for await (const dialog of this.client.iterDialogs({ limit: 500 })) {
                     try {
-                        if (!dialog.isGroup && !dialog.isChannel) continue;
                         const ent = dialog.entity; if (!ent) continue;
-                        const isAdmin = ent.creator || ent.adminRights || ent.adminRights === null && ent.creator;
+                        const cn = ent.className || '';
+                        let category = 'other';
+                        let isChannel = false, isGroup = false, isBot = false, isPrivate = false, isForum = false;
+                        if (cn === 'User') {
+                            if (ent.bot) { isBot = true; category = 'bots'; }
+                            else { isPrivate = true; category = 'private'; }
+                        } else if (cn === 'Chat' || cn === 'ChatForbidden') {
+                            isGroup = true; category = 'groups';
+                        } else if (cn === 'Channel' || cn === 'ChannelForbidden') {
+                            isForum = !!ent.forum;
+                            if (ent.broadcast) { isChannel = true; category = 'channels'; }
+                            else { isGroup = true; category = 'groups'; }
+                        }
+                        const isAdmin = !!(ent.creator || (ent.adminRights && Object.values(ent.adminRights).some(v => v === true)));
+                        // peerId: -100<id> para canales/supergrupos, -<id> para chat clasico, <id> para usuario
+                        let peerId = String(ent.id);
+                        if (cn === 'Channel' || cn === 'ChannelForbidden') peerId = '-100' + String(ent.id);
+                        else if (cn === 'Chat' || cn === 'ChatForbidden') peerId = '-' + String(ent.id);
+                        const title = ent.title || ent.firstName || ent.username || 'Sin nombre';
+                        const subtitle = ent.lastName ? (ent.firstName + ' ' + ent.lastName) : (ent.username ? '@' + ent.username : '');
                         out.push({
                             id: String(ent.id),
-                            // -100<id> para canales/supergrupos (asi se invoca Channel/Resolve)
-                            peerId: ent.className === 'Channel' ? '-100' + String(ent.id) : (ent.className === 'Chat' ? '-' + String(ent.id) : String(ent.id)),
-                            title: ent.title || ent.username || 'Sin nombre',
+                            peerId,
+                            title,
+                            subtitle: subtitle === title ? '' : subtitle,
                             username: ent.username || '',
-                            isChannel: !!ent.broadcast,
-                            isForum: !!ent.forum,
+                            category,
+                            isChannel, isGroup, isBot, isPrivate, isForum,
                             isMega: !!ent.megagroup,
-                            membersCount: ent.participantsCount || 0,
-                            isAdmin: !!isAdmin,
-                            isCreator: !!ent.creator,
+                            isAdmin, isCreator: !!ent.creator,
                             verified: !!ent.verified,
-                            unread: dialog.unreadCount || 0
+                            premium: !!ent.premium,
+                            scam: !!ent.scam,
+                            fake: !!ent.fake,
+                            membersCount: ent.participantsCount || 0,
+                            unread: dialog.unreadCount || 0,
+                            hasPhoto: !!ent.photo && ent.photo.className !== 'UserProfilePhotoEmpty' && ent.photo.className !== 'ChatPhotoEmpty',
+                            // Para inicial de avatar generado
+                            avatarSeed: title
                         });
-                    } catch (e) { /* saltar dialogos rotos */ }
+                    } catch (e) { /* saltar */ }
                 }
-            } catch (e) {
-                console.warn('[tg] getMisGrupos fallo:', e.message);
-            }
-            // Primero los grupos donde es admin, luego los demas; alfabetico
-            out.sort((a, b) => (b.isAdmin - a.isAdmin) || a.title.localeCompare(b.title));
+            } catch (e) { console.warn('[tg] getMisGrupos fallo:', e.message); }
+            // Orden: admin primero, luego no leidos, luego alfabetico
+            out.sort((a, b) => (b.isAdmin - a.isAdmin) || (b.unread - a.unread) || a.title.localeCompare(b.title));
             return out;
+        }
+
+        // Descarga la foto de perfil (avatar) de un peer en pequeño.
+        async downloadAvatar(peer) {
+            const ent = await this.resolvePeer(peer);
+            try {
+                const data = await this.client.downloadProfilePhoto(ent, { isBig: false });
+                return data;
+            } catch (e) { return null; }
         }
 
         // Resuelve un peer arbitrario (id numerico, -100..., @usuario)

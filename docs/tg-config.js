@@ -8,8 +8,16 @@ window.TVP_CONFIG = {
     apiId: 8952741,
     apiHash: '693fb2da124662dad85b2b337c53a386',
 
-    // Grupo/foro de origen
+    // Grupo/foro principal de origen del catalogo
     groupId: '-1003749684388',
+
+    // ===== PROPIETARIO (admin de la app) =====
+    // Solo el propietario ve el "Gestor personal" (panel completo de Telegram).
+    // Pon AQUI tu ID numerico de Telegram o tu @usuario (sin @).
+    // Si lo dejas vacio, la app entra en modo "configuracion": el panel se muestra
+    // a quien entre, y arriba veras tu ID/usuario para copiarlo aqui y bloquear el resto.
+    ownerId: '',          // ej: '123456789'
+    ownerUsername: '',    // ej: 'miusuario' (sin @)
 
     appName: 'Tv Player',
 
