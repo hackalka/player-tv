@@ -990,7 +990,15 @@
             if (asCopy) {
                 // RAW API: reenvio anonimizado (sin autor, sin "Reenviado de")
                 const ids = msgIds.map(Number);
-                const randomIds = ids.map(() => bigInt.randBetween('-0x8000000000000000', '0x7fffffffffffffff'));
+                // randomId int64 aleatorio. Combinamos dos enteros 32-bit aleatorios
+                // y los pasamos a bigInt (la libreria global big-integer expuesta en index.html).
+                const rand64 = () => {
+                    const hi = (Math.random() * 0x100000000) >>> 0;
+                    const lo = (Math.random() * 0x100000000) >>> 0;
+                    // BigInteger acepta valores numericos (high*2^32 + low)
+                    return bigInt(hi).shiftLeft(32).add(bigInt(lo));
+                };
+                const randomIds = ids.map(rand64);
                 await this.client.invoke(new Api.messages.ForwardMessages({
                     fromPeer: from, toPeer: to,
                     id: ids, randomId: randomIds,
