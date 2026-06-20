@@ -9,7 +9,7 @@ window.TVP_CONFIG = {
     apiHash: '693fb2da124662dad85b2b337c53a386',
 
     // Grupo/foro principal de origen del catalogo
-    groupId: '-1003749684388',
+    groupId: '-1003924237464',
 
     // ===== PROPIETARIO (admin de la app) =====
     // Solo el propietario ve el "Gestor personal" (panel completo de Telegram).
