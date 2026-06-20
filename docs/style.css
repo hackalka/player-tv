@@ -1315,3 +1315,43 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
     .tg-sidebar { display: none; }
     .tg-card { width: 100vw; height: 100vh; border-radius: 0; }
 }
+
+
+
+/* ====== BOTONES "ABRIR CON" / OPCIONES DE REPRODUCCION ====== */
+.opt-btn.primary {
+    background: var(--netflix-red);
+    color: #fff;
+    border-color: var(--netflix-red);
+    font-weight: 600;
+}
+.opt-btn.primary:hover { background: var(--netflix-red-hover); border-color: var(--netflix-red-hover); }
+.opt-btn.external {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid #333;
+    color: #ddd;
+}
+.opt-btn.external:hover { background: rgba(255,255,255,0.12); border-color: #555; }
+
+/* ====== OVERLAY DEL MKV PLAYER (FFmpeg.wasm) ====== */
+#mkv-overlay { position: fixed; inset: 0; z-index: 9999; }
+#mkv-overlay .mkv-back { position: absolute; inset: 0; background: rgba(0,0,0,0.85); }
+#mkv-overlay .mkv-card {
+    position: relative; max-width: 880px; width: 92%; margin: 30px auto;
+    background: #181818; border-radius: 10px; padding: 24px 24px 18px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+}
+#mkv-overlay .mkv-close {
+    position: absolute; top: 8px; right: 12px;
+    background: transparent; border: none; color: #fff; font-size: 1.6rem; cursor: pointer;
+}
+#mkv-overlay .mkv-title { color: #fff; font-size: 1.1rem; margin-bottom: 8px; }
+#mkv-overlay .mkv-status { color: #aaa; font-size: 0.92rem; margin-bottom: 8px; }
+#mkv-overlay .mkv-bar { height: 6px; background: #2a2a2a; border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+#mkv-overlay .mkv-bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--netflix-red), #ff3344);
+    transition: width 200ms ease;
+}
+#mkv-overlay #mkv-video { width: 100%; max-height: 60vh; background: #000; border-radius: 6px; }
+#mkv-overlay .mkv-hint { color: #777; font-size: 0.78rem; margin-top: 10px; line-height: 1.4; }

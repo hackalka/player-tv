@@ -826,18 +826,39 @@ const ExternalPlayers = {
             // con el reproductor del sistema (VLC/MX Player/MPV).
             const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
             const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (luego ábrelo con VLC/MX Player/MPV)</a>`);
-            // Intentar reproducción interna a la fuerza (a veces el navegador puede)
-            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._forceInternal && Player._forceInternal()">▶ Intentar reproducir aquí igualmente</button>`);
-            // Botones que solo tienen utilidad si la web NO es servida por SW
-            // (por ejemplo en el modo servidor antiguo). No estorban.
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(url)}">Probar VLC (solo modo servidor)</a>`);
+            // Botón principal: descargar + abrir con reproductor del sistema.
+            items.push(`<a class="opt-btn primary focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (abrir con VLC/MX Player/MPV)</a>`);
+            // Probar reproducción interna a la fuerza
+            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._forceInternal && Player._forceInternal()">▶ Intentar reproducir aquí</button>`);
+            // Reproducir aquí con FFmpeg.wasm (modo avanzado, lazy-loaded)
+            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Reproducir aquí (avanzado)</button>`);
+            // Compartir con app del sistema (móvil): tras descargar, mostramos el menú nativo
+            if (navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x')] })) {
+                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="ExternalPlayers.shareDownloaded(${JSON.stringify(dl)},${JSON.stringify(fn)})">📤 Compartir con otra app</button>`);
+            }
+            // Apps externas (Android/iOS/desktop) — funcionan mejor tras descargar
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="vlc://${escapeHtml(url)}">▶ VLC (PC)</a>`);
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="intent:${escapeHtml(url)}#Intent;type=video/*;action=android.intent.action.VIEW;end" title="Abre el selector de apps de Android">▶ MX Player / Android</a>`);
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="infuse://${encodeURIComponent(url)}">▶ Infuse (iOS/macOS)</a>`);
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="nplayer-${escapeHtml(url)}">▶ nPlayer (iOS)</a>`);
         }
         const label = isAce
             ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
-            : `Formato${info && info.ext ? ' ' + info.ext : ''} no compatible con el navegador. Descarga el archivo y ábrelo con tu reproductor (VLC, MX Player, MPV, etc.):`;
+            : `Formato${info && info.ext ? ' ' + info.ext.toUpperCase() : ''} no compatible con el navegador. Elige cómo verlo:`;
         box.hidden = false;
         box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
+    },
+
+    // Tras descargar el archivo, abre el menú nativo del móvil para compartirlo
+    // con cualquier app instalada (VLC, MX Player, etc.).
+    async shareDownloaded(downloadUrl, filename) {
+        try {
+            const r = await fetch(downloadUrl);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const blob = await r.blob();
+            const file = new File([blob], filename || 'video', { type: blob.type || 'video/mp4' });
+            await navigator.share({ files: [file], title: filename });
+        } catch (e) { alert('No se pudo compartir: ' + (e.message || e)); }
     }
 };
 
