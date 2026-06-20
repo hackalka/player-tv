@@ -86,6 +86,29 @@
     }
 
     /* ---------------- LOGIN ---------------- */
+    // Acciones que necesitan File/Blob (no caben en el JSON shim) - API directa.
+    window.TVP_ADMIN = {
+        // Subir archivo: file=File, peer=string, caption?
+        async sendFile(peer, file, caption, replyTo) {
+            const r = await requireService(); if (r.err) throw new Error('Sin sesión');
+            return await r.svc.sendFileTo(peer, file, caption, replyTo);
+        },
+        // Reemplazar el archivo de un mensaje.
+        async replaceFile(peer, msgId, file, caption) {
+            const r = await requireService(); if (r.err) throw new Error('Sin sesión');
+            await r.svc.replaceFileIn(peer, msgId, file, caption);
+            return true;
+        },
+        // Descargar miniatura de un mensaje (devuelve Blob para mostrar).
+        async getThumb(peer, msgId) {
+            const r = await requireService(); if (r.err) return null;
+            const data = await r.svc.downloadAnyThumb(peer, msgId);
+            if (!data) return null;
+            const u = data instanceof Uint8Array ? data : new Uint8Array(data);
+            return new Blob([u], { type: 'image/jpeg' });
+        }
+    };
+
     // Login con QR: el usuario escanea el codigo desde su app de Telegram movil
     // (Ajustes -> Dispositivos -> Vincular dispositivo) y entra sin SMS ni codigo.
     async function qrLogin(opts) {
@@ -375,6 +398,44 @@
             if (parts[0] === 'admin' && parts[1] === 'tmdb' && parts[2] === 'details') {
                 const r = await requireAdmin(); if (r.err) return r.err;
                 return json({ info: await r.svc.tmdbDetails(parts[3], parts[4]) });
+            }
+
+            // ====== HERRAMIENTAS DE ADMIN GENERICO (gestor de grupos) ======
+            // Listar grupos donde el usuario participa (con marca admin/dueno).
+            if (rest === 'admin/groups') {
+                const r = await requireService(); if (r.err) return r.err;
+                return json({ groups: await r.svc.getMisGrupos() });
+            }
+            // Historial de un grupo concreto: /api/admin/group/:peer/messages?topic=...&limit=...
+            if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'messages') {
+                const r = await requireService(); if (r.err) return r.err;
+                const peer = decodeURIComponent(parts[2]);
+                const limit = Number(u.searchParams.get('limit') || 50);
+                const topic = Number(u.searchParams.get('topic') || 0);
+                return json({ messages: await r.svc.getChatHistory(peer, limit, topic) });
+            }
+            // Enviar texto: { peer, text, replyTo? }
+            if (rest === 'admin/send-text' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                return json({ message: await r.svc.sendTextTo(body.peer, body.text, body.replyTo) });
+            }
+            // Editar texto: { peer, msgId, text }
+            if (rest === 'admin/edit-text' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                await r.svc.editTextIn(body.peer, body.msgId, body.text);
+                return json({ ok: true });
+            }
+            // Borrar mensajes: { peer, msgIds: [] }
+            if (rest === 'admin/delete-msgs' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                await r.svc.deleteMessagesIn(body.peer, body.msgIds || []);
+                return json({ ok: true });
+            }
+            // Reenviar mensajes: { fromPeer, msgIds: [], toPeer, asCopy }
+            if (rest === 'admin/forward' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], body.toPeer, !!body.asCopy);
+                return json({ ok: true });
             }
 
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);

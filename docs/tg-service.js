@@ -802,6 +802,176 @@
             await this.client.deleteMessages(entity, [Number(msgId)], { revoke: true });
             this._msgCache.delete(Number(msgId));
         }
+
+        // ================== HERRAMIENTAS DE ADMIN GENERICO ==================
+        // (cualquier grupo donde el usuario tenga permisos, no solo el del config)
+
+        // Lista TODOS los grupos/canales donde el usuario es miembro,
+        // marcando cuales es admin/dueno (ahi es donde puede gestionar).
+        async getMisGrupos() {
+            const out = [];
+            try {
+                for await (const dialog of this.client.iterDialogs({ limit: 300 })) {
+                    try {
+                        if (!dialog.isGroup && !dialog.isChannel) continue;
+                        const ent = dialog.entity; if (!ent) continue;
+                        const isAdmin = ent.creator || ent.adminRights || ent.adminRights === null && ent.creator;
+                        out.push({
+                            id: String(ent.id),
+                            // -100<id> para canales/supergrupos (asi se invoca Channel/Resolve)
+                            peerId: ent.className === 'Channel' ? '-100' + String(ent.id) : (ent.className === 'Chat' ? '-' + String(ent.id) : String(ent.id)),
+                            title: ent.title || ent.username || 'Sin nombre',
+                            username: ent.username || '',
+                            isChannel: !!ent.broadcast,
+                            isForum: !!ent.forum,
+                            isMega: !!ent.megagroup,
+                            membersCount: ent.participantsCount || 0,
+                            isAdmin: !!isAdmin,
+                            isCreator: !!ent.creator,
+                            verified: !!ent.verified,
+                            unread: dialog.unreadCount || 0
+                        });
+                    } catch (e) { /* saltar dialogos rotos */ }
+                }
+            } catch (e) {
+                console.warn('[tg] getMisGrupos fallo:', e.message);
+            }
+            // Primero los grupos donde es admin, luego los demas; alfabetico
+            out.sort((a, b) => (b.isAdmin - a.isAdmin) || a.title.localeCompare(b.title));
+            return out;
+        }
+
+        // Resuelve un peer arbitrario (id numerico, -100..., @usuario)
+        async resolvePeer(peer) {
+            const raw = String(peer).trim();
+            const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+            try { return await this.client.getEntity(id); }
+            catch (e) {
+                await this.client.getDialogs({ limit: 200 });
+                return await this.client.getEntity(id);
+            }
+        }
+
+        // Historial de mensajes de un peer (con tope opcional). Soporta tópicos
+        // del foro pasando topicId (replyTo).
+        async getChatHistory(peer, limit, topicId) {
+            const entity = await this.resolvePeer(peer);
+            const opts = { limit: Number(limit) || 50 };
+            if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
+            const all = [];
+            try {
+                for await (const m of this.client.iterMessages(entity, opts)) {
+                    all.push(m);
+                    if (all.length >= opts.limit) break;
+                }
+            } catch (e) {
+                console.warn('[tg] iterMessages fallo, usando getMessages:', e.message);
+                const msgs = await this.client.getMessages(entity, opts);
+                if (msgs) all.push(...msgs);
+            }
+            return all.map(m => this.serializeMsg(m, peer));
+        }
+
+        // Convierte un mensaje GramJS a un objeto sencillo para el frontend.
+        serializeMsg(m, peer) {
+            const doc = m.media && m.media.document;
+            const ph = m.media && m.media.photo;
+            const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
+            const isImage = !!ph || !!(doc && /image\//.test(doc.mimeType || ''));
+            const hasThumb = !!(ph || (doc && doc.thumbs && doc.thumbs.length));
+            let filename = '';
+            if (doc) {
+                const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+                if (fn) filename = fn.fileName || '';
+            }
+            return {
+                id: m.id,
+                date: Number(m.date) || 0,
+                fromId: m.fromId ? String(m.fromId.userId || m.fromId.channelId || m.fromId.chatId || '') : '',
+                text: m.message || '',
+                hasMedia: !!m.media,
+                isVideo, isImage,
+                mimeType: doc ? doc.mimeType : (ph ? 'image/jpeg' : ''),
+                size: doc ? Number(doc.size) : 0,
+                filename,
+                duration: this._duration(doc || {}),
+                hasThumb,
+                editedAt: Number(m.editDate) || 0,
+                replyToMsgId: m.replyTo && m.replyTo.replyToMsgId ? Number(m.replyTo.replyToMsgId) : 0
+            };
+        }
+
+        // Enviar texto a un peer (con respuesta opcional).
+        async sendTextTo(peer, text, replyTo) {
+            const entity = await this.resolvePeer(peer);
+            const opts = {};
+            if (replyTo) opts.replyTo = Number(replyTo);
+            const msg = await this.client.sendMessage(entity, Object.assign({ message: String(text || '') }, opts));
+            return this.serializeMsg(msg, peer);
+        }
+
+        // Subir y enviar un archivo (Blob/File). Para videos pone soporte de streaming.
+        async sendFileTo(peer, file, caption, replyTo) {
+            const entity = await this.resolvePeer(peer);
+            const opts = {
+                file: file,
+                caption: caption || '',
+                forceDocument: false,
+                supportsStreaming: /^video\//.test(file.type || '') ? true : undefined,
+                fileName: file.name || undefined,
+                workers: 1
+            };
+            if (replyTo) opts.replyTo = Number(replyTo);
+            const msg = await this.client.sendFile(entity, opts);
+            return this.serializeMsg(msg, peer);
+        }
+
+        // Editar el texto/leyenda de un mensaje en cualquier peer.
+        async editTextIn(peer, msgId, text) {
+            const entity = await this.resolvePeer(peer);
+            await this.client.editMessage(entity, { message: Number(msgId), text: String(text || '') });
+        }
+
+        // Reemplazar el archivo de un mensaje (cambiar el video).
+        async replaceFileIn(peer, msgId, newFile, caption) {
+            const entity = await this.resolvePeer(peer);
+            await this.client.editMessage(entity, {
+                message: Number(msgId),
+                file: newFile,
+                text: caption || '',
+                supportsStreaming: /^video\//.test(newFile.type || '') ? true : undefined,
+                fileName: newFile.name || undefined
+            });
+        }
+
+        // Borrar uno o varios mensajes (revoke = borrar para todos).
+        async deleteMessagesIn(peer, msgIds) {
+            const entity = await this.resolvePeer(peer);
+            await this.client.deleteMessages(entity, msgIds.map(Number), { revoke: true });
+        }
+
+        // Reenviar mensajes de un peer a otro (forward o copy).
+        async forwardMessages(fromPeer, msgIds, toPeer, asCopy) {
+            const from = await this.resolvePeer(fromPeer);
+            const to = await this.resolvePeer(toPeer);
+            await this.client.forwardMessages(to, {
+                messages: msgIds.map(Number),
+                fromPeer: from,
+                noQuote: !!asCopy,
+                silent: false
+            });
+        }
+
+        // Descarga el contenido (thumbnail) de un mensaje cualquiera (Buffer/Uint8Array).
+        async downloadAnyThumb(peer, msgId) {
+            const entity = await this.resolvePeer(peer);
+            const res = await this.client.getMessages(entity, { ids: [Number(msgId)] });
+            const m = res && res[0]; if (!m || !m.media) return null;
+            if (m.media.photo) return await this.client.downloadMedia(m, {});
+            const doc = m.media.document;
+            if (doc && doc.thumbs && doc.thumbs.length) return await this.client.downloadMedia(m, { thumb: doc.thumbs.length - 1 });
+            return null;
+        }
     }
 
     window.TelegramService = TelegramService;
