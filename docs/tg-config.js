@@ -25,7 +25,7 @@ window.TVP_CONFIG = {
     messagesPerTopic: 300,
 
     // Etiqueta(s) que debe tener el TITULO de un tema para mostrarse
-    autoTags: ['playertv:auto', 'tvplayer:auto'],
+    autoTags: ['playertv:auto', 'tvplayer:auto', 'tvgram:auto'],
 
     // TMDB (v4 token recomendado o v3 key). Se usa desde el navegador.
     tmdbKey: 'cbb1fa07c88626f5c57d56e48d8ce704',
