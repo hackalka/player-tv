@@ -76,6 +76,7 @@ jobs:
             --minify \
             --define:process.env.NODE_ENV='"production"' \
             --inject:./shim.js \
+            --footer:js="if(typeof window!=='undefined')window.telegram=telegram;" \
             --alias:fs=./empty/index.js \
             --alias:net=./empty/index.js \
             --alias:tls=./empty/index.js \
