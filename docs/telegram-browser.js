@@ -2178,3 +2178,4 @@ store2/dist/store2.js:
   (*! store2 - v2.14.4 - 2024-12-26
   * Copyright (c) 2024 Nathan Bubna; Licensed MIT *)
 */
+if(typeof window!=='undefined')window.telegram=telegram;
