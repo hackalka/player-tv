@@ -122,8 +122,17 @@
                 }
             );
         } catch (e) {
-            onStatus('No se pudo iniciar sesión: ' + (e && (e.errorMessage || e.message)));
-            throw e;
+            // GramJS 2.26 a veces falla al procesar el ultimo update tras escanear QR
+            // ("Missing MTProto Entity: ID ..."). Pero la sesion YA es valida en el cliente.
+            const msg = (e && (e.message || e.errorMessage)) || '';
+            console.warn('[tg-qr] post-scan exception:', msg);
+            let authorized = false;
+            try { authorized = await _loginClient.checkAuthorization(); } catch (e2) { }
+            if (!authorized) {
+                onStatus('No se pudo iniciar sesión: ' + msg);
+                throw e;
+            }
+            console.log('[tg-qr] La sesión SI quedo iniciada pese al error de TL. Continuando.');
         }
         // Sesion iniciada
         saveSession(_loginClient);
