@@ -33,6 +33,8 @@ jobs:
         working-directory: gramjs-src
         run: |
           npm install --no-audit --no-fund --legacy-peer-deps --include=dev
+          # Forzar modo produccion en webpack (sin eval, bundle mas pequeno)
+          sed -i 's/process.env.NODE_ENV ?? "development"/"production"/' webpack.config.js
           node generate_webpack.js
           # generate_webpack.js compila de forma asincrona; esperamos al archivo
           for i in $(seq 1 120); do
