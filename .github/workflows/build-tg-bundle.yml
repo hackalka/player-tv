@@ -28,33 +28,44 @@ jobs:
 
       - name: Instalar telegram@browser + esbuild + polyfills
         run: |
+          set -e
           mkdir -p build && cd build
           npm init -y >/dev/null
-          npm install --no-audit --no-fund \
+          npm install --no-audit --no-fund --legacy-peer-deps \
             telegram@browser \
             esbuild@0.24.0 \
             buffer@6.0.3 \
             process@0.11.10
-          # Comprobacion: que version se instalo
-          node -e "console.log('telegram instalado:', require('./node_modules/telegram/package.json').version)"
-          # Confirmar que el CryptoFile usa Web Crypto (no 'require crypto')
-          head -5 node_modules/telegram/CryptoFile.js || true
+          echo "=== telegram@browser instalado ==="
+          node -e "const p=require('./node_modules/telegram/package.json'); console.log('version:', p.version, '| main:', p.main)"
+          echo "=== CryptoFile.js (deberia usar Web Crypto, NO require('crypto')) ==="
+          head -5 node_modules/telegram/CryptoFile.js
+          echo "=== ¿hay BROWSER aun? ==="
+          find node_modules/telegram -name '*BROWSER*' | head -5
 
-      - name: Crear shim global (Buffer, process)
+      - name: Crear shim global y modulo vacio
         run: |
-          cat > build/shim.js <<'EOF'
-          import { Buffer } from 'buffer';
-          import process from 'process';
-          if (typeof globalThis.Buffer === 'undefined') globalThis.Buffer = Buffer;
-          if (typeof globalThis.process === 'undefined') globalThis.process = process;
+          set -e
+          cd build
+          mkdir -p empty
+          cat > empty/index.js <<'EOF'
+          module.exports = {};
+          EOF
+          # Shim: define process y Buffer en globalThis. NO usa imports ESM
+          # para evitar problemas con esbuild en formato IIFE.
+          cat > shim.js <<'EOF'
+          var processPolyfill = require('process');
+          var bufferPolyfill = require('buffer');
+          if (typeof globalThis.process === 'undefined') globalThis.process = processPolyfill;
+          if (typeof globalThis.Buffer === 'undefined') globalThis.Buffer = bufferPolyfill.Buffer;
           if (typeof globalThis.global === 'undefined') globalThis.global = globalThis;
           EOF
 
-      - name: Empaquetar con esbuild (IIFE -> window.telegram)
+      - name: Empaquetar con esbuild
         run: |
+          set -e
           cd build
-          # Crear un alias-vacio para los modulos Node que GramJS no necesita en navegador
-          mkdir -p empty && echo "module.exports = {};" > empty/index.js
+          echo "=== ejecutando esbuild... ==="
           npx esbuild node_modules/telegram/index.js \
             --bundle \
             --outfile=../docs/telegram-browser.js \
@@ -82,7 +93,8 @@ jobs:
             --alias:crypto=./empty/index.js \
             --alias:node-localstorage=./empty/index.js \
             --alias:socks=./empty/index.js \
-            --log-level=warning
+            --log-level=info 2>&1 | tee esbuild.log
+          echo "=== resultado ==="
           ls -la ../docs/telegram-browser.js
 
       - name: Commit del bundle
@@ -90,5 +102,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/telegram-browser.js
-          git commit -m "build: bundle de GramJS desde telegram@browser (TL al dia + Web Crypto)" || echo "Sin cambios"
+          git commit -m "build: bundle GramJS desde telegram@browser (TL al dia + Web Crypto)" || echo "Sin cambios"
           git push
