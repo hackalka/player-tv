@@ -113,6 +113,16 @@
         if (!_loginClient) { _loginClient = newClient(''); await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram.'); }
         console.log('[tg] login: enviando código a', phone);
         const r = await withTimeout(_loginClient.sendCode({ apiId: cfg.apiId, apiHash: cfg.apiHash }, phone), 25000, 'Telegram no respondió al enviar el código.');
+        // Diagnostico: por que medio mando Telegram el codigo
+        try {
+            const t = r && r.type && r.type.className;
+            const next = r && r.nextType && r.nextType.className;
+            const len = r && r.type && r.type.length;
+            console.log('[tg] login: tipo de envio =', t, '| longitud =', len, '| siguiente medio =', next || '(ninguno)');
+            if (/App/i.test(t || '')) console.log('[tg] -> El codigo se envio a la APP de Telegram (chat oficial "Telegram"), NO por SMS.');
+            else if (/Sms/i.test(t || '')) console.log('[tg] -> El codigo se envio por SMS al numero', phone);
+            else if (/Call/i.test(t || '')) console.log('[tg] -> El codigo se envia por LLAMADA telefonica.');
+        } catch (e) { }
         console.log('[tg] login: código enviado, revisa Telegram.');
         _login = { phone, hash: r.phoneCodeHash };
         return json({ ok: true });
