@@ -13,10 +13,18 @@
     let coreLoaded = false;
     let loading = false;
 
-    // CDN de FFmpeg.wasm (UMD). Funciona desde paginas con SharedArrayBuffer
-    // o sin el (versiones mas nuevas usan worker normal).
-    const FFMPEG_CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-    const UTIL_CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/util.js';
+    // CDN de FFmpeg.wasm (UMD). Tres mirrors para no depender de uno solo.
+    const FFMPEG_SRC = [
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
+        'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js'
+    ];
+    const UTIL_SRC = [
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js',
+        'https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js',
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js',
+        'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js'
+    ];
     const CORE_BASE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
 
     function loadScript(src) {
@@ -39,11 +47,23 @@
         loading = true;
         try {
             progressCb && progressCb('Descargando FFmpeg.wasm (~30 MB)...');
-            await loadScript(FFMPEG_CDN);
-            await loadScript(UTIL_CDN);
+            // Probamos varios CDN de FFmpeg.js
+            let okFf = false;
+            for (const u of FFMPEG_SRC) {
+                try { await loadScript(u); okFf = true; break; }
+                catch (e) { console.warn('[mkv] FFmpeg fallo en', u); }
+            }
+            if (!okFf) throw new Error('No se pudo cargar FFmpeg.wasm desde ningún CDN');
+            // Y varios mirrors de @ffmpeg/util
+            let okU = false;
+            for (const u of UTIL_SRC) {
+                try { await loadScript(u); okU = true; break; }
+                catch (e) { console.warn('[mkv] util fallo en', u); }
+            }
+            if (!okU) throw new Error('No se pudo cargar @ffmpeg/util desde ningún CDN');
             const FFmpegLib = window.FFmpegWASM || window.FFmpeg;
             const Util = window.FFmpegUtil;
-            if (!FFmpegLib || !Util) throw new Error('FFmpeg no se cargó correctamente');
+            if (!FFmpegLib || !Util) throw new Error('FFmpeg/Util no se expusieron globalmente');
             ffmpeg = new FFmpegLib.FFmpeg();
             ffmpeg.on('progress', (p) => {
                 if (p.progress != null && progressCb) progressCb('Convirtiendo: ' + Math.round(p.progress * 100) + '%');

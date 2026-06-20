@@ -1,0 +1,159 @@
+name: Build Android APK (TWA)
+
+# Compila una APK que envuelve la PWA (player-tv.pages.dev) en una "Trusted
+# Web Activity". Resultado: APK firmada lista para descargar como artifact
+# y como release. Sirve para Android movil y Android TV.
+#
+# La huella SHA-256 del certificado generado se imprime en el log para que
+# la pegues en docs/.well-known/assetlinks.json (necesario para que la APK
+# no muestre la barra del navegador).
+
+on:
+  workflow_dispatch:        # Lanzalo a mano desde la pestaña Actions
+  push:
+    branches: [feature/client-only]
+    paths:
+      - '.github/workflows/build-android-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_PASSWORD: 'tvplayer-keystore'
+      KEY_PASSWORD: 'tvplayer-key'
+      KEY_ALIAS: 'tvplayer'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+
+      - name: Instalar Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli@1.21.1
+
+      - name: Generar/recuperar keystore para firmar la APK
+        run: |
+          mkdir -p apk-build && cd apk-build
+          if [ ! -f android.keystore ]; then
+            keytool -genkey -v \
+              -keystore android.keystore \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 36500 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=Tv Player, OU=Player TV, O=Player TV, L=Madrid, ST=Madrid, C=ES"
+          fi
+          echo "=== Huella SHA-256 del certificado ==="
+          keytool -list -v -keystore android.keystore -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" | grep "SHA256:" | tee sha256.txt
+          # Extraer formato hex con dos puntos: xx:xx:xx...
+          grep -oE "[A-F0-9]{2}(:[A-F0-9]{2}){31}" sha256.txt > sha256-clean.txt || true
+          echo "=== huella limpia: ===" && cat sha256-clean.txt
+
+      - name: Generar twa-manifest.json
+        working-directory: apk-build
+        run: |
+          cat > twa-manifest.json <<'EOF'
+          {
+            "packageId": "app.playertv.web",
+            "host": "player-tv.pages.dev",
+            "name": "Tv Player",
+            "launcherName": "Tv Player",
+            "display": "standalone",
+            "themeColor": "#0b0b0b",
+            "navigationColor": "#0b0b0b",
+            "navigationColorDark": "#0b0b0b",
+            "navigationDividerColor": "#0b0b0b",
+            "navigationDividerColorDark": "#0b0b0b",
+            "backgroundColor": "#0b0b0b",
+            "enableNotifications": false,
+            "startUrl": "/",
+            "iconUrl": "https://player-tv.pages.dev/icon_512x512.png",
+            "maskableIconUrl": "https://player-tv.pages.dev/icon_512x512.png",
+            "appVersionName": "1.0.0",
+            "appVersionCode": 1,
+            "shortcuts": [],
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": "https://player-tv.pages.dev/manifest.json",
+            "fallbackType": "customtabs",
+            "features": {
+              "playBilling": { "enabled": false }
+            },
+            "alphaDependencies": { "enabled": false },
+            "enableSiteSettingsShortcut": true,
+            "isChromeOSOnly": false,
+            "isMetaQuest": false,
+            "orientation": "any",
+            "fullScopeUrl": "https://player-tv.pages.dev/",
+            "minSdkVersion": 21,
+            "androidTV": true,
+            "leanbackLaunchActivity": true
+          }
+          EOF
+          echo "=== Manifest generado ==="
+          cat twa-manifest.json
+
+      - name: Inicializar proyecto Bubblewrap
+        working-directory: apk-build
+        run: |
+          # Aceptar prompts con respuestas por defecto
+          yes "" | bubblewrap init --manifest=twa-manifest.json --skipPwaValidation || true
+
+      - name: Construir APK firmada
+        working-directory: apk-build
+        run: |
+          bubblewrap build \
+            --skipPwaValidation \
+            --signingKeyPath=./android.keystore \
+            --signingKeyAlias="$KEY_ALIAS"
+          echo "=== Resultado del build ==="
+          ls -la *.apk *.aab 2>/dev/null || true
+
+      - name: Renombrar APK con fecha
+        working-directory: apk-build
+        run: |
+          ts=$(date -u +%Y%m%d-%H%M)
+          for f in app-release-signed.apk app-release.apk *.apk; do
+            if [ -f "$f" ]; then mv "$f" "tv-player-${ts}.apk"; break; fi
+          done
+          ls -la *.apk
+
+      - name: Subir APK como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-player-apk
+          path: apk-build/*.apk
+
+      - name: Crear release con la APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "apk-${{ github.run_number }}"
+          name: "APK build #${{ github.run_number }}"
+          body: |
+            APK de **Tv Player** generada automáticamente.
+
+            Es una **TWA** (Trusted Web Activity) que envuelve la web https://player-tv.pages.dev.
+            Funciona en Android móvil y Android TV (gracias a `androidTV: true` y `leanbackLaunchActivity`).
+
+            **Importante**: la primera vez que descargues una APK debes copiar la huella SHA-256
+            que aparece en los logs de este job al fichero `docs/.well-known/assetlinks.json`
+            (campo `sha256_cert_fingerprints`). Sin ese paso, la app abrirá la barra de Chrome.
+          files: apk-build/*.apk
+          fail_on_unmatched_files: false
