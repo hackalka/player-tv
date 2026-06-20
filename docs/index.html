@@ -381,6 +381,15 @@
                     document.head.appendChild(s);
                 });
             }
+            // Carga un bundle local via fetch + eval. Mas fiable que <script> con 304/MIME.
+            async function loadLocalUmd(src) {
+                var r = await fetch(src, { cache: 'no-store' });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                var code = await r.text();
+                if (code.length < 1000) throw new Error('archivo demasiado pequeño (' + code.length + ' bytes)');
+                // Ejecuta el UMD en el ambito global; webpack lo cuelga de window.telegram
+                (0, eval)(code);
+            }
             function waitGlobal(ms) {
                 return new Promise(function (res) {
                     var n = Math.ceil((ms || 5000) / 100);
@@ -391,15 +400,20 @@
                 await polyfills();
                 // 1) UMD clasico (dist/index.js): expondria window.telegram con crypto nativo del navegador
                 for (var u = 0; u < UMD.length; u++) {
-                    try { await loadScript(UMD[u]); }
-                    catch (e) { console.warn('[tg-loader] UMD no carga', UMD[u]); continue; }
-                    if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', UMD[u]); continue; }
-                    console.log('[tg-loader] UMD importado:', UMD[u], '— probando conexion...');
+                    var src = UMD[u];
+                    var isLocal = !/^https?:/i.test(src); // bundle local que servimos nosotros
+                    try {
+                        if (isLocal) await loadLocalUmd(src);
+                        else await loadScript(src);
+                    }
+                    catch (e) { console.warn('[tg-loader] UMD no carga', src, e && e.message); continue; }
+                    if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', src); continue; }
+                    console.log('[tg-loader] UMD importado:', src, '— probando conexion...');
                     if (await connects(window.telegram)) {
-                        console.log('[tg-loader] ✅ GramJS FUNCIONA (UMD) via', UMD[u]);
+                        console.log('[tg-loader] ✅ GramJS FUNCIONA (UMD) via', src);
                         return window.__tgResolve(window.telegram);
                     }
-                    console.warn('[tg-loader] UMD importó pero no conecta:', UMD[u]);
+                    console.warn('[tg-loader] UMD importó pero no conecta:', src);
                 }
                 // 2) Fallback ESM (esm.sh) — puede traer crypto roto (unenv)
                 for (var i = 0; i < ESM.length; i++) {
