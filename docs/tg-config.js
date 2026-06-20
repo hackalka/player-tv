@@ -16,8 +16,8 @@ window.TVP_CONFIG = {
     // Pon AQUI tu ID numerico de Telegram o tu @usuario (sin @).
     // Si lo dejas vacio, la app entra en modo "configuracion": el panel se muestra
     // a quien entre, y arriba veras tu ID/usuario para copiarlo aqui y bloquear el resto.
-    ownerId: '',          // ej: '898353177'
-    ownerUsername: '',    // ej: 'ck_alka' (sin @)
+    ownerId: '898353177',          // ej: '898353177'
+    ownerUsername: 'ck_alka',    // ej: 'ck_alka' (sin @)
 
     appName: 'Tv Player',
 
