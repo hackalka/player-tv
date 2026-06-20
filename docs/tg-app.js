@@ -86,6 +86,56 @@
     }
 
     /* ---------------- LOGIN ---------------- */
+    // Login con QR: el usuario escanea el codigo desde su app de Telegram movil
+    // (Ajustes -> Dispositivos -> Vincular dispositivo) y entra sin SMS ni codigo.
+    async function qrLogin(opts) {
+        opts = opts || {};
+        const onUrl = opts.onUrl || function () { };
+        const onStatus = opts.onStatus || function () { };
+        const askPassword = opts.askPassword || (() => prompt('Contraseña 2FA:') || '');
+        await whenReady();
+        if (!_loginClient) {
+            _loginClient = newClient('');
+            await withTimeout(_loginClient.connect(), 25000, 'No se pudo conectar con Telegram.');
+        }
+        try {
+            await _loginClient.signInUserWithQrCode(
+                { apiId: cfg.apiId, apiHash: cfg.apiHash },
+                {
+                    qrCode: async (code) => {
+                        try {
+                            const token = code.token.toString('base64')
+                                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                            onUrl('tg://login?token=' + token);
+                            onStatus('Escanea el código en tu app de Telegram.');
+                        } catch (e) { console.warn('[tg-qr] qrCode cb', e); }
+                    },
+                    password: async () => {
+                        onStatus('Pide tu contraseña 2FA…');
+                        return await askPassword();
+                    },
+                    onError: async (err) => {
+                        console.warn('[tg-qr] error:', err && err.message);
+                        onStatus('Error: ' + (err && err.message));
+                        return true; // detener
+                    }
+                }
+            );
+        } catch (e) {
+            onStatus('No se pudo iniciar sesión: ' + (e && (e.errorMessage || e.message)));
+            throw e;
+        }
+        // Sesion iniciada
+        saveSession(_loginClient);
+        _client = _loginClient;
+        _loginClient = null;
+        _service = new window.TelegramService(_client, cfg);
+        onStatus('¡Conectado! Cargando…');
+        try { localStorage.setItem('tvp_token', 'local'); } catch { }
+        location.reload();
+    }
+    window.TVP_QR = { start: qrLogin };
+
     async function loginStart() {
         await whenReady();
         console.log('[tg] login: creando cliente...');

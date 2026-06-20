@@ -206,6 +206,13 @@
                 <label class="login-label" for="login-phone">Número de teléfono (con prefijo de país)</label>
                 <input id="login-phone" class="login-input" type="tel" inputmode="tel" placeholder="+34 600 00 00 00" autocomplete="tel">
                 <button id="btn-send-code" class="btn btn-play login-action" type="button">Enviar código</button>
+                <button id="btn-qr-login" class="btn-link" type="button" style="margin-top:14px;">📱 O entrar escaneando un código QR</button>
+            </div>
+            <div class="login-step" data-step="qr" hidden>
+                <p class="login-help">Abre Telegram en tu móvil → <b>Ajustes → Dispositivos → Vincular dispositivo</b> y escanea este código:</p>
+                <div id="qr-box" style="background:#fff;padding:16px;display:inline-block;border-radius:8px;margin:8px auto;"></div>
+                <p id="qr-status" class="boot-status" style="margin-top:10px;">Generando código…</p>
+                <button id="btn-qr-back" class="btn-link" type="button">‹ Volver al login normal</button>
             </div>
             <div class="login-step" data-step="code" hidden>
                 <label class="login-label" for="login-code">Código recibido en Telegram</label>
@@ -310,6 +317,8 @@
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     <!-- Polyfill de Buffer (Node) para el navegador, ANTES de cargar GramJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js" crossorigin="anonymous"></script>
+    <!-- QR para el login alternativo -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script>
         try { window.Buffer = window.Buffer || (window.buffer && window.buffer.Buffer); } catch (e) { }
         if (!window.global) window.global = window;
@@ -445,5 +454,37 @@
     <script src="tg-app.js"></script>
     <!-- Frontend (sin cambios) -->
     <script src="script.js"></script>
+    <script>
+        // Conectar el boton "Entrar con QR" del modal de login con la funcion QR de tg-app.js
+        (function () {
+            function $(id) { return document.getElementById(id); }
+            function setStep(step) {
+                Array.prototype.forEach.call(document.querySelectorAll('.login-step'), function (s) {
+                    s.hidden = s.getAttribute('data-step') !== step;
+                });
+            }
+            function renderQR(url) {
+                var box = $('qr-box'); if (!box || !window.qrcode) return;
+                box.innerHTML = '';
+                var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+                box.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2 });
+            }
+            function setStatus(msg) { var s = $('qr-status'); if (s) s.innerText = msg || ''; }
+            function start() {
+                setStep('qr');
+                setStatus('Generando código…');
+                if (!window.TVP_QR || !window.TVP_QR.start) { setStatus('Espera unos segundos a que cargue la librería e intenta de nuevo.'); return; }
+                window.TVP_QR.start({
+                    onUrl: renderQR,
+                    onStatus: setStatus,
+                    askPassword: function () { return prompt('Tu contraseña 2FA:') || ''; }
+                }).catch(function (e) { setStatus('Error: ' + (e && (e.errorMessage || e.message))); });
+            }
+            document.addEventListener('DOMContentLoaded', function () {
+                var b = $('btn-qr-login'); if (b) b.addEventListener('click', start);
+                var back = $('btn-qr-back'); if (back) back.addEventListener('click', function () { setStep('phone'); });
+            });
+        })();
+    </script>
 </body>
 </html>
