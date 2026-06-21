@@ -534,30 +534,44 @@
         buildPlayer();
         const m = state.messages.find(x => x.id === msgId);
         if (!m) return;
-        // streamUrl que sirve el SW: tgstreamlink/<peer>/<msgId>
         const u = `tgstreamlink/${encodeURIComponent(state.currentPeer)}/${msgId}`;
         const ext = (m.filename || '').split('.').pop().toLowerCase();
         const browserOk = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov'].includes(ext);
         $('#tg-player-overlay').hidden = false;
         const v = $('#tg-pl-video');
         v.src = u;
-        $('#tg-pl-info').textContent = (m.filename || '') + ' · ' + fmtBytes(m.size);
+        const dl = u + '?download=1';
+        const fname = (m.filename || 'video' + (ext ? '.' + ext : ''));
+        const baseLinks = `
+            <button id="tg-pl-dl" class="btn-sm" type="button">⬇ Descargar (${fmtBytes(m.size)})</button>
+            <button id="tg-pl-mkv" class="btn-sm" type="button">⚡ Reproductor avanzado</button>
+            <a class="btn-sm" id="tg-pl-share" href="${esc(dl)}" download="${esc(fname)}" target="_blank">📤 Compartir/abrir</a>
+            <a class="btn-sm" id="tg-pl-vlc" href="vlc://${esc(u)}">▶ VLC</a>
+            <a class="btn-sm" id="tg-pl-mx" href="intent:${esc(u)}#Intent;type=video/*;action=android.intent.action.VIEW;end">▶ Android (MX/etc.)</a>`;
+        $('#tg-pl-info').innerHTML = esc(fname) + ' · ' + fmtBytes(m.size) + '<br>' + baseLinks;
+        wirePlayerLinks(msgId, u, dl, m, ext);
         v.onerror = () => {
-            $('#tg-pl-info').innerHTML = `Este formato no se reproduce en el navegador.
-                <button id="tg-pl-dl" class="btn-sm" type="button">⬇ Descargar</button>
-                <button id="tg-pl-mkv" class="btn-sm" type="button">⚡ Reproducir avanzado (FFmpeg)</button>`;
-            $('#tg-pl-dl').addEventListener('click', () => onDownload(msgId));
-            $('#tg-pl-mkv').addEventListener('click', () => {
-                if (window.MkvPlayer) window.MkvPlayer.play({ streamUrl: u, filename: m.filename, ext });
-            });
+            $('#tg-pl-info').innerHTML = `<b>Este formato no se reproduce en el navegador.</b> Elige cómo verlo:<br>` + baseLinks;
+            wirePlayerLinks(msgId, u, dl, m, ext);
         };
-        v.play().catch(() => {});
+        v.play().catch(() => { });
+    }
+
+    function wirePlayerLinks(msgId, u, dl, m, ext) {
+        const dlBtn = document.getElementById('tg-pl-dl');
+        if (dlBtn) dlBtn.onclick = () => onDownload(msgId);
+        const mkvBtn = document.getElementById('tg-pl-mkv');
+        if (mkvBtn) mkvBtn.onclick = () => {
+            if (window.MkvPlayer) window.MkvPlayer.play({ streamUrl: u, filename: m.filename, ext });
+            else alert('Reproductor avanzado no disponible (recarga la página).');
+        };
     }
     function onDownload(msgId) {
         const m = state.messages.find(x => x.id === msgId);
         const u = `tgstreamlink/${encodeURIComponent(state.currentPeer)}/${msgId}?download=1`;
         const a = document.createElement('a');
         a.href = u; a.download = (m && m.filename) || 'video';
+        a.target = '_blank';
         document.body.appendChild(a); a.click(); a.remove();
     }
 

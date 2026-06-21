@@ -520,20 +520,25 @@
     }
     async function swInfo(kind, a, b) {
         const svc = await ensureService(); if (!svc) return null;
-        const msg = await resolveMessage(svc, kind, a, b);
-        if (!msg) return null;
-        const info = svc.docInfo(msg);
-        if (!info) return null;
-        // Filename real del archivo (para descargas con nombre legible)
-        let filename = '';
         try {
-            const doc = msg.media && msg.media.document;
-            if (doc) {
-                const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
-                if (fn) filename = fn.fileName || '';
-            }
-        } catch { }
-        return { size: info.size, mime: info.mimeType, filename };
+            const msg = await resolveMessage(svc, kind, a, b);
+            if (!msg) { console.warn('[sw-bridge] sin mensaje para', kind, a, b); return null; }
+            const info = svc.docInfo(msg);
+            if (!info) { console.warn('[sw-bridge] sin docInfo (¿no es archivo?) para', kind, a, b); return null; }
+            let filename = '';
+            try {
+                const doc = msg.media && msg.media.document;
+                if (doc) {
+                    const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+                    if (fn) filename = fn.fileName || '';
+                }
+            } catch { }
+            console.log('[sw-bridge] info OK', kind, a, b, '→', info.size, info.mimeType, filename);
+            return { size: info.size, mime: info.mimeType, filename };
+        } catch (e) {
+            console.error('[sw-bridge] info ERROR', kind, a, b, e && e.message);
+            return null;
+        }
     }
     async function swChunk(kind, a, b, start, length) {
         const svc = await ensureService(); if (!svc) return null;
