@@ -788,7 +788,9 @@
 
         streamRange(info, start, length) {
             return this.client.iterDownload({
-                file: info.location, offset: bigInt(start), limit: length, requestSize: 512 * 1024, dcId: info.dcId
+                file: info.location, offset: bigInt(start), limit: length,
+                requestSize: 1024 * 1024, // 1 MB por bloque (mas velocidad)
+                dcId: info.dcId
             });
         }
 
@@ -942,7 +944,7 @@
         }
 
         // Subir y enviar un archivo (Blob/File). Para videos pone soporte de streaming.
-        async sendFileTo(peer, file, caption, replyTo) {
+        async sendFileTo(peer, file, caption, replyTo, onProgress) {
             const entity = await this.resolvePeer(peer);
             const opts = {
                 file: file,
@@ -950,7 +952,10 @@
                 forceDocument: false,
                 supportsStreaming: /^video\//.test(file.type || '') ? true : undefined,
                 fileName: file.name || undefined,
-                workers: 1
+                workers: 4, // 4 chunks en paralelo (mas rapido en redes con buena subida)
+                progressCallback: typeof onProgress === 'function'
+                    ? (sent, total) => { try { onProgress(Number(sent), Number(total)); } catch (e) { } }
+                    : undefined
             };
             if (replyTo) opts.replyTo = Number(replyTo);
             const msg = await this.client.sendFile(entity, opts);
@@ -1014,24 +1019,79 @@
             });
         }
 
-        // Lista los tópicos (foros) de un grupo, con título y datos para mostrar
+        // Lista los tópicos (foros) de un grupo, paginando para traer TODOS.
         async getGroupTopics(peer) {
             const entity = await this.resolvePeer(peer);
-            try {
-                const res = await this.client.invoke(new Api.channels.GetForumTopics({
-                    channel: entity, limit: 100, offsetDate: 0, offsetId: 0, offsetTopic: 0
-                }));
-                return (res.topics || [])
-                    .filter(t => t.id !== undefined)
-                    .map(t => ({
-                        id: Number(t.id),
-                        title: t.title || ('Tema ' + t.id),
-                        iconColor: t.iconColor || 0,
-                        unread: t.unreadCount || 0,
-                        closed: !!t.closed,
-                        pinned: !!t.pinned
+            const all = [];
+            let offsetDate = 0, offsetId = 0, offsetTopic = 0;
+            for (let page = 0; page < 20; page++) {
+                let res;
+                try {
+                    res = await this.client.invoke(new Api.channels.GetForumTopics({
+                        channel: entity, limit: 100,
+                        offsetDate, offsetId, offsetTopic
                     }));
-            } catch (e) { console.warn('[tg] getGroupTopics fallo:', e.message); return []; }
+                } catch (e) { console.warn('[tg] getGroupTopics page', page, 'fallo:', e.message); break; }
+                const items = (res.topics || []).filter(t => t.id !== undefined);
+                if (!items.length) break;
+                items.forEach(t => all.push({
+                    id: Number(t.id),
+                    title: t.title || ('Tema ' + t.id),
+                    iconColor: t.iconColor || 0,
+                    unread: t.unreadCount || 0,
+                    closed: !!t.closed,
+                    pinned: !!t.pinned,
+                    fromId: t.fromId ? String(t.fromId.userId || t.fromId.channelId || '') : ''
+                }));
+                if (items.length < 100) break;
+                // Preparar offset para la siguiente pagina (ultimo topic)
+                const last = items[items.length - 1];
+                offsetTopic = Number(last.id);
+                // Para paginacion correcta tambien hace falta offsetDate del ultimo top message
+                if (res.messages && res.messages.length) {
+                    const lm = res.messages[res.messages.length - 1];
+                    offsetDate = Number(lm.date) || 0;
+                    offsetId = Number(lm.id) || 0;
+                }
+                if (offsetTopic === 0) break;
+            }
+            // Quitar duplicados conservando orden
+            const seen = new Set(); const out = [];
+            for (const t of all) { if (!seen.has(t.id)) { seen.add(t.id); out.push(t); } }
+            return out;
+        }
+
+        // Crear un nuevo tópico (foro) en un grupo.
+        async createTopic(peer, title, iconColor) {
+            const entity = await this.resolvePeer(peer);
+            const colors = [0x6FB9F0, 0xFFD67E, 0xCB86DB, 0x8EEE98, 0xFF93B2, 0xFB6F5F];
+            const color = iconColor != null ? Number(iconColor) : colors[Math.floor(Math.random() * colors.length)];
+            const random = bigInt(Math.floor(Math.random() * 0x100000000)).shiftLeft(32)
+                .add(bigInt(Math.floor(Math.random() * 0x100000000)));
+            const res = await this.client.invoke(new Api.channels.CreateForumTopic({
+                channel: entity,
+                title: String(title || '').slice(0, 128) || 'Nuevo tema',
+                iconColor: color,
+                randomId: random
+            }));
+            // res.updates contiene el topic creado; devolvemos un topicId aproximado
+            return { ok: true };
+        }
+
+        // Datos de la cuenta logueada (premium, etc.)
+        async getMyAccount() {
+            try {
+                const me = await this.client.getMe();
+                return {
+                    id: String(me.id || ''),
+                    firstName: me.firstName || '',
+                    lastName: me.lastName || '',
+                    username: me.username || '',
+                    premium: !!me.premium,
+                    verified: !!me.verified,
+                    phone: me.phone || ''
+                };
+            } catch (e) { return null; }
         }
 
         // Descarga el contenido (thumbnail) de un mensaje cualquiera (Buffer/Uint8Array).

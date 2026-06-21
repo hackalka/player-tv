@@ -1382,3 +1382,19 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
 #tg-fwd-dialog .tg-fwd-item-sub { color: #888; font-size: 0.72rem; }
 #tg-fwd-dialog .tg-fwd-opt { display: flex; align-items: center; gap: 8px; padding: 12px 4px 4px; color: #ddd; font-size: 0.85rem; }
 #tg-fwd-dialog .tg-fwd-info { color: #aaa; font-size: 0.83rem; padding-top: 6px; }
+
+
+
+/* === Boton play en mensajes + tema "+ Nuevo" === */
+.tg-msg-actions .msg-act.primary { background: var(--netflix-red); border-color: var(--netflix-red); color: #fff; }
+.tg-msg-actions .msg-act.primary:hover { background: var(--netflix-red-hover); }
+.tg-topic.new { background: rgba(229,9,20,.15); color: var(--netflix-red); border-color: var(--netflix-red); }
+.tg-topic.new:hover { background: rgba(229,9,20,.25); }
+
+/* === Reproductor inline del Mi Telegram === */
+#tg-player-overlay { position: fixed; inset: 0; z-index: 10001; }
+#tg-player-overlay .tg-pl-back { position: absolute; inset: 0; background: rgba(0,0,0,.85); }
+#tg-player-overlay .tg-pl-card { position: relative; width: 92%; max-width: 1100px; margin: 4vh auto; background: #181818; border-radius: 10px; padding: 16px; }
+#tg-player-overlay .tg-pl-close { position: absolute; top: 8px; right: 12px; background: transparent; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; z-index: 2; }
+#tg-player-overlay #tg-pl-video { width: 100%; max-height: 75vh; background: #000; border-radius: 6px; }
+#tg-player-overlay .tg-pl-info { color: #aaa; font-size: 0.85rem; padding: 8px 4px 0; display: flex; align-items: center; gap: 10px; }

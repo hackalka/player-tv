@@ -275,17 +275,30 @@
     function renderTopicsBar() {
         // Quitar la barra anterior si existe
         const old = document.getElementById('tg-topics-bar'); if (old) old.remove();
-        if (!state.topics.length) return;
+        const ch = state.chats.find(x => x.peerId === state.currentPeer);
+        if (!ch || !ch.isForum) return;
         const bar = document.createElement('div');
         bar.id = 'tg-topics-bar';
         bar.className = 'tg-topics-bar';
-        bar.innerHTML = state.topics.map(t => `
+        const items = state.topics.map(t => `
             <button class="tg-topic${state.currentTopic === t.id ? ' active' : ''}" data-id="${t.id}" data-title="${esc(t.title)}">
                 ${esc(t.title)}${t.unread ? ` <span class="tg-unread">${t.unread > 99 ? '99+' : t.unread}</span>` : ''}
             </button>`).join('');
+        bar.innerHTML = items + (ch.isAdmin ? '<button class="tg-topic new" id="tg-topic-new" title="Nuevo tema">+ Nuevo</button>' : '');
         const head = $('#tg-main-head');
         head.parentNode.insertBefore(bar, head.nextSibling);
-        $$('#tg-topics-bar .tg-topic').forEach(b => b.addEventListener('click', () => selectTopic(Number(b.dataset.id), b.dataset.title)));
+        $$('#tg-topics-bar .tg-topic[data-id]').forEach(b => b.addEventListener('click', () => selectTopic(Number(b.dataset.id), b.dataset.title)));
+        const newBtn = document.getElementById('tg-topic-new');
+        if (newBtn) newBtn.addEventListener('click', onCreateTopic);
+    }
+
+    async function onCreateTopic() {
+        const title = prompt('Nombre del nuevo tema:');
+        if (!title || !title.trim()) return;
+        try {
+            await api('/api/admin/topic-create', { method: 'POST', body: JSON.stringify({ peer: state.currentPeer, title: title.trim() }) });
+            await loadTopics();
+        } catch (e) { alert('No se pudo crear el tema: ' + e.message); }
     }
 
     async function selectTopic(topicId, title) {
@@ -320,6 +333,10 @@
             if (rep) rep.addEventListener('click', () => onReplaceFile(Number(el.dataset.id)));
             const fwd = el.querySelector('[data-act="forward"]');
             if (fwd) fwd.addEventListener('click', () => onForward(Number(el.dataset.id)));
+            const play = el.querySelector('[data-act="play"]');
+            if (play) play.addEventListener('click', () => onPlay(Number(el.dataset.id)));
+            const dl = el.querySelector('[data-act="download"]');
+            if (dl) dl.addEventListener('click', () => onDownload(Number(el.dataset.id)));
         });
         body.scrollTop = body.scrollHeight;
         msgs.filter(m => m.hasMedia && m.hasThumb && !state.thumbs.has(m.id)).forEach(loadThumb);
@@ -327,7 +344,9 @@
 
     function msgHTML(m) {
         const dateStr = fmtTime(m.date) + (m.editedAt ? ' · editado' : '');
+        const playBtn = (m.isVideo || m.isImage) ? `<button class="msg-act primary" data-act="play" title="Ver">▶</button>` : '';
         const replaceBtn = (m.isVideo || m.isImage) ? `<button class="msg-act" data-act="replace" title="Reemplazar archivo">🔄</button>` : '';
+        const dlBtn = m.hasMedia ? `<button class="msg-act" data-act="download" title="Descargar">⬇</button>` : '';
         const mediaIcon = m.isVideo ? '▶' : m.isImage ? '🖼' : '📎';
         const mediaTitle = m.filename || (m.isVideo ? 'Video' : m.isImage ? 'Imagen' : 'Archivo');
         const mediaLine = m.hasMedia ? `<div class="tg-msg-media">
@@ -342,8 +361,10 @@
                 <span class="tg-msg-id">#${m.id}</span>
                 <span class="tg-msg-date">${esc(dateStr)}</span>
                 <div class="tg-msg-actions">
+                    ${playBtn}
                     <button class="msg-act" data-act="edit" title="Editar">✏️</button>
                     ${replaceBtn}
+                    ${dlBtn}
                     <button class="msg-act" data-act="forward" title="Reenviar / copiar a otro chat">↗</button>
                     <button class="msg-act danger" data-act="delete" title="Borrar">🗑</button>
                 </div>
@@ -400,8 +421,14 @@
         e.target.value = '';
         const cap = $('#tg-text').value || '';
         try {
-            showStatus('Subiendo ' + file.name + '...');
-            await window.TVP_ADMIN.sendFile(state.currentPeer, file, cap);
+            showStatus('Subiendo ' + file.name + '... 0%');
+            // Callback de progreso desde GramJS
+            await window.TVP_ADMIN.sendFile(state.currentPeer, file, cap, undefined,
+                (sent, total) => {
+                    const pct = total ? Math.round(sent / total * 100) : 0;
+                    showStatus(`Subiendo ${file.name}: ${pct}% (${fmtBytes(sent)}/${fmtBytes(total)})`);
+                }
+            );
             $('#tg-text').value = '';
             showStatus(''); await loadMessages();
         } catch (err) { showStatus(''); alert('Error al enviar: ' + err.message); }
@@ -413,6 +440,59 @@
             $('#tg-text').value = '';
             await loadMessages();
         } catch (e) { alert('No se pudo enviar: ' + e.message); }
+    }
+
+    // ====== VER VIDEO / DESCARGAR ======
+    function buildPlayer() {
+        if (document.getElementById('tg-player-overlay')) return;
+        const html = `
+        <div id="tg-player-overlay" hidden>
+            <div class="tg-pl-back"></div>
+            <div class="tg-pl-card">
+                <button class="tg-pl-close" type="button">×</button>
+                <video id="tg-pl-video" controls playsinline></video>
+                <div class="tg-pl-info" id="tg-pl-info"></div>
+            </div>
+        </div>`;
+        const w = document.createElement('div'); w.innerHTML = html;
+        document.body.appendChild(w.firstElementChild);
+        $('#tg-player-overlay .tg-pl-back').addEventListener('click', closePlayer);
+        $('#tg-player-overlay .tg-pl-close').addEventListener('click', closePlayer);
+    }
+    function closePlayer() {
+        const v = document.getElementById('tg-pl-video');
+        if (v) { try { v.pause(); } catch (e) {} v.removeAttribute('src'); v.load(); }
+        document.getElementById('tg-player-overlay').hidden = true;
+    }
+    async function onPlay(msgId) {
+        buildPlayer();
+        const m = state.messages.find(x => x.id === msgId);
+        if (!m) return;
+        // streamUrl que sirve el SW: tgstreamlink/<peer>/<msgId>
+        const u = `tgstreamlink/${encodeURIComponent(state.currentPeer)}/${msgId}`;
+        const ext = (m.filename || '').split('.').pop().toLowerCase();
+        const browserOk = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov'].includes(ext);
+        $('#tg-player-overlay').hidden = false;
+        const v = $('#tg-pl-video');
+        v.src = u;
+        $('#tg-pl-info').textContent = (m.filename || '') + ' · ' + fmtBytes(m.size);
+        v.onerror = () => {
+            $('#tg-pl-info').innerHTML = `Este formato no se reproduce en el navegador.
+                <button id="tg-pl-dl" class="btn-sm" type="button">⬇ Descargar</button>
+                <button id="tg-pl-mkv" class="btn-sm" type="button">⚡ Reproducir avanzado (FFmpeg)</button>`;
+            $('#tg-pl-dl').addEventListener('click', () => onDownload(msgId));
+            $('#tg-pl-mkv').addEventListener('click', () => {
+                if (window.MkvPlayer) window.MkvPlayer.play({ streamUrl: u, filename: m.filename, ext });
+            });
+        };
+        v.play().catch(() => {});
+    }
+    function onDownload(msgId) {
+        const m = state.messages.find(x => x.id === msgId);
+        const u = `tgstreamlink/${encodeURIComponent(state.currentPeer)}/${msgId}?download=1`;
+        const a = document.createElement('a');
+        a.href = u; a.download = (m && m.filename) || 'video';
+        document.body.appendChild(a); a.click(); a.remove();
     }
 
     // ====== REENVIAR / COPIAR ======
@@ -496,7 +576,8 @@
         el.hidden = false; el.textContent = s;
     }
 
-    // ====== ENGANCHE: boton solo visible si la cuenta es la propietaria ======
+    // ====== ENGANCHE: boton visible para CUALQUIER usuario logueado ======
+    // Cada usuario ve SUS propios chats (vienen de su sesion de Telegram).
     async function attach() {
         const navRight = document.querySelector('.navbar-right');
         if (!navRight || document.getElementById('tg-personal-btn')) return;
@@ -509,14 +590,14 @@
         btn.addEventListener('click', open);
         navRight.insertBefore(btn, navRight.firstChild);
 
-        // Comprobar quien soy y si soy el owner. Reintenta hasta 30s.
+        // Lo mostramos a CUALQUIERA que este logueado en Telegram. El owner
+        // sigue siendo solo TU para los botones admin del catalogo (carátula, enlace).
         for (let i = 0; i < 30; i++) {
             try {
                 const me = await api('/api/me');
                 if (me && me.loggedIn) {
                     state.owner = me;
-                    if (me.isOwner) { btn.hidden = false; return; }
-                    // No soy owner -> no mostrar el boton.
+                    btn.hidden = false;
                     return;
                 }
             } catch { }

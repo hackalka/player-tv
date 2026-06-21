@@ -88,10 +88,10 @@
     /* ---------------- LOGIN ---------------- */
     // Acciones que necesitan File/Blob (no caben en el JSON shim) - API directa.
     window.TVP_ADMIN = {
-        // Subir archivo: file=File, peer=string, caption?
-        async sendFile(peer, file, caption, replyTo) {
+        // Subir archivo: file=File, peer=string, caption?, replyTo?, onProgress?
+        async sendFile(peer, file, caption, replyTo, onProgress) {
             const r = await requireService(); if (r.err) throw new Error('Sin sesión');
-            return await r.svc.sendFileTo(peer, file, caption, replyTo);
+            return await r.svc.sendFileTo(peer, file, caption, replyTo, onProgress);
         },
         // Reemplazar el archivo de un mensaje.
         async replaceFile(peer, msgId, file, caption) {
@@ -467,6 +467,17 @@
                 const r = await requireService(); if (r.err) return r.err;
                 const peer = decodeURIComponent(parts[2]);
                 return json({ topics: await r.svc.getGroupTopics(peer) });
+            }
+            // Crear un nuevo topic en un grupo: { peer, title, iconColor? }
+            if (rest === 'admin/topic-create' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                await r.svc.createTopic(body.peer, body.title, body.iconColor);
+                return json({ ok: true });
+            }
+            // Datos de la cuenta logueada (para mostrar Premium/etc.)
+            if (rest === 'admin/account') {
+                const r = await requireService(); if (r.err) return r.err;
+                return json({ account: await r.svc.getMyAccount() });
             }
 
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);
