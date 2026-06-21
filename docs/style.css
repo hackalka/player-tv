@@ -673,7 +673,7 @@ body {
 body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
 .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-.logo-text { color: var(--netflix-red); font-weight: 700; letter-spacing: 1px; font-size: 1.15rem; }
+.logo-text { color: #3ee65c; font-weight: 700; letter-spacing: 1px; font-size: 1.15rem; text-shadow: 0 0 8px rgba(62, 230, 92, 0.4); }
 
 /* Conmutador de vista */
 .navbar-center.view-switch {

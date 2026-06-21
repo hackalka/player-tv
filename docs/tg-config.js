@@ -19,7 +19,7 @@ window.TVP_CONFIG = {
     ownerId: '898353177',          // ej: '898353177'
     ownerUsername: 'ck_alka',    // ej: 'ck_alka' (sin @)
 
-    appName: 'Tv Player',
+    appName: 'TV+',
 
     // Mensajes a traer por tema
     messagesPerTopic: 300,

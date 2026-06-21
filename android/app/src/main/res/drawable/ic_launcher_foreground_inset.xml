@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mete el logo un 12% por cada lado para que el adaptive icon
-     no recorte tu logo TV+ (Android solo muestra el 66% central). -->
+<!-- Mete el logo un 16% por cada lado para que el adaptive icon
+     no recorte tu logo TV+ (Android solo muestra el 66% central).
+     Probado: 16% se ve como en la version anterior, equilibrado. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/ic_launcher_foreground"
-    android:inset="12%" />
+    android:inset="16%" />
