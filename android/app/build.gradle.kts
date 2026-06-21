@@ -15,6 +15,16 @@ android {
         versionName = "1.0.0"
     }
 
+    // Nombre del APK al compilar: "TvPlayerPlus-<version>-<debug|release>.apk"
+    // (sin espacios para evitar problemas con rutas en Windows/Linux/Mac).
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "TvPlayerPlus-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
