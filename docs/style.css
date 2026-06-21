@@ -1398,3 +1398,13 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
 #tg-player-overlay .tg-pl-close { position: absolute; top: 8px; right: 12px; background: transparent; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; z-index: 2; }
 #tg-player-overlay #tg-pl-video { width: 100%; max-height: 75vh; background: #000; border-radius: 6px; }
 #tg-player-overlay .tg-pl-info { color: #aaa; font-size: 0.85rem; padding: 8px 4px 0; display: flex; align-items: center; gap: 10px; }
+
+
+
+/* === Reproductor avanzado MKV/AVI: 3 barras de progreso === */
+#mkv-overlay .mkv-progress { margin: 12px 0; }
+#mkv-overlay .mkv-row { margin-bottom: 14px; }
+#mkv-overlay .mkv-label { color: #ddd; font-size: 0.92rem; margin-bottom: 4px; font-weight: 500; }
+#mkv-overlay .mkv-stats { color: #aaa; font-size: 0.78rem; margin-top: 4px; font-family: monospace; }
+#mkv-overlay .mkv-bar-fill.engine { background: linear-gradient(90deg, #65aadd, #a695e7); }
+#mkv-overlay .mkv-bar-fill.remux { background: linear-gradient(90deg, #faa774, #ee7aae); }
