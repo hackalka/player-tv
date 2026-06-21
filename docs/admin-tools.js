@@ -31,7 +31,8 @@
         private: { label: 'Privados', icon: '👤' },
         groups: { label: 'Grupos', icon: '👥' },
         channels: { label: 'Canales', icon: '📢' },
-        bots: { label: 'Bots', icon: '🤖' }
+        bots: { label: 'Bots', icon: '🤖' },
+        search: { label: 'Buscar', icon: '🔎' }
     };
 
     const state = {
@@ -169,6 +170,10 @@
 
     function renderList() {
         const list = $('#tg-list');
+        // Modo "Buscar mensajes": muestra UI de busqueda en lugar de chats
+        if (state.cat === 'search') {
+            renderSearchUI(); return;
+        }
         const q = ($('#tg-search').value || '').trim().toLowerCase();
         const items = state.chats.filter(c => {
             if (state.cat === 'admin' && !c.isAdmin) return false;
@@ -184,6 +189,67 @@
             const av = list.querySelector(`.tg-item[data-peer="${peer}"] .tg-avatar`);
             if (av) { av.style.backgroundImage = `url(${url})`; av.textContent = ''; }
         });
+    }
+
+    // ====== BUSQUEDA GLOBAL DE MENSAJES ======
+    let _searchTimer = null;
+    function renderSearchUI() {
+        const list = $('#tg-list');
+        list.innerHTML = `
+            <div class="tg-search-box">
+                <input id="tg-search-q" class="tg-search" type="search" placeholder="Texto a buscar en TUS mensajes..." autocomplete="off">
+                <div class="tg-search-filters">
+                    <button class="tg-search-tab active" data-kind="all">Todo</button>
+                    <button class="tg-search-tab" data-kind="videos">Videos</button>
+                    <button class="tg-search-tab" data-kind="photos">Fotos</button>
+                    <button class="tg-search-tab" data-kind="docs">Archivos</button>
+                    <button class="tg-search-tab" data-kind="links">Enlaces</button>
+                </div>
+                <div class="tg-search-help">Escribe al menos 2 caracteres. La búsqueda usa la API de Telegram y mira en TODOS tus chats privados, grupos y canales.</div>
+                <div class="tg-search-results" id="tg-search-results"></div>
+            </div>`;
+        const inp = $('#tg-search-q');
+        inp.focus();
+        inp.addEventListener('input', () => { clearTimeout(_searchTimer); _searchTimer = setTimeout(runGlobalSearch, 350); });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(_searchTimer); runGlobalSearch(); } });
+        $$('#tg-list .tg-search-tab').forEach(b => b.addEventListener('click', () => {
+            $$('#tg-list .tg-search-tab').forEach(x => x.classList.remove('active'));
+            b.classList.add('active'); runGlobalSearch();
+        }));
+    }
+    async function runGlobalSearch() {
+        const q = ($('#tg-search-q')?.value || '').trim();
+        const kindBtn = document.querySelector('#tg-list .tg-search-tab.active');
+        const kind = (kindBtn && kindBtn.dataset.kind) || 'all';
+        const out = $('#tg-search-results'); if (!out) return;
+        if (q.length < 2) { out.innerHTML = '<div class="tg-empty">Escribe al menos 2 caracteres.</div>'; return; }
+        out.innerHTML = '<div class="tg-loading">Buscando…</div>';
+        try {
+            const r = await api(`/api/admin/search?q=${encodeURIComponent(q)}&kind=${kind}&limit=50`);
+            const items = r.results || [];
+            if (!items.length) { out.innerHTML = '<div class="tg-empty">Sin resultados.</div>'; return; }
+            out.innerHTML = items.map(searchResultHTML).join('');
+            $$('#tg-search-results .tg-sr').forEach(el => el.addEventListener('click', () => {
+                const peer = el.dataset.peer; const title = el.dataset.title;
+                if (peer) selectChat(peer, title);
+            }));
+        } catch (e) {
+            out.innerHTML = `<div class="tg-error">Error: ${esc(e.message)}</div>`;
+        }
+    }
+    function searchResultHTML(m) {
+        const date = fmtTime(m.date);
+        const tag = m.peerType === 'channel' ? '📢' : m.peerType === 'group' ? '👥' : m.peerType === 'bot' ? '🤖' : '👤';
+        const mediaIco = m.isVideo ? '▶ ' : m.isImage ? '🖼 ' : (m.hasMedia ? '📎 ' : '');
+        const text = m.text ? m.text.slice(0, 200) : (m.filename ? m.filename : '(media)');
+        return `<div class="tg-sr" data-peer="${esc(m.peerId)}" data-title="${esc(m.peerTitle)}">
+            <div class="tg-sr-head">
+                <span class="tg-sr-icon">${tag}</span>
+                <span class="tg-sr-title">${esc(m.peerTitle)}</span>
+                <span class="tg-sr-date">${esc(date)}</span>
+            </div>
+            <div class="tg-sr-text">${esc(mediaIco + text)}</div>
+        </div>`;
     }
 
     function chatItemHTML(c) {

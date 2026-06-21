@@ -1408,3 +1408,20 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
 #mkv-overlay .mkv-stats { color: #aaa; font-size: 0.78rem; margin-top: 4px; font-family: monospace; }
 #mkv-overlay .mkv-bar-fill.engine { background: linear-gradient(90deg, #65aadd, #a695e7); }
 #mkv-overlay .mkv-bar-fill.remux { background: linear-gradient(90deg, #faa774, #ee7aae); }
+
+
+
+/* === Buscador global === */
+.tg-search-box { padding: 6px 12px 14px; }
+.tg-search-filters { display: flex; gap: 4px; padding: 8px 0 6px; flex-wrap: wrap; }
+.tg-search-tab { background: #232323; color: #ccc; border: 1px solid #333; padding: 5px 10px; border-radius: 14px; font-size: 0.78rem; cursor: pointer; }
+.tg-search-tab.active { background: var(--netflix-red); border-color: var(--netflix-red); color: #fff; }
+.tg-search-help { color: #777; font-size: 0.74rem; padding: 4px 0 8px; line-height: 1.4; }
+.tg-search-results { display: flex; flex-direction: column; gap: 6px; }
+.tg-sr { background: #1a1a1a; border: 1px solid #232323; border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background 150ms; }
+.tg-sr:hover { background: #232323; border-color: #333; }
+.tg-sr-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.tg-sr-icon { font-size: 0.9rem; }
+.tg-sr-title { color: #fff; font-weight: 500; font-size: 0.86rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-sr-date { color: #777; font-size: 0.72rem; }
+.tg-sr-text { color: #ccc; font-size: 0.82rem; line-height: 1.35; max-height: 4.05em; overflow: hidden; }

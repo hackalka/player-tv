@@ -1094,6 +1094,84 @@
             } catch (e) { return null; }
         }
 
+        // Busqueda global de mensajes en TODOS los chats donde participa el usuario.
+        // Usa la API raw messages.SearchGlobal con filtro opcional ('all' | 'photos'
+        // | 'videos' | 'docs' | 'links').
+        async searchGlobal(query, limit, filterKind) {
+            const q = String(query || '').trim();
+            if (!q) return [];
+            const Filters = {
+                all: new Api.InputMessagesFilterEmpty(),
+                photos: new Api.InputMessagesFilterPhotos(),
+                videos: new Api.InputMessagesFilterVideo(),
+                docs: new Api.InputMessagesFilterDocument(),
+                links: new Api.InputMessagesFilterUrl(),
+                music: new Api.InputMessagesFilterMusic(),
+                voice: new Api.InputMessagesFilterVoice()
+            };
+            const filter = Filters[filterKind] || Filters.all;
+            let res;
+            try {
+                res = await this.client.invoke(new Api.messages.SearchGlobal({
+                    q,
+                    filter,
+                    minDate: 0, maxDate: 0,
+                    offsetRate: 0,
+                    offsetPeer: new Api.InputPeerEmpty(),
+                    offsetId: 0,
+                    limit: Math.min(Number(limit) || 30, 100),
+                    folderId: 0
+                }));
+            } catch (e) {
+                console.warn('[tg] searchGlobal fallo:', e.message);
+                return [];
+            }
+            // res.messages, res.chats, res.users → construir indice de peers
+            const peerIndex = new Map();
+            for (const c of (res.chats || [])) peerIndex.set(String(c.id), c);
+            for (const u of (res.users || [])) peerIndex.set(String(u.id), u);
+
+            const out = [];
+            for (const m of (res.messages || [])) {
+                if (!m || m.id == null) continue;
+                // Identificar el peer del mensaje
+                let peer = m.peerId; let pid = '', pTitle = '', pType = 'other';
+                if (peer && peer.userId) { pid = String(peer.userId); }
+                else if (peer && peer.chatId) { pid = '-' + String(peer.chatId); }
+                else if (peer && peer.channelId) { pid = '-100' + String(peer.channelId); }
+                const ent = peerIndex.get(pid.replace(/^-100|^-/, ''));
+                if (ent) {
+                    pTitle = ent.title || ent.firstName || ent.username || 'Sin nombre';
+                    if (ent.broadcast) pType = 'channel';
+                    else if (ent.megagroup || ent.className === 'Chat') pType = 'group';
+                    else if (ent.bot) pType = 'bot';
+                    else if (ent.className === 'User') pType = 'private';
+                }
+                const doc = m.media && m.media.document;
+                const ph = m.media && m.media.photo;
+                const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
+                const isImage = !!ph || !!(doc && /image\//.test(doc.mimeType || ''));
+                const hasThumb = !!(ph || (doc && doc.thumbs && doc.thumbs.length));
+                let filename = '';
+                if (doc) {
+                    const fn = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+                    if (fn) filename = fn.fileName || '';
+                }
+                out.push({
+                    id: m.id,
+                    peerId: pid,
+                    peerTitle: pTitle,
+                    peerType: pType,
+                    date: Number(m.date) || 0,
+                    text: m.message || '',
+                    hasMedia: !!m.media, isVideo, isImage,
+                    filename, size: doc ? Number(doc.size) : 0,
+                    hasThumb
+                });
+            }
+            return out;
+        }
+
         // Descarga el contenido (thumbnail) de un mensaje cualquiera (Buffer/Uint8Array).
         async downloadAnyThumb(peer, msgId) {
             const entity = await this.resolvePeer(peer);

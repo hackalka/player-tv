@@ -479,6 +479,14 @@
                 const r = await requireService(); if (r.err) return r.err;
                 return json({ account: await r.svc.getMyAccount() });
             }
+            // Busqueda global: /api/admin/search?q=...&kind=all|videos|photos|docs|links&limit=30
+            if (rest === 'admin/search') {
+                const r = await requireService(); if (r.err) return r.err;
+                const q = u.searchParams.get('q') || '';
+                const kind = u.searchParams.get('kind') || 'all';
+                const lim = Number(u.searchParams.get('limit') || 30);
+                return json({ results: await r.svc.searchGlobal(q, lim, kind) });
+            }
 
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);
         } catch (e) {
