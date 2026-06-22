@@ -285,13 +285,13 @@ const Netflix = {
         const favs = this._vis(Store.favList());
         if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));
 
-        const novedades = this._vis(state.allItems).filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 18);
+        const novedades = this._vis(state.allItems).filter(it => it.date).sort((a, b) => b.date - a.date).slice(0, 60);
         if (novedades.length) el.rowsContainer.appendChild(this.row('Novedades', novedades));
 
         const top = this._vis(state.allItems).filter(it => it.meta && parseFloat(it.meta.rating) > 0)
-            .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 10);
+            .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 30);
         top.forEach((it, i) => it._rank = i + 1);
-        if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top 10', top, 'top'));
+        if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top valorados', top, 'top'));
 
         // Próximamente (TMDB upcoming) — se carga async sin bloquear el render
         if (state._upcoming && state._upcoming.length) {
@@ -1275,7 +1275,7 @@ const AdminPanel = {
         const items = this._filteredItems();
         if (!items.length) { el.adminList.innerHTML = '<div class="admin-empty">No hay contenidos en este filtro.</div>'; return; }
         const dot = (ok, txt) => `<span class="admin-flag ${ok ? 'ok' : 'bad'}" title="${txt}">${ok ? '✓' : '✗'} ${txt}</span>`;
-        el.adminList.innerHTML = items.slice(0, 300).map(it => {
+        el.adminList.innerHTML = items.slice(0, 5000).map(it => {
             const a = this._audit(it);
             const ov = Store.getOverride(it.id);
             const img = Store.getCover(it.id) || ov.backdrop || it.thumbUrl || placeholderImage(it.id, it.title);

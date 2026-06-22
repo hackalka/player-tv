@@ -35,7 +35,7 @@
             catch (e) { console.warn('[tg] getEntity directo fallo:', e && e.message); }
 
             // 2) Tras refrescar dialogos
-            try { await this.client.getDialogs({ limit: 200 }); }
+            try { await this.client.getDialogs({ limit: 1000 }); }
             catch (e) { console.warn('[tg] getDialogs fallo:', e && e.message); }
             try { this.entity = await this.client.getEntity(id); return this.entity; }
             catch (e) { console.warn('[tg] getEntity tras getDialogs fallo:', e && e.message); }
@@ -46,7 +46,7 @@
             const wantNum = typeof id === 'number' ? id : null;
             const wantUser = typeof id === 'string' ? id.replace(/^@/, '').toLowerCase() : '';
             try {
-                for await (const dialog of this.client.iterDialogs({ limit: 500 })) {
+                for await (const dialog of this.client.iterDialogs({ limit: 5000 })) {
                     try {
                         const ent = dialog.entity; if (!ent || ent.id == null) continue;
                         const eid = Number(ent.id.toString());
@@ -91,7 +91,7 @@
             const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
             let ent;
             try { ent = await this.client.getEntity(id); }
-            catch (e) { await this.client.getDialogs({ limit: 50 }); ent = await this.client.getEntity(id); }
+            catch (e) { await this.client.getDialogs({ limit: 1000 }); ent = await this.client.getEntity(id); }
             this._chanCache.set(channel, ent);
             return ent;
         }
@@ -814,7 +814,8 @@
         async getMisGrupos() {
             const out = [];
             try {
-                for await (const dialog of this.client.iterDialogs({ limit: 500 })) {
+                // Sin limite practico: 5000 dialogos cubre cualquier cuenta real.
+                for await (const dialog of this.client.iterDialogs({ limit: 5000 })) {
                     try {
                         const ent = dialog.entity; if (!ent) continue;
                         const cn = ent.className || '';
@@ -880,7 +881,7 @@
             const id = /^-?\d+$/.test(raw) ? parseInt(raw, 10) : raw;
             try { return await this.client.getEntity(id); }
             catch (e) {
-                await this.client.getDialogs({ limit: 200 });
+                await this.client.getDialogs({ limit: 1000 });
                 return await this.client.getEntity(id);
             }
         }
@@ -1024,7 +1025,8 @@
             const entity = await this.resolvePeer(peer);
             const all = [];
             let offsetDate = 0, offsetId = 0, offsetTopic = 0;
-            for (let page = 0; page < 20; page++) {
+            // 200 paginas x 100 = hasta 20.000 topicos (limite practicamente infinito)
+            for (let page = 0; page < 200; page++) {
                 let res;
                 try {
                     res = await this.client.invoke(new Api.channels.GetForumTopics({
