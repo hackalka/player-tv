@@ -547,27 +547,34 @@ const Detail = {
         setTimeout(() => el.detailPlay.focus(), 50);
     },
 
-    // Lista de enlaces (Enlace DAZN 1, 2, 3...) — cada uno abre directo de un toque
+    // Lista de fuentes reproducibles. Cada una con un boton "▶ Play" (etiqueta limpia).
+    // Si el post original tiene una etiqueta especifica (calidad, idioma, "DAZN 1"...),
+    // la mostramos pequeña al lado. Si no, ponemos solo "▶ Play 1, 2, 3...".
     renderSources(item) {
         el.sources.hidden = false;
         el.sourcesTrack.innerHTML = '';
         const playables = item.links.map((l, i) => this._linkToPlayable(item, l, i));
         playables.forEach((pl, i) => {
-            const label = `<span class="source-ico">${pl.aceUrl ? '📡' : '▶'}</span> ${escapeHtml(item.links[i].label)}`;
+            const raw = String(item.links[i].label || '').trim();
+            // Detectar si la etiqueta original es algo util (calidad/idioma/DAZN/canal),
+            // o un genérico tipo "Enlace 1" que conviene reemplazar.
+            const isGeneric = !raw || /^enlace\s*\d*$/i.test(raw) || /^link\s*\d*$/i.test(raw) || /^opci[oó]n\s*\d*$/i.test(raw);
+            const tag = pl.aceUrl ? 'AceStream' : (pl.playableInBrowser === false ? (item.links[i].kind === 'tg' ? 'Telegram' : 'Externo') : '');
+            const sub = isGeneric ? '' : raw;
+            const main = `▶ Play ${playables.length > 1 ? (i + 1) : ''}`.trim();
+            const ico = pl.aceUrl ? '📡' : '▶';
+            const label = `<span class="source-ico">${ico}</span><span class="source-main">${escapeHtml(main)}</span>${sub ? `<span class="source-sub">${escapeHtml(sub)}</span>` : ''}${tag ? `<span class="source-tag">${escapeHtml(tag)}</span>` : ''}`;
             let node;
             if (pl.aceUrl) {
-                // AceStream: abre la app directamente (un toque)
                 node = document.createElement('a');
                 node.href = pl.aceUrl; node.className = 'source-btn ace focusable'; node.tabIndex = 0; node.innerHTML = label;
                 node.onclick = () => { Detail.primary = pl; };
             } else if (!pl.streamUrl && pl.externalUrl) {
-                // Enlace externo (no reproducible dentro): abrir directo
                 node = document.createElement('a');
                 node.href = pl.externalUrl; node.target = '_blank'; node.rel = 'noopener';
                 node.className = 'source-btn focusable'; node.tabIndex = 0; node.innerHTML = label;
                 node.onclick = () => { Detail.primary = pl; };
             } else {
-                // Vídeo reproducible dentro de la web (Telegram / mp4 directo)
                 node = document.createElement('button');
                 node.className = 'source-btn focusable'; node.tabIndex = 0; node.innerHTML = label;
                 node.onclick = () => {
@@ -1120,13 +1127,18 @@ const Admin = {
     },
     async refresh() {
         try {
+            // Toast no-bloqueante mientras refresca
+            App.toast && App.toast('Actualizando catálogo…', 0);
             await api('/api/admin/refresh', { method: 'POST', body: '{}' });
             const catalog = await api('/api/catalog?refresh=1');
             state.catalog = catalog; state.allItems = []; state.itemsById = {};
             catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
+            try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
             App.populateFilters(); Netflix.render();
-            alert('Catálogo actualizado.');
-        } catch (e) { alert('Error al actualizar: ' + e.message); }
+            App.toast ? App.toast('✅ Catálogo actualizado', 2200) : null;
+        } catch (e) {
+            App.toast ? App.toast('Error al actualizar: ' + e.message, 3500, true) : alert('Error al actualizar: ' + e.message);
+        }
     },
     reflect() {
         const a = !!state.isAdmin;
@@ -1537,6 +1549,24 @@ const Chat = {
 
 /* ===== APP / VISTAS / BÚSQUEDA ===== */
 const App = {
+    // Toast: mensajes no-bloqueantes en la esquina inferior. Ms=0 -> permanente
+    // hasta que llamen otra vez con un texto distinto. error=true -> color rojo.
+    toast(msg, ms, error) {
+        let el = document.getElementById('tvp-toast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'tvp-toast';
+            el.className = 'tvp-toast';
+            document.body.appendChild(el);
+        }
+        clearTimeout(el._t);
+        el.textContent = msg;
+        el.classList.toggle('error', !!error);
+        el.classList.add('show');
+        if (ms !== 0) {
+            el._t = setTimeout(() => { el.classList.remove('show'); }, ms || 2200);
+        }
+    },
     switchView(view) {
         state.currentView = view;
         const isNet = view === 'netflix';

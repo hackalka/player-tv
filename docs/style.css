@@ -1475,3 +1475,35 @@ html.tv-mode a:focus {
     outline-offset: 2px;
     box-shadow: 0 0 0 6px rgba(62, 230, 92, 0.25) !important;
 }
+
+
+
+/* === Toast (mensajes flotantes, no-bloqueantes) === */
+.tvp-toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(80px);
+    background: rgba(10, 26, 58, 0.96); color: #fff;
+    border: 1px solid #3ee65c;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+    padding: 12px 22px; border-radius: 28px;
+    font-size: 0.96rem; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: transform 250ms cubic-bezier(.2,.9,.3,1.4), opacity 200ms;
+    z-index: 99999; max-width: 90vw; text-align: center;
+}
+.tvp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.tvp-toast.error { border-color: var(--netflix-red); background: rgba(78, 12, 18, 0.96); }
+
+/* === Botones de fuentes (▶ Play, calidad, etc.) === */
+.source-btn .source-main { font-weight: 600; }
+.source-btn .source-sub {
+    display: inline-block; margin-left: 6px;
+    font-size: 0.78rem; color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.10); padding: 2px 8px; border-radius: 12px;
+}
+.source-btn .source-tag {
+    display: inline-block; margin-left: 6px;
+    font-size: 0.7rem; color: #3ee65c; font-weight: 700;
+    background: rgba(62, 230, 92, 0.12); padding: 2px 8px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.source-btn.ace .source-tag { color: #ff9e3e; background: rgba(255, 158, 62, 0.12); }
