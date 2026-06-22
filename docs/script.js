@@ -14,7 +14,15 @@ function placeholderImage(seed, label) {
     const color = PLACEHOLDER_COLORS[Math.abs(hashCode(String(seed))) % PLACEHOLDER_COLORS.length];
     const txt = (label || 'TV').slice(0, 16);
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'><rect width='100%' height='100%' fill='${color}'/><text x='50%' y='50%' fill='rgba(255,255,255,.85)' font-family='Arial' font-size='26' font-weight='bold' text-anchor='middle' dominant-baseline='middle'>${escapeXml(txt)}</text></svg>`;
-    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+    // encodeURIComponent puede fallar con surrogates "rotos" (algunos emojis cortados por slice).
+    // Lo blindamos para que no rompa el render del catalogo.
+    try { return 'data:image/svg+xml,' + encodeURIComponent(svg); }
+    catch (e) {
+        const safe = (label || 'TV').replace(/[\uD800-\uDFFF]/g, '').slice(0, 16) || 'TV';
+        const svg2 = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'><rect width='100%' height='100%' fill='${color}'/><text x='50%' y='50%' fill='rgba(255,255,255,.85)' font-family='Arial' font-size='26' font-weight='bold' text-anchor='middle' dominant-baseline='middle'>${escapeXml(safe)}</text></svg>`;
+        try { return 'data:image/svg+xml,' + encodeURIComponent(svg2); }
+        catch (e2) { return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'><rect width='100%' height='100%' fill='${color}'/></svg>`); }
+    }
 }
 function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; } return h; }
 function escapeXml(s) { return String(s).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
