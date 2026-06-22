@@ -21,8 +21,8 @@ window.TVP_CONFIG = {
 
     appName: 'TV+',
 
-    // Mensajes a traer por tema
-    messagesPerTopic: 300,
+    // Mensajes a traer por tema (sube si tienes temas con muchas películas/series)
+    messagesPerTopic: 1500,
 
     // Etiqueta(s) que debe tener el TITULO de un tema para mostrarse
     autoTags: ['playertv:auto', 'tvplayer:auto', 'tvgram:auto'],

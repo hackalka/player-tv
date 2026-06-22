@@ -229,6 +229,7 @@ const el = {
     coverBtn: $('#cover-btn'),
     coverTmdbBtn: $('#cover-tmdb-btn'),
     videoLinkBtn: $('#video-link-btn'),
+    titleBtn: $('#title-btn'),
     adminFab: $('#admin-fab'),
     adminFabToggle: $('#admin-fab-toggle'),
     adminFabMenu: $('#admin-fab-menu'),
@@ -530,6 +531,19 @@ const Detail = {
                 if (state.isAdmin) CloudStore.saveCovers();
                 Detail.open(item);
                 Netflix.render();   // refresca tarjetas
+            };
+        }
+        if (el.titleBtn) {
+            el.titleBtn.onclick = () => {
+                const ov = Store.getOverride(item.id) || {};
+                const cur = ov.title || item.title || '';
+                const t = prompt('Nuevo título para esta ficha (deja vacío para restaurar el original):', cur);
+                if (t === null) return;
+                Store.setOverride(item.id, { title: (t || '').trim() });
+                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                Detail.open(item);
+                Netflix.render();
+                App.toast && App.toast('✅ Título actualizado', 1800);
             };
         }
         if (el.coverTmdbBtn) {
