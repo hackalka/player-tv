@@ -227,7 +227,16 @@ const el = {
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
     coverBtn: $('#cover-btn'),
+    coverTmdbBtn: $('#cover-tmdb-btn'),
     videoLinkBtn: $('#video-link-btn'),
+    adminFab: $('#admin-fab'),
+    adminFabToggle: $('#admin-fab-toggle'),
+    adminFabMenu: $('#admin-fab-menu'),
+    coverTmdbModal: $('#cover-tmdb-modal'),
+    coverQ: $('#cover-q'),
+    coverType: $('#cover-type'),
+    coverResults: $('#cover-results'),
+    coverSearchGo: $('#cover-search-go'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
@@ -513,7 +522,6 @@ const Detail = {
             el.watchedBtn.onclick = () => { Store.toggleWatched(item.id); this.updateWatched(); CloudStore.saveWatched && CloudStore.saveWatched(); Netflix.render(); };
         }
         if (el.coverBtn) {
-            el.coverBtn.hidden = !state.isAdmin;
             el.coverBtn.onclick = async () => {
                 const cur = Store.getCover(item.id) || '';
                 const url = prompt('Pega la URL de la carátula (deja vacío para quitar):', cur);
@@ -524,8 +532,16 @@ const Detail = {
                 Netflix.render();   // refresca tarjetas
             };
         }
+        if (el.coverTmdbBtn) {
+            el.coverTmdbBtn.onclick = () => CoverPicker.open(item);
+        }
+        if (el.adminFab) {
+            el.adminFab.hidden = !state.isAdmin;
+            if (el.adminFabToggle) el.adminFabToggle.onclick = () => {
+                if (el.adminFabMenu) el.adminFabMenu.hidden = !el.adminFabMenu.hidden;
+            };
+        }
         if (el.videoLinkBtn) {
-            el.videoLinkBtn.hidden = !state.isAdmin;
             el.videoLinkBtn.onclick = async () => {
                 const ov = Store.getOverride(item.id) || {};
                 const cur = ov.videoUrl || '';
@@ -1547,12 +1563,79 @@ const Chat = {
     linkify(t) { return t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 };
 
+/* ===== Selector de carátula desde TMDB ===== */
+const CoverPicker = {
+    item: null,
+    open(item) {
+        this.item = item;
+        if (!el.coverTmdbModal) return;
+        el.coverTmdbModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        // Pre-rellenar con el título limpio
+        const ov = Store.getOverride(item.id) || {};
+        el.coverQ.value = (ov.title || item.title || '').replace(/\b(1080p|720p|480p|2160p|4k|hd|hdr|bluray|brrip|webrip|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|latino|castellano|espa[ñn]ol|spanish|english|sub|subs|temporada\s*\d+|t\d+|s\d+|cap[ií]tulo\s*\d+|cap\s*\d+|ep\.?\s*\d+|episodio\s*\d+)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+        // tipo según la categoría
+        const isSeries = /serie/i.test(item.category || '') || item.isSeries;
+        el.coverType.value = isSeries ? 'tv' : (/pel[ií]cul/i.test(item.category || '') ? 'movie' : '');
+        el.coverResults.innerHTML = '<div class="cover-empty">Pulsa Buscar para ver carátulas en TMDB.</div>';
+        // Wire eventos (solo la primera vez)
+        if (!this._wired) {
+            this._wired = true;
+            $$('[data-cover-close]').forEach(b => b.onclick = () => this.close());
+            el.coverSearchGo.onclick = () => this.search();
+            el.coverQ.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.search(); } });
+        }
+        // Auto-buscar
+        setTimeout(() => this.search(), 100);
+    },
+    close() {
+        if (!el.coverTmdbModal) return;
+        el.coverTmdbModal.hidden = true;
+        document.body.style.overflow = '';
+    },
+    async search() {
+        const q = (el.coverQ.value || '').trim();
+        if (!q) return;
+        el.coverResults.innerHTML = '<div class="cover-loading">Buscando…</div>';
+        try {
+            const type = el.coverType.value || '';
+            const url = '/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '');
+            const r = await api(url);
+            const list = r.results || [];
+            if (!list.length) { el.coverResults.innerHTML = '<div class="cover-empty">Sin resultados.</div>'; return; }
+            el.coverResults.innerHTML = list.map(c => `
+                <div class="cover-card focusable" tabindex="0" data-poster="${escapeHtml(c.poster || '')}" data-id="${c.id}" data-type="${c.type}">
+                    <img src="${escapeHtml(c.poster || placeholderImage(c.id, c.title))}" alt="${escapeHtml(c.title)}" onerror="this.src='${placeholderImage(c.id, c.title)}'">
+                    <div class="cover-card-info">
+                        <div class="cover-card-title">${escapeHtml(c.title)}</div>
+                        <div class="cover-card-sub">${c.year ? c.year + ' · ' : ''}${c.type === 'tv' ? 'Serie' : 'Película'}${c.rating ? ' · ⭐ ' + c.rating : ''}</div>
+                    </div>
+                </div>`).join('');
+            $$('#cover-results .cover-card').forEach(card => {
+                card.onclick = () => this.pick(card.dataset.poster, card.dataset.type, card.dataset.id);
+            });
+        } catch (e) {
+            el.coverResults.innerHTML = `<div class="cover-error">Error: ${escapeHtml(e.message)}</div>`;
+        }
+    },
+    async pick(posterUrl, type, tmdbId) {
+        if (!this.item) return;
+        if (!posterUrl) { App.toast('Esa ficha no tiene carátula', 2500, true); return; }
+        // Guarda como override de cover
+        Store.setCover(this.item.id, posterUrl);
+        if (state.isAdmin) CloudStore.saveCovers();
+        App.toast('✅ Carátula actualizada', 1800);
+        this.close();
+        Detail.open(this.item);
+        Netflix.render();
+    }
+};
+
 /* ===== APP / VISTAS / BÚSQUEDA ===== */
 const App = {
     // Toast: mensajes no-bloqueantes en la esquina inferior. Ms=0 -> permanente
     // hasta que llamen otra vez con un texto distinto. error=true -> color rojo.
-    toast(msg, ms, error) {
-        let el = document.getElementById('tvp-toast');
+    toast(msg, ms, error) {        let el = document.getElementById('tvp-toast');
         if (!el) {
             el = document.createElement('div');
             el.id = 'tvp-toast';

@@ -138,15 +138,20 @@
                         <button class="btn btn-fav focusable" id="watched-btn" aria-label="Marcar como visto">
                             <span class="watched-ico">✓</span> <span class="watched-txt">Marcar como visto</span>
                         </button>
-                        <button class="btn btn-fav focusable" id="cover-btn" aria-label="Cambiar carátula" hidden>
-                            <span>🖼</span> <span>Cambiar carátula</span>
-                        </button>
-                        <button class="btn btn-fav focusable" id="video-link-btn" aria-label="Cambiar enlace del vídeo" hidden>
-                            <span>🔗</span> <span>Cambiar enlace</span>
-                        </button>
                     </div>
                 </div>
                 <div class="player-status" id="player-status" hidden></div>
+                <!-- Menu admin flotante (solo dueño): cambiar carátula/enlace, buscar TMDB -->
+                <div class="admin-fab" id="admin-fab" hidden>
+                    <button class="admin-fab-btn focusable" id="admin-fab-toggle" aria-label="Opciones de admin" title="Opciones de admin">
+                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </button>
+                    <div class="admin-fab-menu" id="admin-fab-menu" hidden>
+                        <button class="admin-fab-item focusable" id="cover-btn">🖼 Cambiar carátula</button>
+                        <button class="admin-fab-item focusable" id="cover-tmdb-btn">🔍 Buscar carátula en TMDB</button>
+                        <button class="admin-fab-item focusable" id="video-link-btn">🔗 Cambiar enlace del vídeo</button>
+                    </div>
+                </div>
             </div>
             <div class="modal-details">
                 <div class="detail-body">
@@ -199,6 +204,27 @@
     </div>
 
     <!-- ===== LOGIN POR USUARIO ===== -->
+    <!-- Modal: buscar carátula en TMDB -->
+    <div class="modal" id="cover-tmdb-modal" hidden>
+        <div class="modal-overlay" data-cover-close></div>
+        <div class="modal-content cover-tmdb-card">
+            <button class="modal-close" data-cover-close aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+            <h2 class="modal-title">🔍 Buscar carátula en TMDB</h2>
+            <div class="cover-search-row">
+                <input id="cover-q" class="admin-input" type="text" placeholder="Título a buscar...">
+                <select id="cover-type" class="admin-input cover-type-sel">
+                    <option value="">Auto</option>
+                    <option value="movie">Película</option>
+                    <option value="tv">Serie</option>
+                </select>
+                <button class="btn btn-play" id="cover-search-go">Buscar</button>
+            </div>
+            <div class="cover-results" id="cover-results"></div>
+        </div>
+    </div>
+
     <div class="modal" id="login-modal" hidden>
         <div class="modal-overlay"></div>
         <div class="modal-content login-box">
