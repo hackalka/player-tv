@@ -203,6 +203,9 @@ const el = {
     adminRefresh: $('#admin-refresh'),
     filterGenre: $('#filter-genre'),
     filterYear: $('#filter-year'),
+    filterQuality: $('#filter-quality'),
+    filterLang: $('#filter-lang'),
+    filterCat: $('#filter-cat'),
     heroImage: $('#hero-image'),
     heroTitle: $('#hero-title'),
     heroDescription: $('#hero-description'),
@@ -1682,47 +1685,108 @@ const App = {
         }
         TVNav.refresh();
     },
+    // Construye un indice rapido de busqueda y deteccion de calidad/idioma
+    // a partir del titulo original. Se llama tras cargar el catalogo.
+    _buildSearchIndex() {
+        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        state.allItems.forEach(it => {
+            const t = it.title || '';
+            const ov = Store.getOverride(it.id) || {};
+            const realTitle = ov.title || t;
+            // Deteccion de calidad
+            const q = (t.match(/\b(2160p|4k|uhd|1080p|720p|480p|hdr|hdr10|dolby vision|dv)\b/i) || [])[0];
+            it._quality = q ? q.toUpperCase() : '';
+            // Deteccion de idioma
+            const lang = (t.match(/\b(latino|castellano|espa[ñn]ol|spanish|english|ingles|vose|vos|dual|subtitulado)\b/i) || [])[0];
+            it._lang = lang ? lang.toLowerCase() : '';
+            // Texto buscable: titulo + descripcion + categoria + generos, normalizado.
+            it._search = norm([
+                realTitle, it.description, it.category,
+                (it.meta && it.meta.genres) || '',
+                String(it.year || ''),
+                it._quality, it._lang
+            ].join(' '));
+        });
+    },
     search() {
-        const q = (el.searchInput.value || '').trim().toLowerCase();
-        const genre = (el.filterGenre.value || '').toLowerCase();
+        // Debounce: agrupar pulsaciones rapidas en una sola busqueda.
+        clearTimeout(this._searchTimer);
+        this._searchTimer = setTimeout(() => this._doSearch(), 180);
+    },
+    _doSearch() {
+        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const q = norm((el.searchInput.value || '').trim());
+        const genre = norm((el.filterGenre.value || '').trim());
         const year = el.filterYear.value || '';
-        if (!q && !genre && !year) { el.searchResults.innerHTML = ''; return; }
+        const quality = el.filterQuality && el.filterQuality.value || '';
+        const lang = el.filterLang && el.filterLang.value || '';
+        const cat = el.filterCat && el.filterCat.value || '';
+        if (!q && !genre && !year && !quality && !lang && !cat) { el.searchResults.innerHTML = ''; return; }
+        // Para queries con varias palabras, todas tienen que aparecer.
+        const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
         const res = state.allItems.filter(it => {
             if (Store.isHidden(it.id)) return false;
-            const okText = !q || (it.title || '').toLowerCase().includes(q) ||
-                (it.description || '').toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q);
-            const okGenre = !genre || ((it.meta && it.meta.genres) || '').toLowerCase().includes(genre);
-            const okYear = !year || String(it.year) === year;
-            return okText && okGenre && okYear;
+            if (!it._search) return false; // sin indice (no deberia pasar)
+            for (const tk of tokens) { if (it._search.indexOf(tk) === -1) return false; }
+            if (genre && !norm((it.meta && it.meta.genres) || '').includes(genre)) return false;
+            if (year && String(it.year) !== year) return false;
+            if (quality && (it._quality || '').toUpperCase() !== quality.toUpperCase()) return false;
+            if (lang && !(it._lang || '').includes(lang.toLowerCase())) return false;
+            if (cat && (it.category || '') !== cat) return false;
+            return true;
         });
         if (!res.length) { el.searchResults.innerHTML = '<div class="search-empty">Sin resultados.</div>'; return; }
-        el.searchResults.innerHTML = '';
-        res.forEach(it => {
-            const c = document.createElement('div');
-            c.className = 'search-card focusable'; c.tabIndex = 0;
-            c.innerHTML = `<img class="search-image" src="${it.thumbUrl || placeholderImage(it.id, it.title)}" alt=""
+        // Limitar resultados visibles para no petar el DOM
+        const view = res.slice(0, 240);
+        const html = view.map(it => `<div class="search-card focusable" tabindex="0" data-id="${escapeHtml(it.id)}">
+            <img class="search-image" src="${it.thumbUrl || placeholderImage(it.id, it.title)}" alt=""
                 onerror="this.src='${placeholderImage(it.id, it.title)}'">
-                <div class="search-meta"><h3>${escapeHtml(it.title)}</h3>
+            <div class="search-meta"><h3>${escapeHtml(it.title)}</h3>
                 <p>${escapeHtml((it.description || '').slice(0, 140))}</p>
-                <span class="search-cat">${escapeHtml(it.category || '')}</span></div>`;
-            c.onclick = () => { this.closeSearch(); Detail.open(it); };
-            el.searchResults.appendChild(c);
+                <span class="search-cat">${escapeHtml(it.category || '')}</span>
+                ${it._quality ? `<span class="search-tag">${escapeHtml(it._quality)}</span>` : ''}
+                ${it._lang ? `<span class="search-tag lang">${escapeHtml(it._lang)}</span>` : ''}
+            </div></div>`).join('');
+        el.searchResults.innerHTML = html + (res.length > view.length ? `<div class="search-more">Mostrando ${view.length} de ${res.length} resultados. Refina tu búsqueda para ver más.</div>` : '');
+        $$('#search-results .search-card').forEach(card => {
+            card.onclick = () => {
+                const it = state.itemsById[card.dataset.id]; if (!it) return;
+                this.closeSearch(); Detail.open(it);
+            };
         });
         TVNav.refresh();
     },
     populateFilters() {
-        const genres = new Set(), years = new Set();
+        const genres = new Set(), years = new Set(), qualities = new Set(), langs = new Set(), cats = new Set();
+        // Construir indice si aun no
+        this._buildSearchIndex();
         state.allItems.forEach(it => {
             if (it.meta && it.meta.genres) it.meta.genres.split(/[,/]/).forEach(g => { const t = g.trim(); if (t) genres.add(t); });
             if (it.year) years.add(String(it.year));
+            if (it._quality) qualities.add(it._quality);
+            if (it._lang) langs.add(it._lang);
+            if (it.category) cats.add(it.category);
         });
-        el.filterGenre.innerHTML = '<option value="">Todos los géneros</option>' +
-            [...genres].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
-        el.filterYear.innerHTML = '<option value="">Todos los años</option>' +
-            [...years].sort((a, b) => b - a).map(y => `<option value="${y}">${y}</option>`).join('');
+        const opts = (set, def, sortFn) => `<option value="">${def}</option>` +
+            [...set].sort(sortFn || ((a, b) => a.localeCompare(b))).map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        if (el.filterGenre) el.filterGenre.innerHTML = opts(genres, 'Todos los géneros');
+        if (el.filterYear) el.filterYear.innerHTML = opts(years, 'Todos los años', (a, b) => b - a);
+        if (el.filterQuality) el.filterQuality.innerHTML = opts(qualities, 'Cualquier calidad');
+        if (el.filterLang) el.filterLang.innerHTML = opts(langs, 'Cualquier idioma');
+        if (el.filterCat) el.filterCat.innerHTML = opts(cats, 'Todas las categorías');
     },
     openSearch() { el.searchOverlay.hidden = false; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
-    closeSearch() { el.searchOverlay.hidden = true; el.searchInput.value = ''; el.filterGenre.value = ''; el.filterYear.value = ''; el.searchResults.innerHTML = ''; el.body.style.overflow = ''; }
+    closeSearch() {
+        el.searchOverlay.hidden = true;
+        if (el.searchInput) el.searchInput.value = '';
+        if (el.filterGenre) el.filterGenre.value = '';
+        if (el.filterYear) el.filterYear.value = '';
+        if (el.filterQuality) el.filterQuality.value = '';
+        if (el.filterLang) el.filterLang.value = '';
+        if (el.filterCat) el.filterCat.value = '';
+        if (el.searchResults) el.searchResults.innerHTML = '';
+        el.body.style.overflow = '';
+    }
 };
 
 /* ===== Búsqueda por voz (Web Speech API) ===== */
@@ -1857,28 +1921,45 @@ async function boot() {
                 usedCache = true;
             }
         } catch {}
-        // 2) Si había caché, refrescar en segundo plano; si no, cargar ahora
+
+        // Función helper: aplicar un catálogo nuevo y refrescar la UI
+        const applyCatalog = (cat) => {
+            state.catalog = cat;
+            state.allItems = []; state.itemsById = {};
+            cat.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
+            try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: cat })); } catch {}
+            App.populateFilters(); Netflix.render();
+        };
+
+        // Carga progresiva: 1) rápida (300/tema), 2) completa en background.
         if (usedCache) {
+            // Solo refrescamos en background con el catálogo completo
             (async () => {
                 try {
-                    const fresh = await api('/api/catalog');
-                    state.catalog = fresh; state.allItems = []; state.itemsById = {};
-                    fresh.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
-                    try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: fresh })); } catch {}
-                    App.populateFilters(); Netflix.render();
+                    const fresh = await api('/api/catalog?refresh=1');
+                    applyCatalog(fresh);
                 } catch {}
             })();
-            return; // ya cargado desde caché
+            return;
         }
-        const catalog = await api('/api/catalog');
-        state.catalog = catalog;
-        catalog.categories.forEach(c => c.items.forEach(it => {
-            it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it;
-        }));
-        try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
-        App.populateFilters();
-        Netflix.render();
-        App.switchView('netflix');
+        try {
+            // 1) Carga rápida: aparece el catálogo casi al instante
+            const fast = await api('/api/catalog?fast=1');
+            applyCatalog(fast);
+            App.switchView('netflix');
+            App.toast && App.toast('Cargando catálogo completo en segundo plano…', 2500);
+            // 2) Carga completa en background, sin bloquear
+            setTimeout(async () => {
+                try {
+                    const full = await api('/api/catalog?refresh=1');
+                    applyCatalog(full);
+                    App.toast && App.toast('✅ Catálogo completo cargado', 1800);
+                } catch (e) { console.warn('full catalog fallo:', e.message); }
+            }, 200);
+        } catch (e) {
+            console.error('catalog error:', e);
+            el.bootStatus && (el.bootStatus.innerText = 'Error: ' + e.message);
+        }
         setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
     } catch (e) {
         console.error(e);
@@ -1907,6 +1988,9 @@ function wireUi() {
     Voice.init();
     el.filterGenre.addEventListener('change', () => App.search());
     el.filterYear.addEventListener('change', () => App.search());
+    if (el.filterQuality) el.filterQuality.addEventListener('change', () => App.search());
+    if (el.filterLang) el.filterLang.addEventListener('change', () => App.search());
+    if (el.filterCat) el.filterCat.addEventListener('change', () => App.search());
     el.adminRefresh.onclick = () => Admin.refresh();
     el.navLinks.addEventListener('click', (e) => {
         const a = e.target.closest('a[data-cat]'); if (!a) return;

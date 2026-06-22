@@ -1599,3 +1599,20 @@ html.tv-mode a:focus {
     padding: 30px; text-align: center; color: #888;
 }
 .cover-error { color: #f55; }
+
+
+
+/* === Chips de calidad/idioma en resultados de búsqueda === */
+.search-tag {
+    display: inline-block; margin-right: 4px; margin-top: 4px;
+    background: rgba(62, 230, 92, 0.18); color: #3ee65c;
+    padding: 1px 8px; border-radius: 10px;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.search-tag.lang { background: rgba(101, 170, 221, 0.22); color: #65aadd; }
+.search-more {
+    grid-column: 1 / -1;
+    padding: 16px; text-align: center;
+    color: #888; font-size: 0.85rem; font-style: italic;
+}

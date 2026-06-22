@@ -366,13 +366,17 @@
             return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
         }
 
-        async getCatalog() {
+        // Catalogo. Si pasas {limit: N} solo trae N mensajes por tema (carga rapida).
+        // Si no, usa cfg.messagesPerTopic completo (carga total).
+        async getCatalog(opts) {
+            opts = opts || {};
+            const perTopic = Number(opts.limit) || this.cfg.messagesPerTopic;
             const topics = await this.getAutoTopics();
             const categories = [];
             for (const topic of topics) {
                 let items = [];
                 try {
-                    const msgs = await this.getTopicMessages(topic.id, this.cfg.messagesPerTopic);
+                    const msgs = await this.getTopicMessages(topic.id, perTopic);
                     items = this._buildTopicItems(msgs, topic);
                 } catch (e) { console.warn(`Tema ${topic.name} fallo:`, e.message); }
                 if ((this.cfg.tmdbKey || this.cfg.tmdbToken) && typeof fetch === 'function' && (topic.type === 'movie' || topic.type === 'series')) {
@@ -381,7 +385,7 @@
                 }
                 categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
             }
-            return { categories };
+            return { categories, partial: !!opts.limit };
         }
 
         _tmdbHeaders() {

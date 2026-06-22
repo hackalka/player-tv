@@ -314,8 +314,9 @@
         const r = await requireService();
         if (r.err) return r.err;
         const fresh = u.searchParams.get('refresh') === '1';
+        const fast = u.searchParams.get('fast') === '1'; // carga rapida (300 por tema)
         if (!_catalog || fresh || Date.now() - _catalogTime > 60000) {
-            _catalog = await r.svc.getCatalog();
+            _catalog = await r.svc.getCatalog(fast ? { limit: 300 } : undefined);
             _catalogTime = Date.now();
         }
         return json(_catalog);
