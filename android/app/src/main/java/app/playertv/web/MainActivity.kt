@@ -56,9 +56,11 @@ class MainActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         )
-        // Limpiar focus para que TVs con DPad puedan navegar dentro del WebView
+        // Que el WebView pueda recibir foco con DPad y mostrar el teclado del sistema
         web.isFocusable = true
         web.isFocusableInTouchMode = true
+        web.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        web.setBackgroundColor(android.graphics.Color.parseColor("#0a1a3a"))
 
         setContentView(web)
 
@@ -76,13 +78,17 @@ class MainActivity : AppCompatActivity() {
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            // Permitir tamaño/zoom adaptativos (para TV es importante para el escalado)
             useWideViewPort = true
             loadWithOverviewMode = true
             setSupportZoom(false)
-            // User agent: añadimos sufijo para que la web pueda detectarnos si quiere
+            // En TV-boxes, esto fuerza que el IME aparezca al enfocar inputs
+            javaScriptCanOpenWindowsAutomatically = true
+            // Sufijo en el UA: la web puede detectar que es la APK
             userAgentString = userAgentString + " TvPlayer-App/1.0"
         }
+
+        // En TV box, indicar al WebView que acepte input
+        web.requestFocus(android.view.View.FOCUS_DOWN)
 
         // ---- Cliente Web (navegacion) ----
         web.webViewClient = object : WebViewClient() {
