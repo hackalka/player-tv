@@ -324,6 +324,13 @@
     function tmdbHeaders() { return cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' }; }
     function tmdbAuthQuery() { return cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')); }
 
+    // Decode URI seguro: si la cadena es invalida (caracter % suelto, etc.),
+    // devuelve la cadena original en lugar de lanzar 'URI malformed'.
+    function safeDecode(s) {
+        try { return decodeURIComponent(s); }
+        catch (e) { console.warn('[tg] safeDecode fallback para', s); return s; }
+    }
+
     async function handleApi(pathname, init, fullUrl) {
         const u = new URL(fullUrl, location.href);
         const rest = pathname.replace(/^.*\/api\//, '');
@@ -434,7 +441,7 @@
             // Historial de un grupo concreto: /api/admin/group/:peer/messages?topic=...&limit=...
             if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'messages') {
                 const r = await requireService(); if (r.err) return r.err;
-                const peer = decodeURIComponent(parts[2]);
+                const peer = safeDecode(parts[2]);
                 const limit = Number(u.searchParams.get('limit') || 50);
                 const topic = Number(u.searchParams.get('topic') || 0);
                 return json({ messages: await r.svc.getChatHistory(peer, limit, topic) });
@@ -465,7 +472,7 @@
             // Lista de topicos de un grupo foro: /api/admin/group/:peer/topics
             if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'topics') {
                 const r = await requireService(); if (r.err) return r.err;
-                const peer = decodeURIComponent(parts[2]);
+                const peer = safeDecode(parts[2]);
                 return json({ topics: await r.svc.getGroupTopics(peer) });
             }
             // Crear un nuevo topic en un grupo: { peer, title, iconColor? }
@@ -516,7 +523,7 @@
     }
     async function resolveMessage(svc, kind, a, b) {
         if (kind === 'tgstream' || kind === 'tgthumb') return svc.getMessageById(b);
-        return svc.getMessageByRef(decodeURIComponent(a), b); // tgstreamlink / tgthumblink
+        return svc.getMessageByRef(safeDecode(a), b); // tgstreamlink / tgthumblink
     }
     async function swInfo(kind, a, b) {
         const svc = await ensureService(); if (!svc) return null;
@@ -561,7 +568,7 @@
         const svc = await ensureService(); if (!svc) return null;
         let data;
         if (kind === 'tgthumb') data = await svc.downloadThumb(null, b);
-        else data = await svc.downloadThumbByRef(decodeURIComponent(a), b);
+        else data = await svc.downloadThumbByRef(safeDecode(a), b);
         if (!data) return null;
         return data instanceof Uint8Array ? data : new Uint8Array(data);
     }
