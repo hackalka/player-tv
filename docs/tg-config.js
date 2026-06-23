@@ -21,6 +21,13 @@ window.TVP_CONFIG = {
 
     appName: 'TV+',
 
+    // Enlaces "tvgram://" del catalogo se abriran en esta app Android.
+    // Si conoces el nombre EXACTO del paquete de TVGram Player, ponlo aqui
+    // (ej: 'com.tvgram.player'); asi Android abrira esa app directamente y, si
+    // no esta instalada, ofrecera el Play Store. Dejalo vacio para que Android
+    // muestre el selector de apps que soportan el esquema tvgram://.
+    tvgramPackage: '',
+
     // Mensajes a traer por tema. 50000 cubre cualquier grupo real (Telegram
     // pagina internamente, pero la carga inicial es proporcional al numero).
     messagesPerTopic: 50000,

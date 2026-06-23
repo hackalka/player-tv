@@ -593,7 +593,7 @@ const Detail = {
                 const cur = ov.videoUrl || '';
                 const url = prompt(
                     'Pega el enlace del vídeo para esta ficha (deja vacío para quitar el override).\n\n' +
-                    'Acepta:\n  • URL directa de vídeo (mp4, webm...)\n  • acestream://...\n' +
+                    'Acepta:\n  • URL directa de vídeo (mp4, webm...)\n  • acestream://...\n  • tvgram://... (abre en TVGram Player)\n' +
                     '  • magnet:...\n  • https://t.me/c/<id>/<msgId> (otro mensaje de Telegram)',
                     cur
                 );
@@ -621,16 +621,22 @@ const Detail = {
             // Detectar si la etiqueta original es algo util (calidad/idioma/DAZN/canal),
             // o un genérico tipo "Enlace 1" que conviene reemplazar.
             const isGeneric = !raw || /^enlace\s*\d*$/i.test(raw) || /^link\s*\d*$/i.test(raw) || /^opci[oó]n\s*\d*$/i.test(raw);
-            const tag = pl.aceUrl ? 'AceStream' : (pl.playableInBrowser === false ? (item.links[i].kind === 'tg' ? 'Telegram' : 'Externo') : '');
+            const tag = pl.aceUrl ? 'AceStream' : pl.tvgramUrl ? 'TVGram' : (pl.playableInBrowser === false ? (item.links[i].kind === 'tg' ? 'Telegram' : 'Externo') : '');
             const sub = isGeneric ? '' : raw;
             const main = `▶ Play ${playables.length > 1 ? (i + 1) : ''}`.trim();
-            const ico = pl.aceUrl ? '📡' : '▶';
+            const ico = pl.aceUrl ? '📡' : pl.tvgramUrl ? '📺' : '▶';
             const label = `<span class="source-ico">${ico}</span><span class="source-main">${escapeHtml(main)}</span>${sub ? `<span class="source-sub">${escapeHtml(sub)}</span>` : ''}${tag ? `<span class="source-tag">${escapeHtml(tag)}</span>` : ''}`;
             let node;
             if (pl.aceUrl) {
                 node = document.createElement('a');
                 node.href = pl.aceUrl; node.className = 'source-btn ace focusable'; node.tabIndex = 0; node.innerHTML = label;
                 node.onclick = () => { Detail.primary = pl; };
+            } else if (pl.tvgramUrl) {
+                // Enlace tvgram:// → abrir directamente en la app TVGram Player
+                node = document.createElement('a');
+                node.href = ExternalPlayers.tvgramHref(pl.tvgramUrl);
+                node.className = 'source-btn tvgram focusable'; node.tabIndex = 0; node.innerHTML = label;
+                node.onclick = () => { Detail.primary = pl; ExternalPlayers.render(pl); };
             } else if (!pl.streamUrl && pl.externalUrl) {
                 node = document.createElement('a');
                 node.href = pl.externalUrl; node.target = '_blank'; node.rel = 'noopener';
@@ -656,6 +662,7 @@ const Detail = {
             title: link.label,
             streamUrl: link.streamUrl || '',
             aceUrl: link.aceUrl || '',
+            tvgramUrl: link.tvgramUrl || '',
             externalUrl: link.externalUrl || '',
             playableInBrowser: link.playableInBrowser === true,
             ext: link.ext || '',
@@ -879,8 +886,36 @@ const Detail = {
     }
 };
 
-/* ===== Reproductores externos (VLC / AceStream / copiar) ===== */
+/* ===== Reproductores externos (VLC / AceStream / TVGram / copiar) ===== */
 const ExternalPlayers = {
+    // Construye el enlace para abrir un tvgram:// en la app TVGram Player.
+    // En Android usa un intent (con package si está configurado) para abrir la
+    // app o llevar al Play Store; en iOS/desktop navega al esquema directamente.
+    tvgramHref(url) {
+        const cfg = window.TVP_CONFIG || {};
+        const ua = navigator.userAgent || '';
+        if (/Android/i.test(ua)) {
+            const rest = String(url).replace(/^tvgram:\/\//i, '');
+            const pkg = (cfg.tvgramPackage || '').trim();
+            const pkgPart = pkg ? `package=${pkg};` : '';
+            return `intent://${rest}#Intent;scheme=tvgram;${pkgPart}action=android.intent.action.VIEW;end`;
+        }
+        return url; // iOS / macOS / Windows: el SO enruta el esquema tvgram://
+    },
+
+    // Panel dedicado para un enlace tvgram:// con botón destacado.
+    renderTvgram(url, playable) {
+        const box = el.playerOptions; if (!box) return;
+        const href = this.tvgramHref(url);
+        const items = [
+            `<a class="opt-btn primary focusable" tabindex="0" href="${escapeHtml(href)}">📺 Abrir en TVGram Player</a>`,
+            `<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(url)}">📺 Abrir (esquema directo)</a>`,
+            `<button class="opt-btn external focusable" tabindex="0" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(${JSON.stringify(url)})">📋 Copiar enlace</button>`
+        ];
+        box.hidden = false;
+        box.innerHTML = `<div class="opt-label">Este enlace se abre en la app TVGram Player:</div><div class="opt-row">${items.join('')}</div>`;
+    },
+
     render(playable) {
         const box = el.playerOptions;
         box.innerHTML = '';
@@ -888,6 +923,11 @@ const ExternalPlayers = {
         const stream = playable.streamUrl ? absUrl(playable.streamUrl) : '';
         const items = [];
 
+        if (playable.tvgramUrl) {
+            const href = this.tvgramHref(playable.tvgramUrl);
+            items.push(`<a class="opt-btn primary tvgram focusable" tabindex="0" href="${escapeHtml(href)}">📺 Abrir en TVGram Player</a>`);
+            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.tvgramUrl)}">📺 Abrir (esquema directo)</a>`);
+        }
         if (playable.aceUrl) {
             items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(playable.aceUrl)}">▶ AceStream</a>`);
             const id = (playable.aceUrl.match(/[0-9a-fA-F]{40}/) || [''])[0];
@@ -900,9 +940,11 @@ const ExternalPlayers = {
         }
 
         const notBrowser = playable.streamUrl && playable.playableInBrowser === false;
-        const label = playable.aceUrl
-            ? 'Enlace AceStream: ábrelo con tu reproductor.'
-            : (notBrowser ? `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Ábrelo con un reproductor externo:` : 'Otros reproductores:');
+        const label = playable.tvgramUrl
+            ? 'Este enlace se abre en la app TVGram Player:'
+            : playable.aceUrl
+                ? 'Enlace AceStream: ábrelo con tu reproductor.'
+                : (notBrowser ? `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Ábrelo con un reproductor externo:` : 'Otros reproductores:');
 
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
@@ -986,6 +1028,11 @@ const Player = {
                 replaced.aceUrl = u; replaced.streamUrl = ''; replaced.externalUrl = '';
                 replaced.playableInBrowser = false;
             }
+            // tvgram:// → abrir en la app TVGram Player
+            else if (/^tvgram:/i.test(u)) {
+                replaced.tvgramUrl = u; replaced.streamUrl = ''; replaced.externalUrl = ''; replaced.aceUrl = '';
+                replaced.playableInBrowser = false;
+            }
             // t.me/c/<id>/<msgId> → stream del propio servidor (versión cliente: SW maneja)
             else {
                 const mC = u.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
@@ -1013,6 +1060,11 @@ const Player = {
         // 1) AceStream: nunca dentro -> abrir reproductor externo (acestream://)
         if (playable.aceUrl) {
             this._openExternal(playable.aceUrl, playable);
+            return;
+        }
+        // 1b) tvgram:// -> abrir en la app TVGram Player (deep link)
+        if (playable.tvgramUrl) {
+            this._openTvgram(playable.tvgramUrl, playable);
             return;
         }
         // 2) Vídeo de Telegram (streamUrl) -> intentar dentro si es navegador-compatible
@@ -1110,6 +1162,22 @@ const Player = {
             if (window.MkvPlayer) { try { window.MkvPlayer.play(playable); return; } catch (e) {} }
         }
         this._openExternal(absUrl(playable.streamUrl), playable);
+    },
+
+    // Abre el enlace tvgram:// en la app TVGram Player. En Android usa un intent
+    // explícito (abre la app o, si no está, ofrece descargarla); en el resto de
+    // plataformas navega al esquema tvgram:// directamente (el SO enruta a la app).
+    _openTvgram(url, playable) {
+        el.detailHero.classList.remove('playing');
+        if (window.ArtBridge && !window.ArtBridge.hidden) { try { window.ArtBridge.destroy(); } catch {} }
+        try { el.playerVideo.pause(); } catch {}
+        el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src');
+        el.playerIframe.hidden = true; el.playerIframe.src = '';
+        el.detailBackdrop.hidden = false;
+        // Mostrar el panel de opciones (con botón destacado "Abrir en TVGram Player")
+        ExternalPlayers.renderTvgram(url, playable);
+        // Intentar abrir directamente
+        try { window.location.href = ExternalPlayers.tvgramHref(url); } catch (e) {}
     },
 
     // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)
@@ -1317,7 +1385,7 @@ const AdminPanel = {
         const hasTmdb = !!(it.tmdbId || ov.tmdbId);
         const hasSynopsis = !!(ov.desc || (it.description && it.description.length > 20));
         const hasTrailer = !!(ov.trailer || it.trailerKey);
-        const hasVideo = !!(it.streamUrl || it.aceUrl || it.externalUrl || (it.links && it.links.length) || (it.episodes && it.episodes.length));
+        const hasVideo = !!(it.streamUrl || it.aceUrl || it.tvgramUrl || it.externalUrl || (it.links && it.links.length) || (it.episodes && it.episodes.length));
         return { hasCover, hasTmdb, hasSynopsis, hasTrailer, hasVideo };
     },
     _problems(it) {

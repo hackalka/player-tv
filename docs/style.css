@@ -861,6 +861,8 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .opt-btn:hover { background: #3a3a3a; }
 .opt-btn.ace { background: #1d7a3a; border-color: #1d7a3a; }
 .opt-btn.ace:hover { background: #229046; }
+.opt-btn.tvgram, .opt-btn.primary.tvgram { background: #0a1a3a; border-color: #3ee65c; color: #3ee65c; font-weight: 700; }
+.opt-btn.tvgram:hover, .opt-btn.primary.tvgram:hover { background: #122752; }
 
 /* Acciones de chat (admin) */
 .tg-actions { display: flex; gap: 8px; margin-top: 6px; }
@@ -901,6 +903,9 @@ body.telegram-mode .nav-links { visibility: hidden; }
 .source-btn:hover { background: #3a3a3a; }
 .source-btn.active { border-color: var(--netflix-red); background: #3a1417; }
 .source-btn.ace .source-ico { color: #4fd07a; }
+.source-btn.tvgram { border-color: rgba(62, 230, 92, 0.4); }
+.source-btn.tvgram .source-ico { color: #3ee65c; }
+.source-btn.tvgram .source-tag { color: #3ee65c; background: rgba(62, 230, 92, 0.14); }
 .source-ico { font-size: 1rem; line-height: 1; }
 
 

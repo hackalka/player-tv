@@ -190,8 +190,8 @@
         buildItem(message, topic) {
             const text = message.message || '';
             const allLines = text.split('\n').map(s => s.trim());
-            const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').trim();
-            const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:)/i.test(l);
+            const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').replace(/tvgram:\/\/\S+/ig, '').trim();
+            const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:|tvgram:\/\/)/i.test(l);
 
             const firstIdx = allLines.findIndex(l => l);
             let title = clean(allLines[firstIdx] || '') || topic.name;
@@ -203,7 +203,7 @@
                 const line = allLines[i];
                 if (!line) continue;
                 if (isUrl(line)) {
-                    let kind = /^acestream:/i.test(line) ? 'ace' : 'http';
+                    let kind = /^acestream:/i.test(line) ? 'ace' : (/^tvgram:/i.test(line) ? 'tvgram' : 'http');
                     const link = { label: (pendingLabel || ('Enlace ' + (links.length + 1))).replace(/[:：]\s*$/, '').trim(), url: line, kind };
                     const tme = this._parseTme(line);
                     if (tme) { link.kind = 'tg'; link.channel = tme.channel; link.msgId = tme.msgId; }
@@ -267,6 +267,7 @@
             const playableInBrowser = isVideo && BROWSER_OK.includes((ext || '').toLowerCase());
 
             const firstAce = links.find(l => l.kind === 'ace');
+            const firstTvgram = links.find(l => l.kind === 'tvgram');
             const firstHttp = links.find(l => l.kind === 'http' || l.kind === 'tg');
 
             return {
@@ -282,6 +283,7 @@
                 playableInBrowser,
                 links,
                 aceUrl: firstAce ? firstAce.url : '',
+                tvgramUrl: firstTvgram ? firstTvgram.url : '',
                 externalUrl: firstHttp ? firstHttp.url : '',
                 hasThumb,
                 streamUrl: isVideo ? `tgstream/${topic.id}/${message.id}` : '',
@@ -305,6 +307,7 @@
                 playableInBrowser: true
             };
             if (link.kind === 'ace') return { aceUrl: link.url, externalUrl: '', playableInBrowser: false };
+            if (link.kind === 'tvgram') return { tvgramUrl: link.url, externalUrl: '', playableInBrowser: false };
             const url = link.url || '';
             if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(url)) return { streamUrl: url, externalUrl: url, playableInBrowser: true };
             return { externalUrl: url, playableInBrowser: false };
@@ -333,18 +336,20 @@
                     streamUrl: l.streamUrl || '',
                     externalUrl: l.externalUrl || '',
                     aceUrl: l.kind === 'ace' ? l.url : (l.aceUrl || ''),
+                    tvgramUrl: l.kind === 'tvgram' ? l.url : (l.tvgramUrl || ''),
                     thumbUrl: l.thumbUrl || it.thumbUrl || '',
                     ext: l.ext || '',
                     playableInBrowser: l.playableInBrowser === true
                 }));
                 return out;
             }
-            if (it.streamUrl || it.aceUrl || it.externalUrl) {
+            if (it.streamUrl || it.aceUrl || it.externalUrl || it.tvgramUrl) {
                 out.push({
                     label: it.title,
                     streamUrl: it.streamUrl || '',
                     externalUrl: it.externalUrl || '',
                     aceUrl: it.aceUrl || '',
+                    tvgramUrl: it.tvgramUrl || '',
                     thumbUrl: it.thumbUrl || '',
                     ext: it.ext || '',
                     playableInBrowser: it.playableInBrowser !== false
@@ -622,7 +627,7 @@
                         if (it.uid) { if (seenUid.has(it.uid)) continue; seenUid.add(it.uid); }
                         const subs = this._movieSources(it);
                         subs.forEach(s => {
-                            const sig = s.aceUrl || s.streamUrl || s.externalUrl || s.label;
+                            const sig = s.aceUrl || s.tvgramUrl || s.streamUrl || s.externalUrl || s.label;
                             if (!sig || seenSig.has(sig)) return;
                             seenSig.add(sig);
                             if (subs.length === 1) {
