@@ -26,7 +26,7 @@ window.TVP_CONFIG = {
     // (ej: 'com.tvgram.player'); asi Android abrira esa app directamente y, si
     // no esta instalada, ofrecera el Play Store. Dejalo vacio para que Android
     // muestre el selector de apps que soportan el esquema tvgram://.
-    tvgramPackage: '',
+    tvgramPackage: 'com.network.tvgramplayer.playstore',
 
     // Mensajes a traer por tema. 50000 cubre cualquier grupo real (Telegram
     // pagina internamente, pero la carga inicial es proporcional al numero).
