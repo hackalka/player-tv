@@ -21,24 +21,45 @@
     const FFMPEG_SRC = [
         'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
         'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js',
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js',
+        'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js',
         'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js'
     ];
     const UTIL_SRC = [
         'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js',
         'https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js',
         'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js',
-        'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js'
+        'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/index.js'
     ];
-    const CORE_BASE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
 
     function loadScript(src) {
         return new Promise((res, rej) => {
             const s = document.createElement('script');
-            s.src = src; s.async = false;
+            s.src = src; s.async = false; s.crossOrigin = 'anonymous';
             s.onload = res;
             s.onerror = () => rej(new Error('No se pudo cargar ' + src));
             document.head.appendChild(s);
         });
+    }
+
+    // Carga la primera URL de la lista que ADEMAS define el global esperado.
+    // checkFn() debe devolver truthy cuando el global ya esta disponible.
+    async function loadFirstWorking(urls, checkFn, label) {
+        // Si ya esta cargado de un intento previo, no recargar.
+        if (checkFn()) return true;
+        let lastErr = null;
+        for (const u of urls) {
+            try {
+                await loadScript(u);
+                // dar un respiro al motor para ejecutar el UMD
+                await new Promise(r => setTimeout(r, 30));
+                if (checkFn()) return true;
+                // cargo pero no expuso el global -> probar siguiente CDN
+            } catch (e) { lastErr = e; }
+        }
+        throw new Error('No se pudo cargar ' + label + (lastErr ? ' (' + lastErr.message + ')' : ''));
     }
     function fmtBytes(n) { if (!n) return '0 B'; const u=['B','KB','MB','GB']; let v=Number(n),i=0; while(v>=1024 && i<u.length-1){v/=1024;i++} return v.toFixed(v<10&&i?1:0)+' '+u[i]; }
     function fmtETA(secs) { secs = Math.max(0, Math.round(secs)); if (secs < 60) return secs + 's'; const m = Math.floor(secs/60), s = secs%60; if (m < 60) return m + 'm ' + s + 's'; const h = Math.floor(m/60); return h + 'h ' + (m%60) + 'm'; }
@@ -52,24 +73,45 @@
         loading = true;
         try {
             progressCb && progressCb({ stage: 'engine', text: 'Descargando motor (~30 MB)...' });
-            let okFf = false;
-            for (const u of FFMPEG_SRC) { try { await loadScript(u); okFf = true; break; } catch (e) { } }
-            if (!okFf) throw new Error('No se pudo cargar FFmpeg.wasm');
-            let okU = false;
-            for (const u of UTIL_SRC) { try { await loadScript(u); okU = true; break; } catch (e) { } }
-            if (!okU) throw new Error('No se pudo cargar @ffmpeg/util');
+            // Cargar la libreria FFmpeg verificando que expone el global
+            await loadFirstWorking(
+                FFMPEG_SRC,
+                () => !!((window.FFmpegWASM && window.FFmpegWASM.FFmpeg) || (window.FFmpeg && window.FFmpeg.FFmpeg)),
+                'FFmpeg.wasm'
+            );
+            // Cargar @ffmpeg/util verificando que expone toBlobURL
+            await loadFirstWorking(
+                UTIL_SRC,
+                () => !!(window.FFmpegUtil && window.FFmpegUtil.toBlobURL),
+                '@ffmpeg/util'
+            );
             const FFmpegLib = window.FFmpegWASM || window.FFmpeg;
             const Util = window.FFmpegUtil;
-            if (!FFmpegLib || !Util) throw new Error('FFmpeg/Util no se expusieron');
+            if (!FFmpegLib || !FFmpegLib.FFmpeg || !Util || !Util.toBlobURL) {
+                throw new Error('FFmpeg/Util no se expusieron (¿bloqueado por adblock/CSP?)');
+            }
             ffmpeg = new FFmpegLib.FFmpeg();
             ffmpeg.on('progress', (p) => {
                 if (p.progress != null && progressCb) progressCb({ stage: 'remux-progress', pct: Math.round(p.progress * 100) });
             });
             progressCb && progressCb({ stage: 'engine', text: 'Inicializando motor...' });
-            await ffmpeg.load({
-                coreURL: await Util.toBlobURL(CORE_BASE + '/ffmpeg-core.js', 'text/javascript'),
-                wasmURL: await Util.toBlobURL(CORE_BASE + '/ffmpeg-core.wasm', 'application/wasm')
-            });
+            // Cargar el core (wasm) probando varios CDN por si uno esta bloqueado
+            const CORE_BASES = [
+                'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd',
+                'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd',
+                'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.6/umd'
+            ];
+            let loaded = false, lastErr = null;
+            for (const base of CORE_BASES) {
+                try {
+                    await ffmpeg.load({
+                        coreURL: await Util.toBlobURL(base + '/ffmpeg-core.js', 'text/javascript'),
+                        wasmURL: await Util.toBlobURL(base + '/ffmpeg-core.wasm', 'application/wasm')
+                    });
+                    loaded = true; break;
+                } catch (e) { lastErr = e; }
+            }
+            if (!loaded) throw new Error('No se pudo cargar el core (' + (lastErr && lastErr.message || '?') + ')');
             coreLoaded = true;
             progressCb && progressCb({ stage: 'engine-ready' });
             return ffmpeg;
@@ -117,7 +159,7 @@
     }
     function setBar(id, pct) { const b = document.getElementById(id); if (b) b.style.width = Math.min(100, Math.max(0, pct || 0)) + '%'; }
     function setText(id, t) { const e = document.getElementById(id); if (e) e.innerText = t || ''; }
-    function setHint(t) { setText('mkv-hint', t); }
+    function setHint(t) { const e = document.getElementById('mkv-hint'); if (e) e.innerHTML = t || ''; }
 
     function closeUI() {
         const m = document.getElementById('mkv-overlay'); if (!m) return;
@@ -189,9 +231,11 @@
 
             const dlPromise = downloadFile(dlUrl, ({ received, total, speed }) => {
                 const pct = total ? Math.round((received / total) * 100) : 0;
-                setBar('mkv-bar-dl', pct);
+                setBar('mkv-bar-dl', total ? pct : 50);
                 const eta = (speed && total) ? fmtETA((total - received) / speed) : '?';
-                setText('mkv-stats-dl', `${pct}% · ${fmtBytes(received)}/${fmtBytes(total) || '?'} · ${fmtBytes(speed)}/s · ETA ${eta}`);
+                const totalStr = total ? fmtBytes(total) : '?';
+                const pctStr = total ? pct + '%' : 'descargando…';
+                setText('mkv-stats-dl', `${pctStr} · ${fmtBytes(received)}/${totalStr} · ${fmtBytes(speed)}/s · ETA ${eta}`);
             });
 
             // Esperar a las dos
@@ -243,7 +287,12 @@
             const p = document.getElementById('mkv-progress'); if (p) p.style.display = 'none';
             setHint('▶ Reproduciendo. Si quieres descargar el original, cierra y usa "⬇ Descargar".');
         } catch (e) {
-            setHint('❌ Error: ' + (e && e.message || e));
+            const msg = (e && e.message) || String(e);
+            let hint = '❌ Error: ' + msg;
+            if (/expusieron|no se pudo cargar|core|adblock|csp/i.test(msg)) {
+                hint += '<br><br>💡 En PC suele deberse a un <b>bloqueador de anuncios</b> o extensión de privacidad que bloquea los CDN (jsdelivr/unpkg). Prueba a desactivarlo para esta web, o usa los botones <b>⬇ Descargar</b> / <b>VLC</b> / <b>MX Player</b> para verlo fuera.';
+            }
+            setHint(hint);
             console.error('[mkv]', e);
         }
     }
