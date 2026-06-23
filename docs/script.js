@@ -926,12 +926,14 @@ const ExternalPlayers = {
             // con el reproductor del sistema (VLC/MX Player/MPV).
             const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
             const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
-            // Botón principal: descargar + abrir con reproductor del sistema.
-            items.push(`<a class="opt-btn primary focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (abrir con VLC/MX Player/MPV)</a>`);
-            // Probar reproducción interna a la fuerza
-            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._forceInternal && Player._forceInternal()">▶ Intentar reproducir aquí</button>`);
-            // Reproducir aquí con FFmpeg.wasm (modo avanzado, lazy-loaded)
-            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Reproducir aquí (avanzado)</button>`);
+            // BOTON PRINCIPAL: reproducir aqui mismo. Primero intenta nativo
+            // (rapido, sin descargar); si el formato no va, salta al motor
+            // avanzado (FFmpeg.wasm) que convierte sobre la marcha.
+            items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
+            // Reproducir con FFmpeg.wasm directamente (por si quiere forzar el avanzado)
+            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
+            // Descargar para abrir con el reproductor del sistema.
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (${playable && playable.sizeStr ? escapeHtml(playable.sizeStr) : 'abrir con VLC/MX'})</a>`);
             // Compartir con app del sistema (móvil): tras descargar, mostramos el menú nativo
             if (navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x')] })) {
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="ExternalPlayers.shareDownloaded(${JSON.stringify(dl)},${JSON.stringify(fn)})">📤 Compartir con otra app</button>`);
@@ -1061,10 +1063,11 @@ const Player = {
             });
             if (ok) {
                 // Hooks: timeupdate guarda progreso, ended pasa al siguiente,
-                // error abre reproductor externo, volumechange persiste volumen.
+                // error -> _onInsideError (salta a motor avanzado si procede),
+                // volumechange persiste volumen.
                 window.ArtBridge.on('timeupdate', () => this._tickArt());
                 window.ArtBridge.on('ended', () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); });
-                window.ArtBridge.on('error', () => this._openExternal(absUrl(playable.streamUrl), playable));
+                window.ArtBridge.on('error', () => this._onInsideError(playable, parent));
                 window.ArtBridge.on('volumechange', () => { try { Store.volume = window.ArtBridge.volume; } catch {} });
                 return;
             }
@@ -1076,7 +1079,7 @@ const Player = {
         v.src = url;
         try { v.volume = Store.volume; } catch {}
         v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
-        v.onerror = () => { this._openExternal(absUrl(playable.streamUrl), playable); };
+        v.onerror = () => { this._onInsideError(playable, parent); };
         v.ontimeupdate = () => this._tick();
         v.onvolumechange = () => { Store.volume = v.volume; };
         v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
@@ -1088,6 +1091,25 @@ const Player = {
     _forceInternal() {
         if (!this.current || !this.current.playable) return;
         this._playInside(this.current.playable, this.current.parent);
+    },
+
+    // Botón "▶ Reproducir aquí": intenta nativo/Artplayer y, si el formato no es
+    // compatible (error), salta AUTOMÁTICAMENTE al motor avanzado (FFmpeg.wasm)
+    // que remuxea sobre la marcha. Asi el usuario tiene UN solo botón de Play.
+    _playHere() {
+        if (!this.current || !this.current.playable) return;
+        this._autoAdvanced = true; // si el intento nativo falla, usar motor avanzado
+        this._playInside(this.current.playable, this.current.parent);
+    },
+
+    // Manejo de error al reproducir dentro: si venimos de "_playHere" saltamos al
+    // motor avanzado; si no, mostramos el menú de reproductores externos.
+    _onInsideError(playable, parent) {
+        if (this._autoAdvanced) {
+            this._autoAdvanced = false;
+            if (window.MkvPlayer) { try { window.MkvPlayer.play(playable); return; } catch (e) {} }
+        }
+        this._openExternal(absUrl(playable.streamUrl), playable);
     },
 
     // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)
@@ -1139,6 +1161,7 @@ const Player = {
 
     _lastSave: 0,
     _tick() {
+        this._autoAdvanced = false; // ya reproduce bien: no saltar a avanzado
         const v = el.playerVideo, c = this.current;
         if (!c || !v.duration) return;
         const now = Date.now();
@@ -1146,6 +1169,7 @@ const Player = {
     },
     // Igual que _tick pero leyendo el tiempo desde Artplayer (cuando esta activo)
     _tickArt() {
+        this._autoAdvanced = false; // ya reproduce bien: no saltar a avanzado
         const c = this.current;
         if (!c || !window.ArtBridge || !window.ArtBridge.duration) return;
         const now = Date.now();
