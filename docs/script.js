@@ -1015,12 +1015,17 @@ const ExternalPlayers = {
             // OPCION RECOMENDADA para AVI/MKV/4K: abrir en TVGram Player (reproduce
             // el archivo nativo de Telegram, sin convertir ni depender del navegador).
             const tvgramPlay = playable ? ExternalPlayers.tvgramPlayHref(playable) : '';
+            // Reproductor NATIVO de la APK (ExoPlayer) — máxima prioridad si existe
+            const hasNative = Player._hasNative() && Player._streamRef(playable);
+            if (hasNative) {
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">📺 Reproducir nativo (ExoPlayer)</button>`);
+            }
             if (tvgramPlay) {
-                items.push(`<a class="opt-btn primary tvgram focusable" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player (recomendado)</a>`);
+                items.push(`<a class="opt-btn${hasNative ? '' : ' primary'} tvgram focusable" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player${hasNative ? '' : ' (recomendado)'}</a>`);
             }
             // BOTON: reproducir aqui mismo. Primero intenta nativo (rapido, sin
             // descargar); si el formato no va, salta al motor avanzado (FFmpeg.wasm).
-            items.push(`<button class="opt-btn${tvgramPlay ? '' : ' primary'} focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí (navegador)</button>`);
+            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí (navegador)</button>`);
             // Reproducir con FFmpeg.wasm directamente (por si quiere forzar el avanzado)
             items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
             // Descargar para abrir con el reproductor del sistema.
@@ -1121,8 +1126,11 @@ const Player = {
             this._playInside(playable, parent);
             return;
         }
-        // 3) Vídeo de Telegram NO compatible (mkv/avi) -> reproductor externo con la URL del servidor
+        // 3) Vídeo de Telegram NO compatible (mkv/avi):
+        //    a) Si estamos en la APK con reproductor NATIVO (ExoPlayer) -> usarlo.
+        //    b) Si no, menú de reproductores externos / motor avanzado.
         if (playable.streamUrl) {
+            if (this._hasNative() && this._playNative(playable, parent)) return;
             this._openExternal(absUrl(playable.streamUrl), playable);
             return;
         }
@@ -1227,6 +1235,31 @@ const Player = {
         ExternalPlayers.renderTvgram(url, playable);
         // Intentar abrir directamente
         try { window.location.href = ExternalPlayers.tvgramHref(url); } catch (e) {}
+    },
+
+    // Construye la referencia {kind,a,b} del mensaje a partir del streamUrl,
+    // para pasarla al reproductor nativo de la APK (ExoPlayer).
+    _streamRef(playable) {
+        const su = (playable && playable.streamUrl) || '';
+        const m = su.match(/^(tgstream|tgstreamlink)\/([^/]+)\/([^/?#]+)/);
+        if (!m) return null;
+        return JSON.stringify({ kind: m[1], a: m[2], b: m[3] });
+    },
+    // ¿Está disponible el reproductor nativo de la APK Android?
+    _hasNative() {
+        try { return !!(window.NativeHost && NativeHost.isAvailable && NativeHost.isAvailable()); }
+        catch (e) { return false; }
+    },
+    // Lanza el reproductor nativo ExoPlayer con el vídeo de Telegram.
+    _playNative(playable, parent) {
+        const ref = this._streamRef(playable);
+        if (!ref) return false;
+        try {
+            const title = (parent && parent.title) || playable.title || '';
+            const mime = playable.mime || (playable.ext ? 'video/' + playable.ext : '');
+            NativeHost.play(ref, title, mime);
+            return true;
+        } catch (e) { return false; }
     },
 
     // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Permite trafico en claro (HTTP) SOLO hacia el servidor local 127.0.0.1 que
+  hace de puente entre ExoPlayer (nativo) y la WebView (GramJS). El resto de la
+  app sigue exigiendo HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

@@ -11,6 +11,7 @@ import android.view.KeyEvent
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -21,6 +22,7 @@ import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import fi.iki.elonen.NanoHTTPD
 
 /**
  * Wrapper nativo Android (movil + Android TV) sobre la PWA player-tv.pages.dev.
@@ -41,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var fullscreenView: android.view.View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var streamServer: LocalStreamServer? = null
 
     private val pickFile = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         fileChooserCallback?.onReceiveValue(uris.toTypedArray())
@@ -89,6 +92,10 @@ class MainActivity : AppCompatActivity() {
 
         // En TV box, indicar al WebView que acepte input
         web.requestFocus(android.view.View.FOCUS_DOWN)
+
+        // ---- Servidor local + puente para el reproductor NATIVO (ExoPlayer) ----
+        startStreamServer()
+        web.addJavascriptInterface(NativeHost(), "NativeHost")
 
         // ---- Cliente Web (navegacion) ----
         web.webViewClient = object : WebViewClient() {
@@ -198,5 +205,53 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    // ---- Servidor de streaming local (puente ExoPlayer <-> GramJS) ----
+    private fun startStreamServer() {
+        if (streamServer != null) return
+        val ports = intArrayOf(8970, 8971, 8972, 8973, 8974)
+        for (p in ports) {
+            try {
+                val s = LocalStreamServer(p, web)
+                s.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                streamServer = s
+                NativeStreamHolder.server = s
+                break
+            } catch (_: Exception) { /* puerto ocupado: probar siguiente */ }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try { streamServer?.stop() } catch (_: Exception) {}
+        NativeStreamHolder.server = null
+    }
+
+    /**
+     * Interfaz JS expuesta como `window.NativeHost`. La web la usa para pedir
+     * que un video (que el navegador no puede decodificar: MKV/AVI/...) se abra
+     * en el reproductor NATIVO ExoPlayer dentro de esta misma app.
+     */
+    inner class NativeHost {
+        /** ref = JSON {kind,a,b} que identifica el mensaje de Telegram. */
+        @JavascriptInterface
+        fun play(refJson: String, title: String?, mime: String?) {
+            val srv = streamServer ?: return
+            val url = srv.prepare(refJson, mime ?: "")
+            val it = Intent(this@MainActivity, NativePlayerActivity::class.java)
+            it.putExtra(NativePlayerActivity.EXTRA_URL, url)
+            it.putExtra(NativePlayerActivity.EXTRA_TITLE, title ?: "")
+            it.putExtra(NativePlayerActivity.EXTRA_MIME, mime ?: "")
+            runOnUiThread { startActivity(it) }
+        }
+
+        /** La web comprueba si el reproductor nativo esta disponible. */
+        @JavascriptInterface
+        fun isAvailable(): Boolean = streamServer != null
+
+        /** Puerto del servidor local al que la web sube los bytes (meta/feed). */
+        @JavascriptInterface
+        fun serverPort(): Int = streamServer?.listeningPort ?: 0
     }
 }

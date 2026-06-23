@@ -75,4 +75,15 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     // Soporte minimo para Android TV (Leanback)
     implementation("androidx.leanback:leanback:1.0.0")
+
+    // ---- Reproductor NATIVO (ExoPlayer / media3) ----
+    // Decodifica MKV/MP4/WebM/TS/MOV con su propio motor, sin depender del
+    // navegador ni de FFmpeg.wasm. media3 1.3.x es compatible con compileSdk 34.
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("androidx.media3:media3-datasource:1.3.1")
+    // Servidor HTTP local minusculo: hace de puente para que ExoPlayer pida
+    // rangos del video que la WebView (GramJS) descarga de Telegram.
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 }

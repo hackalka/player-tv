@@ -621,4 +621,56 @@
             navigator.serviceWorker.register('stream-sw.js').catch(e => console.warn('SW register:', e.message));
         });
     }
+
+    // =========================================================================
+    // PUENTE PARA EL REPRODUCTOR NATIVO (ExoPlayer) DE LA APK ANDROID
+    // -------------------------------------------------------------------------
+    // El servidor local de la app (LocalStreamServer) pide aqui los metadatos y
+    // los rangos de bytes del video; nosotros los obtenemos de Telegram con
+    // GramJS (la misma logica que alimenta al Service Worker) y se los devolvemos
+    // subiendolos por HTTP a 127.0.0.1:<puerto>. Solo se activa dentro de la APK
+    // (cuando existe window.NativeHost); en el navegador no hace nada.
+    // =========================================================================
+    function nativePort() {
+        try { return (window.NativeHost && NativeHost.serverPort && NativeHost.serverPort()) || 0; }
+        catch (e) { return 0; }
+    }
+    function parseRef(refJson) {
+        try { const o = JSON.parse(refJson); return { kind: o.kind, a: o.a, b: o.b }; }
+        catch (e) { return null; }
+    }
+    window.NativeStream = {
+        // Metadatos del fichero -> POST /meta?id=reqId con cabeceras x-size/x-mime
+        async meta(refJson, reqId) {
+            const port = nativePort(); if (!port) return;
+            const r = parseRef(refJson); if (!r) return this._failMeta(port, reqId);
+            try {
+                const info = await swInfo(r.kind, r.a, r.b);
+                await fetch(`http://127.0.0.1:${port}/meta?id=${encodeURIComponent(reqId)}`, {
+                    method: 'POST',
+                    headers: { 'x-size': String((info && info.size) || 0), 'x-mime': (info && info.mime) || '' }
+                });
+            } catch (e) { this._failMeta(port, reqId); }
+        },
+        _failMeta(port, reqId) {
+            try { fetch(`http://127.0.0.1:${port}/meta?id=${encodeURIComponent(reqId)}`, { method: 'POST', headers: { 'x-size': '0', 'x-mime': '' } }); } catch (e) {}
+        },
+        // Rango de bytes -> POST /feed?id=reqId con el cuerpo binario
+        async pump(refJson, start, length, reqId) {
+            const port = nativePort(); if (!port) return;
+            const r = parseRef(refJson); if (!r) return this._failFeed(port, reqId);
+            try {
+                const u = await swChunk(r.kind, r.a, r.b, Number(start), Number(length));
+                const body = u ? (u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength)) : new ArrayBuffer(0);
+                await fetch(`http://127.0.0.1:${port}/feed?id=${encodeURIComponent(reqId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body
+                });
+            } catch (e) { this._failFeed(port, reqId); }
+        },
+        _failFeed(port, reqId) {
+            try { fetch(`http://127.0.0.1:${port}/feed?id=${encodeURIComponent(reqId)}`, { method: 'POST', body: new ArrayBuffer(0) }); } catch (e) {}
+        }
+    };
 })();
