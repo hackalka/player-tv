@@ -464,11 +464,27 @@
                 await r.svc.deleteMessagesIn(body.peer, body.msgIds || []);
                 return json({ ok: true });
             }
-            // Reenviar mensajes: { fromPeer, msgIds: [], toPeer, asCopy }
+            // Reenviar mensajes: { fromPeer, msgIds: [], toPeer, asCopy, topMsgId? }
             if (rest === 'admin/forward' && method === 'POST') {
                 const r = await requireService(); if (r.err) return r.err;
-                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], body.toPeer, !!body.asCopy);
+                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], body.toPeer, !!body.asCopy, body.topMsgId);
                 return json({ ok: true });
+            }
+            // Reenviar al grupo principal de TV+: { fromPeer, msgIds: [], topMsgId?, asCopy? }
+            // El destino siempre es cfg.groupId. Por defecto asCopy=true (anonimo).
+            if (rest === 'admin/forward-to-mine' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                const asCopy = body.asCopy === false ? false : true;
+                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], cfg.groupId, asCopy, body.topMsgId);
+                _catalog = null; // invalidar cache para que el catalogo recoja lo nuevo
+                return json({ ok: true });
+            }
+            // Lista de temas del grupo principal de TV+ (para el selector de destino)
+            if (rest === 'admin/dest-topics') {
+                const r = await requireService(); if (r.err) return r.err;
+                let topics = [];
+                try { topics = await r.svc.getGroupTopics(cfg.groupId); } catch (e) { console.warn('[api] dest-topics:', e.message); }
+                return json({ groupId: cfg.groupId, topics });
             }
             // Lista de topicos de un grupo foro: /api/admin/group/:peer/topics
             if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'topics') {

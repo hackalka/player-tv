@@ -994,34 +994,29 @@
         // Reenviar mensajes de un peer a otro (forward o copy oculto).
         // asCopy=true → usa Api.messages.ForwardMessages con dropAuthor para
         // que NO se vea el origen ni el autor (estilo "Copiar y pegar").
-        async forwardMessages(fromPeer, msgIds, toPeer, asCopy) {
+        // topMsgId (opcional) → enviar dentro de un tema (foro) concreto del destino.
+        async forwardMessages(fromPeer, msgIds, toPeer, asCopy, topMsgId) {
             const from = await this.resolvePeer(fromPeer);
             const to = await this.resolvePeer(toPeer);
-            if (asCopy) {
-                // RAW API: reenvio anonimizado (sin autor, sin "Reenviado de")
-                const ids = msgIds.map(Number);
-                // randomId int64 aleatorio. Combinamos dos enteros 32-bit aleatorios
-                // y los pasamos a bigInt (la libreria global big-integer expuesta en index.html).
-                const rand64 = () => {
-                    const hi = (Math.random() * 0x100000000) >>> 0;
-                    const lo = (Math.random() * 0x100000000) >>> 0;
-                    // BigInteger acepta valores numericos (high*2^32 + low)
-                    return bigInt(hi).shiftLeft(32).add(bigInt(lo));
-                };
-                const randomIds = ids.map(rand64);
-                await this.client.invoke(new Api.messages.ForwardMessages({
-                    fromPeer: from, toPeer: to,
-                    id: ids, randomId: randomIds,
-                    dropAuthor: true, dropMediaCaptions: false,
-                    silent: false, background: false, withMyScore: false, noforwards: false
-                }));
-                return;
-            }
-            await this.client.forwardMessages(to, {
-                messages: msgIds.map(Number),
-                fromPeer: from,
-                silent: false
-            });
+            const topId = topMsgId && Number(topMsgId) > 1 ? Number(topMsgId) : 0;
+            // RAW API siempre — soporta topMsgId y dropAuthor en una sola llamada.
+            const ids = msgIds.map(Number);
+            // randomId int64 aleatorio. Combinamos dos enteros 32-bit aleatorios
+            // y los pasamos a bigInt (la libreria global big-integer expuesta en index.html).
+            const rand64 = () => {
+                const hi = (Math.random() * 0x100000000) >>> 0;
+                const lo = (Math.random() * 0x100000000) >>> 0;
+                return bigInt(hi).shiftLeft(32).add(bigInt(lo));
+            };
+            const randomIds = ids.map(rand64);
+            const params = {
+                fromPeer: from, toPeer: to,
+                id: ids, randomId: randomIds,
+                dropAuthor: !!asCopy, dropMediaCaptions: false,
+                silent: false, background: false, withMyScore: false, noforwards: false
+            };
+            if (topId) params.topMsgId = topId;
+            await this.client.invoke(new Api.messages.ForwardMessages(params));
         }
 
         // Lista los tópicos (foros) de un grupo, paginando para traer TODOS.

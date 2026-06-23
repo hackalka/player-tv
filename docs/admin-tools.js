@@ -27,6 +27,7 @@
 
     const CATS = {
         all: { label: 'Todos', icon: '💬' },
+        sources: { label: 'Fuentes TV+', icon: '📥' },
         admin: { label: 'Admin', icon: '⭐' },
         private: { label: 'Privados', icon: '👤' },
         groups: { label: 'Grupos', icon: '👥' },
@@ -47,8 +48,35 @@
         thumbs: new Map(),
         avatars: new Map(),
         cat: 'all',
-        owner: null
+        owner: null,
+        // === NUEVO: gestion de fuentes y reenvio a TV+ ===
+        pinned: new Set(),       // peerIds fijados como "fuentes TV+"
+        selecting: false,        // modo seleccion multiple activo en el chat actual
+        selected: new Set(),     // msgIds seleccionados en el chat actual
+        destTopics: null,        // cache de los temas del grupo principal (cfg.groupId)
+        destGroupId: '',         // peerId del grupo principal
+        lastDestTopic: {}        // por peer fuente, ultimo tema destino usado
     };
+
+    // ---- Persistencia local de las fuentes fijadas y ultimo destino ----
+    function _pinKey() { return 'tvp_pinned_sources_' + ((state.owner && state.owner.userId) || 'anon'); }
+    function _destKey() { return 'tvp_lastdest_' + ((state.owner && state.owner.userId) || 'anon'); }
+    function loadPinned() {
+        try { state.pinned = new Set(JSON.parse(localStorage.getItem(_pinKey()) || '[]')); } catch { state.pinned = new Set(); }
+        try { state.lastDestTopic = JSON.parse(localStorage.getItem(_destKey()) || '{}') || {}; } catch { state.lastDestTopic = {}; }
+    }
+    function savePinned() {
+        try { localStorage.setItem(_pinKey(), JSON.stringify(Array.from(state.pinned))); } catch {}
+    }
+    function saveLastDest() {
+        try { localStorage.setItem(_destKey(), JSON.stringify(state.lastDestTopic || {})); } catch {}
+    }
+    function togglePin(peerId) {
+        if (state.pinned.has(peerId)) state.pinned.delete(peerId);
+        else state.pinned.add(peerId);
+        savePinned();
+        updateCatCounts(); renderList();
+    }
 
     function buildModal() {
         if ($('#tg-personal')) return;
@@ -128,7 +156,9 @@
         $('#tg-personal').hidden = false;
         document.body.style.overflow = 'hidden';
         if (state.owner && !state.owner.ownerConfigured) showBanner();
+        loadPinned();
         if (!state.loaded) await loadChats();
+        else { renderList(); updateCatCounts(); }
     }
     function close() {
         $('#tg-personal').hidden = true;
@@ -163,7 +193,7 @@
     }
 
     function updateCatCounts() {
-        const counts = { all: state.chats.length, admin: 0, private: 0, groups: 0, channels: 0, bots: 0 };
+        const counts = { all: state.chats.length, sources: state.pinned.size, admin: 0, private: 0, groups: 0, channels: 0, bots: 0 };
         for (const c of state.chats) { if (c.isAdmin) counts.admin++; if (counts[c.category] != null) counts[c.category]++; }
         for (const k of Object.keys(counts)) { const el = document.getElementById('tg-cat-' + k); if (el) el.textContent = counts[k] || ''; }
     }
@@ -175,15 +205,57 @@
             renderSearchUI(); return;
         }
         const q = ($('#tg-search').value || '').trim().toLowerCase();
+        const matchQ = (c) => !q || c.title.toLowerCase().includes(q) || (c.username || '').toLowerCase().includes(q);
+
+        // Categoria especial "Fuentes TV+": solo los chats fijados
+        if (state.cat === 'sources') {
+            const items = state.chats.filter(c => state.pinned.has(c.peerId) && matchQ(c));
+            if (!items.length) {
+                list.innerHTML = `<div class="tg-empty tg-sources-empty">
+                    <div style="font-size:32px;margin-bottom:8px">📥</div>
+                    <b>Aún no has fijado ninguna fuente.</b><br>
+                    Pulsa la estrella ⭐ junto a cualquier chat (en "Todos", "Grupos" o "Canales") para fijarlo aquí.<br><br>
+                    Las fuentes TV+ son los grupos/canales de los que importarás contenido al catálogo.
+                </div>`;
+                return;
+            }
+            list.innerHTML = items.map(c => chatItemHTML(c)).join('');
+            wireListItems(list);
+            return;
+        }
+
         const items = state.chats.filter(c => {
             if (state.cat === 'admin' && !c.isAdmin) return false;
             if (state.cat !== 'all' && state.cat !== 'admin' && c.category !== state.cat) return false;
-            if (q && !c.title.toLowerCase().includes(q) && !(c.username || '').toLowerCase().includes(q)) return false;
-            return true;
+            return matchQ(c);
         });
         if (!items.length) { list.innerHTML = '<div class="tg-empty">No hay chats en esta categoría.</div>'; return; }
-        list.innerHTML = items.map(c => chatItemHTML(c)).join('');
-        $$('#tg-list .tg-item').forEach(el => el.addEventListener('click', () => selectChat(el.dataset.peer, el.dataset.title)));
+
+        // Separar fijados al principio (con cabecera) cuando estamos en categorias generales
+        const showHeader = (state.cat === 'all' || state.cat === 'groups' || state.cat === 'channels' || state.cat === 'admin');
+        const pins = showHeader ? items.filter(c => state.pinned.has(c.peerId)) : [];
+        const rest = showHeader ? items.filter(c => !state.pinned.has(c.peerId)) : items;
+        let html = '';
+        if (pins.length) {
+            html += `<div class="tg-list-section">📥 FUENTES TV+ FIJADAS</div>`;
+            html += pins.map(c => chatItemHTML(c)).join('');
+            html += `<div class="tg-list-section">${state.cat === 'all' ? 'TODOS LOS CHATS' : 'OTROS'}</div>`;
+        }
+        html += rest.map(c => chatItemHTML(c)).join('');
+        list.innerHTML = html;
+        wireListItems(list);
+    }
+
+    function wireListItems(list) {
+        $$('#tg-list .tg-item').forEach(el => el.addEventListener('click', (ev) => {
+            // Pulsar la estrella alterna fijado, sin abrir el chat
+            if (ev.target && ev.target.closest('[data-pin]')) {
+                ev.stopPropagation();
+                togglePin(el.dataset.peer);
+                return;
+            }
+            selectChat(el.dataset.peer, el.dataset.title);
+        }));
         // Aplicar avatares ya cacheados
         state.avatars.forEach((url, peer) => {
             const av = list.querySelector(`.tg-item[data-peer="${peer}"] .tg-avatar`);
@@ -265,13 +337,20 @@
         const unread = c.unread > 0 ? `<span class="tg-unread">${c.unread > 999 ? '999+' : c.unread}</span>` : '';
         const color = colorFor(c.avatarSeed || c.title);
         const avatar = `<div class="tg-avatar" style="background:${color}">${esc(initials(c.title))}</div>`;
-        return `<div class="tg-item${state.currentPeer === c.peerId ? ' active' : ''}" data-peer="${esc(c.peerId)}" data-title="${esc(c.title)}">
+        // Boton estrella: solo para grupos y canales (no privados/bots)
+        const canPin = c.isGroup || c.isChannel;
+        const pinned = state.pinned.has(c.peerId);
+        const pinBtn = canPin
+            ? `<button class="tg-pin${pinned ? ' active' : ''}" data-pin title="${pinned ? 'Quitar de fuentes TV+' : 'Fijar como fuente TV+'}">${pinned ? '★' : '☆'}</button>`
+            : '';
+        return `<div class="tg-item${state.currentPeer === c.peerId ? ' active' : ''}${pinned ? ' is-pinned' : ''}" data-peer="${esc(c.peerId)}" data-title="${esc(c.title)}">
             ${avatar}
             <div class="tg-item-body">
-                <div class="tg-item-title">${esc(c.title)} ${tags.join('')}</div>
+                <div class="tg-item-title">${esc(c.title)} ${tags.join('')}${pinned ? '<span class="tg-tag pinsrc" title="Fuente TV+">📥</span>' : ''}</div>
                 <div class="tg-item-sub">${esc(sub)}</div>
             </div>
             ${unread}
+            ${pinBtn}
         </div>`;
     }
 
@@ -293,6 +372,9 @@
     }
 
     async function selectChat(peer, title) {
+        // Resetear modo seleccion al cambiar de chat
+        state.selecting = false;
+        state.selected = new Set();
         state.currentPeer = peer;
         state.currentTitle = title;
         state.currentTopic = 0;
@@ -305,15 +387,26 @@
             ? `<div class="tg-avatar" style="background-image:url(${avurl})"></div>`
             : `<div class="tg-avatar" style="background:${color}">${esc(initials(title))}</div>`;
         const sub = ch ? (ch.username ? '@' + ch.username : (ch.isChannel ? 'Canal' : ch.isBot ? 'Bot' : ch.isPrivate ? 'Privado' : 'Grupo')) : '';
+        const canPin = ch && (ch.isGroup || ch.isChannel);
+        const isPinned = state.pinned.has(peer);
+        const pinHeadBtn = canPin
+            ? `<button class="btn-sm tg-head-pin${isPinned ? ' active' : ''}" id="tg-head-pin" title="${isPinned ? 'Quitar de fuentes TV+' : 'Fijar como fuente TV+'}">${isPinned ? '★ Fuente TV+' : '☆ Fijar como fuente'}</button>`
+            : '';
         $('#tg-main-head').innerHTML = `${avhtml}
             <div class="tg-main-info">
                 <div class="tg-main-title">${esc(title)}</div>
                 <div class="tg-main-sub">${esc(sub)} · <code class="tg-peer-id">${esc(peer)}</code></div>
             </div>
             <div class="tg-main-actions">
+                ${pinHeadBtn}
+                <button class="btn-sm" id="tg-select-toggle" title="Seleccionar varios mensajes">✓ Seleccionar</button>
                 <button class="btn-sm" id="tg-reload">↻</button>
             </div>`;
         $('#tg-reload').addEventListener('click', () => loadMessages(true));
+        const selBtn = $('#tg-select-toggle');
+        if (selBtn) selBtn.addEventListener('click', toggleSelectMode);
+        const pinBtn = $('#tg-head-pin');
+        if (pinBtn) pinBtn.addEventListener('click', () => { togglePin(peer); selectChat(peer, title); });
         $('#tg-compose').hidden = false;
         renderList();
         if (!avurl && ch && ch.hasPhoto) loadAvatar(ch);
@@ -324,6 +417,7 @@
             $('#tg-topics-bar') && $('#tg-topics-bar').remove();
             await loadMessages(true);
         }
+        renderSelectionBar();
     }
 
     async function loadTopics() {
@@ -393,19 +487,34 @@
         const msgs = state.messages.slice().sort((a, b) => a.id - b.id);
         body.innerHTML = msgs.map(msgHTML).join('');
         $$('#tg-main-body .tg-msg').forEach(el => {
-            el.querySelector('[data-act="edit"]').addEventListener('click', () => onEdit(Number(el.dataset.id)));
-            el.querySelector('[data-act="delete"]').addEventListener('click', () => onDelete(Number(el.dataset.id)));
+            const id = Number(el.dataset.id);
+            // Modo seleccion: el body completo alterna seleccion (excepto botones)
+            if (state.selecting) {
+                el.addEventListener('click', (ev) => {
+                    if (ev.target.closest('.tg-msg-actions') || ev.target.closest('button')) return;
+                    toggleMessageSelected(id);
+                });
+            }
+            const cb = el.querySelector('.tg-msg-check');
+            if (cb) cb.addEventListener('change', () => toggleMessageSelected(id));
+            const editBtn = el.querySelector('[data-act="edit"]');
+            if (editBtn) editBtn.addEventListener('click', () => onEdit(id));
+            const delBtn = el.querySelector('[data-act="delete"]');
+            if (delBtn) delBtn.addEventListener('click', () => onDelete(id));
             const rep = el.querySelector('[data-act="replace"]');
-            if (rep) rep.addEventListener('click', () => onReplaceFile(Number(el.dataset.id)));
+            if (rep) rep.addEventListener('click', () => onReplaceFile(id));
             const fwd = el.querySelector('[data-act="forward"]');
-            if (fwd) fwd.addEventListener('click', () => onForward(Number(el.dataset.id)));
+            if (fwd) fwd.addEventListener('click', () => onForward(id));
+            const sendMine = el.querySelector('[data-act="send-mine"]');
+            if (sendMine) sendMine.addEventListener('click', () => openSendToMineDialog([id]));
             const play = el.querySelector('[data-act="play"]');
-            if (play) play.addEventListener('click', () => onPlay(Number(el.dataset.id)));
+            if (play) play.addEventListener('click', () => onPlay(id));
             const dl = el.querySelector('[data-act="download"]');
-            if (dl) dl.addEventListener('click', () => onDownload(Number(el.dataset.id)));
+            if (dl) dl.addEventListener('click', () => onDownload(id));
         });
         body.scrollTop = body.scrollHeight;
         msgs.filter(m => m.hasMedia && m.hasThumb && !state.thumbs.has(m.id)).forEach(loadThumb);
+        renderSelectionBar();
     }
 
     function msgHTML(m) {
@@ -413,6 +522,7 @@
         const playBtn = (m.isVideo || m.isImage) ? `<button class="msg-act primary" data-act="play" title="Ver">▶</button>` : '';
         const replaceBtn = (m.isVideo || m.isImage) ? `<button class="msg-act" data-act="replace" title="Reemplazar archivo">🔄</button>` : '';
         const dlBtn = m.hasMedia ? `<button class="msg-act" data-act="download" title="Descargar">⬇</button>` : '';
+        const sendMineBtn = `<button class="msg-act tv-plus" data-act="send-mine" title="Enviar a TV+ (mi grupo)">📥</button>`;
         const mediaIcon = m.isVideo ? '▶' : m.isImage ? '🖼' : '📎';
         const mediaTitle = m.filename || (m.isVideo ? 'Video' : m.isImage ? 'Imagen' : 'Archivo');
         const mediaLine = m.hasMedia ? `<div class="tg-msg-media">
@@ -422,21 +532,29 @@
                 <div class="tg-msg-mediameta">${fmtBytes(m.size)} ${m.duration ? '· ' + esc(m.duration) : ''}</div>
             </div>
         </div>` : '';
-        return `<div class="tg-msg" data-id="${m.id}">
-            <div class="tg-msg-head">
-                <span class="tg-msg-id">#${m.id}</span>
-                <span class="tg-msg-date">${esc(dateStr)}</span>
-                <div class="tg-msg-actions">
-                    ${playBtn}
-                    <button class="msg-act" data-act="edit" title="Editar">✏️</button>
-                    ${replaceBtn}
-                    ${dlBtn}
-                    <button class="msg-act" data-act="forward" title="Reenviar / copiar a otro chat">↗</button>
-                    <button class="msg-act danger" data-act="delete" title="Borrar">🗑</button>
+        const isSel = state.selected.has(m.id);
+        const checkbox = state.selecting
+            ? `<label class="tg-msg-checkbox"><input type="checkbox" class="tg-msg-check" ${isSel ? 'checked' : ''}><span></span></label>`
+            : '';
+        return `<div class="tg-msg${state.selecting ? ' selecting' : ''}${isSel ? ' selected' : ''}" data-id="${m.id}">
+            ${checkbox}
+            <div class="tg-msg-inner">
+                <div class="tg-msg-head">
+                    <span class="tg-msg-id">#${m.id}</span>
+                    <span class="tg-msg-date">${esc(dateStr)}</span>
+                    <div class="tg-msg-actions">
+                        ${playBtn}
+                        ${sendMineBtn}
+                        <button class="msg-act" data-act="edit" title="Editar">✏️</button>
+                        ${replaceBtn}
+                        ${dlBtn}
+                        <button class="msg-act" data-act="forward" title="Reenviar / copiar a otro chat">↗</button>
+                        <button class="msg-act danger" data-act="delete" title="Borrar">🗑</button>
+                    </div>
                 </div>
+                ${mediaLine}
+                ${m.text ? `<div class="tg-msg-text">${esc(m.text)}</div>` : ''}
             </div>
-            ${mediaLine}
-            ${m.text ? `<div class="tg-msg-text">${esc(m.text)}</div>` : ''}
         </div>`;
     }
 
@@ -632,13 +750,14 @@
     async function doForward(toPeer, toTitle) {
         const asCopy = $('#tg-fwd-copy').checked;
         const info = $('#tg-fwd-info');
-        info.textContent = (asCopy ? 'Copiando' : 'Reenviando') + ' a "' + toTitle + '"...';
+        const ids = Array.isArray(_pendingFwdMsgId) ? _pendingFwdMsgId : [_pendingFwdMsgId];
+        info.textContent = (asCopy ? 'Copiando' : 'Reenviando') + ' ' + ids.length + ' mensaje(s) a "' + toTitle + '"...';
         try {
             await api('/api/admin/forward', {
                 method: 'POST',
                 body: JSON.stringify({
                     fromPeer: state.currentPeer,
-                    msgIds: [_pendingFwdMsgId],
+                    msgIds: ids,
                     toPeer, asCopy
                 })
             });
@@ -654,6 +773,160 @@
         if (!el) return;
         if (!s) { el.hidden = true; el.textContent = ''; return; }
         el.hidden = false; el.textContent = s;
+    }
+
+    // ====== SELECCION MULTIPLE Y ENVIO A TV+ ======
+    function toggleSelectMode() {
+        state.selecting = !state.selecting;
+        if (!state.selecting) state.selected = new Set();
+        const btn = document.getElementById('tg-select-toggle');
+        if (btn) {
+            btn.textContent = state.selecting ? '✕ Cancelar' : '✓ Seleccionar';
+            btn.classList.toggle('active', state.selecting);
+        }
+        renderMessages();
+    }
+
+    function toggleMessageSelected(msgId) {
+        if (state.selected.has(msgId)) state.selected.delete(msgId);
+        else state.selected.add(msgId);
+        const el = document.querySelector(`.tg-msg[data-id="${msgId}"]`);
+        if (el) {
+            el.classList.toggle('selected', state.selected.has(msgId));
+            const cb = el.querySelector('.tg-msg-check');
+            if (cb) cb.checked = state.selected.has(msgId);
+        }
+        renderSelectionBar();
+    }
+
+    function renderSelectionBar() {
+        let bar = document.getElementById('tg-sel-bar');
+        const main = $('#tg-personal .tg-main');
+        if (!main) return;
+        const showBar = state.selecting && state.selected.size > 0;
+        if (!showBar) { if (bar) bar.remove(); return; }
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'tg-sel-bar';
+            bar.className = 'tg-sel-bar';
+            main.appendChild(bar);
+        }
+        const ids = Array.from(state.selected).sort((a, b) => a - b);
+        bar.innerHTML = `
+            <div class="tg-sel-count"><b>${ids.length}</b> seleccionado${ids.length === 1 ? '' : 's'}</div>
+            <button class="btn-sm" id="tg-sel-clear">Cancelar</button>
+            <button class="btn-sm primary" id="tg-sel-send">📥 Enviar a TV+</button>
+            <button class="btn-sm" id="tg-sel-fwd">↗ Reenviar a otro chat</button>
+        `;
+        document.getElementById('tg-sel-clear').addEventListener('click', () => { state.selected = new Set(); renderMessages(); });
+        document.getElementById('tg-sel-send').addEventListener('click', () => openSendToMineDialog(ids));
+        document.getElementById('tg-sel-fwd').addEventListener('click', () => onForwardMany(ids));
+    }
+
+    // Reenviar en lote a OTRO chat (reusa el dialogo existente de fwd)
+    async function onForwardMany(ids) {
+        buildForwardDialog();
+        _pendingFwdMsgId = ids; // ahora puede ser array
+        $('#tg-fwd-search').value = '';
+        $('#tg-fwd-info').textContent = `Vas a reenviar ${ids.length} mensaje(s). Elige el chat destino:`;
+        $('#tg-fwd-dialog').hidden = false;
+        renderFwdList();
+    }
+
+    // ====== DIALOGO: enviar al grupo principal de TV+ con selector de tema ======
+    function buildSendMineDialog() {
+        if (document.getElementById('tg-mine-dialog')) return;
+        const html = `
+        <div id="tg-mine-dialog" hidden>
+            <div class="tg-mine-back"></div>
+            <div class="tg-mine-card">
+                <button class="tg-mine-close" type="button">×</button>
+                <h3>📥 Enviar a mi grupo TV+</h3>
+                <div class="tg-mine-sub" id="tg-mine-sub">Cargando temas del grupo destino…</div>
+                <div class="tg-mine-topics" id="tg-mine-topics"></div>
+                <label class="tg-mine-opt"><input type="checkbox" id="tg-mine-anon" checked>
+                    <span>Modo anónimo (no mostrar de qué grupo viene)</span></label>
+                <div class="tg-mine-info" id="tg-mine-info"></div>
+            </div>
+        </div>`;
+        const w = document.createElement('div'); w.innerHTML = html;
+        document.body.appendChild(w.firstElementChild);
+        $('#tg-mine-dialog .tg-mine-close').addEventListener('click', closeSendMineDialog);
+        $('#tg-mine-dialog .tg-mine-back').addEventListener('click', closeSendMineDialog);
+    }
+    function closeSendMineDialog() {
+        const d = document.getElementById('tg-mine-dialog');
+        if (d) d.hidden = true;
+    }
+
+    let _pendingMineIds = [];
+    async function openSendToMineDialog(msgIds) {
+        if (!msgIds || !msgIds.length) return;
+        _pendingMineIds = msgIds.slice();
+        buildSendMineDialog();
+        $('#tg-mine-info').textContent = '';
+        $('#tg-mine-sub').textContent = `Vas a enviar ${msgIds.length} mensaje(s) desde "${state.currentTitle}". Elige el tema destino:`;
+        $('#tg-mine-dialog').hidden = false;
+        // Cargar temas (con cache)
+        if (!state.destTopics) {
+            $('#tg-mine-topics').innerHTML = '<div class="tg-loading">Cargando temas…</div>';
+            try {
+                const r = await api('/api/admin/dest-topics');
+                state.destTopics = r.topics || [];
+                state.destGroupId = String(r.groupId || '');
+            } catch (e) {
+                $('#tg-mine-topics').innerHTML = `<div class="tg-error">Error: ${esc(e.message)}</div>`;
+                return;
+            }
+        }
+        renderMineTopics();
+    }
+
+    function renderMineTopics() {
+        const wrap = $('#tg-mine-topics');
+        const last = state.lastDestTopic[state.currentPeer] || 0;
+        const topics = state.destTopics || [];
+        const items = [{ id: 0, title: 'General (sin tema)' }].concat(topics);
+        wrap.innerHTML = items.map(t => {
+            const sel = (Number(last) === Number(t.id)) ? ' selected' : '';
+            return `<button class="tg-mine-topic${sel}" data-id="${t.id}">${esc(t.title)}</button>`;
+        }).join('');
+        $$('#tg-mine-topics .tg-mine-topic').forEach(b => b.addEventListener('click', () => doSendToMine(Number(b.dataset.id), b.textContent.trim())));
+    }
+
+    async function doSendToMine(topicId, topicTitle) {
+        const info = $('#tg-mine-info');
+        const anon = !!($('#tg-mine-anon') && $('#tg-mine-anon').checked);
+        info.textContent = `Enviando ${_pendingMineIds.length} mensaje(s) a "${topicTitle}"...`;
+        $$('#tg-mine-topics .tg-mine-topic').forEach(b => b.disabled = true);
+        try {
+            await api('/api/admin/forward-to-mine', {
+                method: 'POST',
+                body: JSON.stringify({
+                    fromPeer: state.currentPeer,
+                    msgIds: _pendingMineIds,
+                    topMsgId: topicId || 0,
+                    asCopy: anon
+                })
+            });
+            // Recordar el ultimo tema usado para esta fuente
+            state.lastDestTopic[state.currentPeer] = topicId;
+            saveLastDest();
+            info.innerHTML = `✅ <b>Enviado a TV+</b> (${topicTitle}). El catálogo se refrescará en breve.`;
+            // Si veniamos de modo seleccion, limpiar
+            if (state.selecting) {
+                state.selected = new Set();
+                state.selecting = false;
+                const btn = document.getElementById('tg-select-toggle');
+                if (btn) { btn.textContent = '✓ Seleccionar'; btn.classList.remove('active'); }
+                renderMessages();
+            }
+            setTimeout(closeSendMineDialog, 1100);
+        } catch (e) {
+            info.innerHTML = `❌ Error: ${esc(e.message)}`;
+        } finally {
+            $$('#tg-mine-topics .tg-mine-topic').forEach(b => b.disabled = false);
+        }
     }
 
     // ====== ENGANCHE: boton visible para CUALQUIER usuario logueado ======
@@ -677,6 +950,7 @@
                 const me = await api('/api/me');
                 if (me && me.loggedIn) {
                     state.owner = me;
+                    loadPinned();
                     btn.hidden = false;
                     return;
                 }

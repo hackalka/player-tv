@@ -1616,3 +1616,166 @@ html.tv-mode a:focus {
     padding: 16px; text-align: center;
     color: #888; font-size: 0.85rem; font-style: italic;
 }
+
+
+
+/* ===================================================================
+ * FUENTES TV+: estrella de fijar, sección de fijados, modo selección
+ * múltiple, barra flotante y diálogo de envío al grupo principal.
+ * =================================================================== */
+
+/* --- Botón estrella en cada fila de chat --- */
+.tg-pin {
+    background: transparent; border: 1px solid transparent; color: #555;
+    width: 30px; height: 30px; line-height: 24px; padding: 0;
+    border-radius: 6px; font-size: 1.05rem; cursor: pointer;
+    flex-shrink: 0; transition: all 150ms;
+}
+.tg-pin:hover { color: #f5d24a; border-color: rgba(245, 210, 74, 0.4); background: rgba(245, 210, 74, 0.08); }
+.tg-pin.active { color: #3ee65c; border-color: rgba(62, 230, 92, 0.45); background: rgba(62, 230, 92, 0.12); }
+.tg-item.is-pinned { background: rgba(62, 230, 92, 0.05); }
+.tg-item.is-pinned:hover { background: rgba(62, 230, 92, 0.1); }
+.tg-tag.pinsrc {
+    background: rgba(62, 230, 92, 0.18); color: #3ee65c;
+    padding: 0 5px; border-radius: 3px; font-size: 0.65rem;
+    font-weight: 700; margin-left: 4px;
+}
+
+/* --- Cabecera de sección dentro de la lista de chats --- */
+.tg-list-section {
+    padding: 10px 14px 4px; color: #3ee65c; font-size: 0.7rem;
+    font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(62, 230, 92, 0.07), transparent);
+    border-top: 1px solid rgba(62, 230, 92, 0.15);
+    border-bottom: 1px solid #2a2a2a;
+}
+.tg-list-section + .tg-item { border-top: none; }
+.tg-sources-empty {
+    padding: 24px 18px; line-height: 1.5; font-size: 0.85rem;
+    color: #aaa; text-align: center;
+}
+
+/* --- Botones de la cabecera del chat: ★ Fijar fuente y ✓ Seleccionar --- */
+.tg-head-pin {
+    background: transparent; border: 1px solid #2a2a2a; color: #aaa;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+    transition: all 150ms;
+}
+.tg-head-pin:hover { color: #f5d24a; border-color: rgba(245, 210, 74, 0.5); }
+.tg-head-pin.active { color: #3ee65c; border-color: #3ee65c; background: rgba(62, 230, 92, 0.1); }
+#tg-select-toggle.active {
+    background: rgba(62, 230, 92, 0.15); color: #3ee65c; border-color: #3ee65c;
+}
+
+/* --- Modo selección: checkbox a la izquierda + estado seleccionado --- */
+.tg-msg { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; }
+.tg-msg-inner { flex: 1; min-width: 0; }
+.tg-msg.selecting { cursor: pointer; padding: 4px; border-radius: 8px; transition: background 150ms; }
+.tg-msg.selecting:hover { background: rgba(62, 230, 92, 0.06); }
+.tg-msg.selected { background: rgba(62, 230, 92, 0.12); border: 1px solid rgba(62, 230, 92, 0.4); border-radius: 8px; padding: 4px; }
+.tg-msg-checkbox {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 6px 0 0; cursor: pointer; user-select: none;
+}
+.tg-msg-checkbox input { display: none; }
+.tg-msg-checkbox span {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid #555; background: transparent;
+    display: inline-block; position: relative; transition: all 150ms;
+}
+.tg-msg-checkbox input:checked + span {
+    background: #3ee65c; border-color: #3ee65c;
+}
+.tg-msg-checkbox input:checked + span::after {
+    content: ''; position: absolute; left: 6px; top: 2px;
+    width: 5px; height: 10px; border: solid #0a1a3a;
+    border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+
+/* --- Botón rápido "📥 TV+" en la fila de acciones de cada mensaje --- */
+.msg-act.tv-plus {
+    color: #3ee65c; border-color: rgba(62, 230, 92, 0.4);
+    font-size: 0.95rem; font-weight: 600;
+}
+.msg-act.tv-plus:hover {
+    background: rgba(62, 230, 92, 0.18);
+    border-color: #3ee65c; color: #3ee65c;
+}
+
+/* --- Barra flotante en modo selección --- */
+.tg-sel-bar {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #0a1a3a; border: 1px solid #3ee65c;
+    border-radius: 12px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(62, 230, 92, 0.2);
+    z-index: 10; animation: tgSelBarIn 200ms ease-out;
+}
+@keyframes tgSelBarIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.tg-sel-count { color: #fff; font-size: 0.9rem; padding-right: 8px; border-right: 1px solid #2a3a5a; }
+.tg-sel-count b { color: #3ee65c; font-size: 1.05rem; }
+.tg-sel-bar .btn-sm.primary {
+    background: #3ee65c; color: #0a1a3a; border-color: #3ee65c; font-weight: 700;
+}
+.tg-sel-bar .btn-sm.primary:hover { background: #2cd24a; border-color: #2cd24a; }
+
+/* La sección principal necesita position:relative para alojar la barra */
+#tg-personal .tg-main { position: relative; }
+
+/* --- Diálogo "Enviar a mi grupo TV+" --- */
+#tg-mine-dialog { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; }
+.tg-mine-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(2px); }
+.tg-mine-card {
+    position: relative; background: #1a1a1a; color: #fff;
+    border-radius: 14px; padding: 22px 24px; min-width: 360px; max-width: 92vw; max-height: 86vh; overflow-y: auto;
+    border: 1px solid rgba(62, 230, 92, 0.25);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.tg-mine-card h3 { margin: 0 0 6px; color: #3ee65c; font-size: 1.05rem; }
+.tg-mine-sub { color: #aaa; font-size: 0.85rem; margin-bottom: 14px; }
+.tg-mine-close {
+    position: absolute; right: 10px; top: 8px;
+    background: transparent; border: 0; color: #888;
+    font-size: 1.6rem; cursor: pointer; line-height: 1; padding: 4px 8px;
+}
+.tg-mine-close:hover { color: #fff; }
+.tg-mine-topics { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.tg-mine-topic {
+    background: #232323; border: 1px solid #2a2a2a; color: #ddd;
+    padding: 10px 14px; border-radius: 8px; cursor: pointer;
+    text-align: left; font-size: 0.95rem; transition: all 150ms;
+}
+.tg-mine-topic:hover {
+    background: rgba(62, 230, 92, 0.12); border-color: #3ee65c; color: #fff;
+}
+.tg-mine-topic.selected {
+    border-color: #3ee65c; background: rgba(62, 230, 92, 0.08); color: #3ee65c;
+    font-weight: 600;
+}
+.tg-mine-topic:disabled { opacity: 0.5; cursor: wait; }
+.tg-mine-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; color: #aaa; font-size: 0.85rem; cursor: pointer;
+    user-select: none; border-top: 1px solid #2a2a2a;
+}
+.tg-mine-opt input { width: 16px; height: 16px; accent-color: #3ee65c; }
+.tg-mine-info {
+    margin-top: 10px; padding: 10px 12px; min-height: 1.2em;
+    background: #0e1a14; border: 1px solid #1f3a26;
+    border-radius: 6px; color: #ddd; font-size: 0.85rem;
+}
+.tg-mine-info b { color: #3ee65c; }
+
+/* === Móvil: barra flotante a ancho completo y diálogo más grande === */
+@media (max-width: 600px) {
+    .tg-sel-bar {
+        left: 8px; right: 8px; transform: none; width: auto;
+        flex-wrap: wrap; justify-content: center;
+    }
+    .tg-sel-bar .btn-sm { flex: 1 1 auto; min-width: 80px; }
+    .tg-mine-card { min-width: 0; width: calc(100vw - 24px); padding: 18px; }
+    .tg-head-pin { font-size: 0.75rem; padding: 4px 8px; }
+}
