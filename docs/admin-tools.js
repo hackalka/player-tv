@@ -91,7 +91,7 @@
                 <div class="tg-layout">
                     <aside class="tg-sidebar">
                         <header class="tg-side-head">
-                            <h3>📨 Mi Telegram</h3>
+                            <h3><span class="tg-brand">Telegram</span><span class="tg-brand-plus">TV+</span></h3>
                             <button id="tg-refresh" class="btn-sm" title="Recargar">↻</button>
                         </header>
                         <input id="tg-search" class="tg-search" type="search" placeholder="🔎 Buscar chats...">
@@ -105,8 +105,9 @@
                         <div class="tg-main-body" id="tg-main-body">
                             <div class="tg-welcome">
                                 <div class="tg-welcome-icon">📨</div>
-                                <h2>Tu Telegram personal</h2>
-                                <p>Elige un chat de la izquierda para verlo y gestionarlo.</p>
+                                <h2><span class="tg-brand">Telegram</span><span class="tg-brand-plus">TV+</span></h2>
+                                <p>Tu Telegram completo dentro de la app: cualquier grupo, cualquier tema, cualquier vídeo.</p>
+                                <p class="tg-welcome-hint">Pulsa la <b>⭐ estrella</b> en cualquier chat para fijarlo como <b style="color:#3ee65c">📥 Fuente TV+</b> y reenviar contenido a tu grupo principal con un click.</p>
                             </div>
                         </div>
                         <footer class="tg-compose" id="tg-compose" hidden>
@@ -440,16 +441,83 @@
         const bar = document.createElement('div');
         bar.id = 'tg-topics-bar';
         bar.className = 'tg-topics-bar';
-        const items = state.topics.map(t => `
-            <button class="tg-topic${state.currentTopic === t.id ? ' active' : ''}" data-id="${t.id}" data-title="${esc(t.title)}">
+
+        // Ordenar: el seleccionado primero, despues no leidos, despues por id desc
+        const sorted = state.topics.slice().sort((a, b) => {
+            if (a.id === state.currentTopic) return -1;
+            if (b.id === state.currentTopic) return 1;
+            const aU = a.unread > 0 ? 1 : 0, bU = b.unread > 0 ? 1 : 0;
+            if (aU !== bU) return bU - aU;
+            return Number(b.id) - Number(a.id);
+        });
+
+        // Mostrar los primeros N en horizontal (con scroll), y un boton "Todos" si hay mas
+        const HEAD_LIMIT = 12;
+        const head = sorted.slice(0, HEAD_LIMIT);
+        const headHTML = head.map(t => `
+            <button class="tg-topic${state.currentTopic === t.id ? ' active' : ''}${t.unread ? ' has-unread' : ''}" data-id="${t.id}" data-title="${esc(t.title)}">
                 ${esc(t.title)}${t.unread ? ` <span class="tg-unread">${t.unread > 99 ? '99+' : t.unread}</span>` : ''}
             </button>`).join('');
-        bar.innerHTML = items + (ch.isAdmin ? '<button class="tg-topic new" id="tg-topic-new" title="Nuevo tema">+ Nuevo</button>' : '');
-        const head = $('#tg-main-head');
-        head.parentNode.insertBefore(bar, head.nextSibling);
+        const moreBtn = state.topics.length > HEAD_LIMIT
+            ? `<button class="tg-topic tg-topic-all" id="tg-topics-all" title="Ver todos los temas">📂 Todos (${state.topics.length}) ▾</button>`
+            : `<button class="tg-topic tg-topic-all" id="tg-topics-all" title="Buscar temas" hidden>🔎</button>`;
+        const newBtn = ch.isAdmin ? '<button class="tg-topic new" id="tg-topic-new" title="Nuevo tema">+ Nuevo</button>' : '';
+
+        bar.innerHTML = `
+            <div class="tg-topics-scroll">${headHTML}</div>
+            ${state.topics.length > HEAD_LIMIT ? moreBtn : ''}
+            ${newBtn}
+        `;
+        const headEl = $('#tg-main-head');
+        headEl.parentNode.insertBefore(bar, headEl.nextSibling);
         $$('#tg-topics-bar .tg-topic[data-id]').forEach(b => b.addEventListener('click', () => selectTopic(Number(b.dataset.id), b.dataset.title)));
-        const newBtn = document.getElementById('tg-topic-new');
-        if (newBtn) newBtn.addEventListener('click', onCreateTopic);
+        const newB = document.getElementById('tg-topic-new');
+        if (newB) newB.addEventListener('click', onCreateTopic);
+        const allB = document.getElementById('tg-topics-all');
+        if (allB && !allB.hidden) allB.addEventListener('click', openTopicsDrawer);
+    }
+
+    // Panel desplegable con TODOS los temas + busqueda
+    function openTopicsDrawer() {
+        let drawer = document.getElementById('tg-topics-drawer');
+        if (drawer) { drawer.remove(); return; }
+        drawer = document.createElement('div');
+        drawer.id = 'tg-topics-drawer';
+        drawer.className = 'tg-topics-drawer';
+        drawer.innerHTML = `
+            <div class="tg-topics-drawer-head">
+                <input id="tg-topics-q" class="tg-search" type="search" placeholder="🔎 Buscar tema (${state.topics.length} disponibles)..." autofocus>
+                <button class="btn-sm" id="tg-topics-close">✕</button>
+            </div>
+            <div class="tg-topics-drawer-list" id="tg-topics-drawer-list"></div>
+        `;
+        const bar = document.getElementById('tg-topics-bar');
+        bar.parentNode.insertBefore(drawer, bar.nextSibling);
+        const q = () => ($('#tg-topics-q').value || '').trim().toLowerCase();
+        const renderD = () => {
+            const filtered = state.topics.filter(t => !q() || t.title.toLowerCase().includes(q()));
+            const list = $('#tg-topics-drawer-list');
+            list.innerHTML = filtered.length
+                ? filtered.map(t => `
+                    <button class="tg-topic-row${state.currentTopic === t.id ? ' active' : ''}" data-id="${t.id}" data-title="${esc(t.title)}">
+                        <span class="tg-topic-row-title">${esc(t.title)}</span>
+                        ${t.closed ? '<span class="tg-topic-row-tag">cerrado</span>' : ''}
+                        ${t.pinned ? '<span class="tg-topic-row-tag pin">📌</span>' : ''}
+                        ${t.unread ? `<span class="tg-unread">${t.unread > 99 ? '99+' : t.unread}</span>` : ''}
+                    </button>`).join('')
+                : '<div class="tg-empty">Sin coincidencias.</div>';
+            $$('#tg-topics-drawer-list .tg-topic-row').forEach(b => b.addEventListener('click', () => {
+                selectTopic(Number(b.dataset.id), b.dataset.title);
+                closeTopicsDrawer();
+            }));
+        };
+        renderD();
+        $('#tg-topics-q').addEventListener('input', renderD);
+        $('#tg-topics-close').addEventListener('click', closeTopicsDrawer);
+    }
+    function closeTopicsDrawer() {
+        const d = document.getElementById('tg-topics-drawer');
+        if (d) d.remove();
     }
 
     async function onCreateTopic() {
@@ -464,13 +532,16 @@
     async function selectTopic(topicId, title) {
         state.currentTopic = topicId;
         state.currentTopicTitle = title;
+        state.selecting = false;
+        state.selected = new Set();
+        closeTopicsDrawer();
         renderTopicsBar();
         await loadMessages(true);
     }
 
-    async function loadMessages() {
+    async function loadMessages(reset) {
         const body = $('#tg-main-body');
-        body.innerHTML = '<div class="tg-loading">Cargando mensajes…</div>';
+        if (reset) body.innerHTML = '<div class="tg-loading">Cargando mensajes…</div>';
         try {
             const tparam = state.currentTopic ? '&topic=' + state.currentTopic : '';
             const r = await api(`/api/admin/group/${encodeURIComponent(state.currentPeer)}/messages?limit=80${tparam}`);
@@ -481,17 +552,58 @@
         }
     }
 
+    // Cargar mas mensajes anteriores (los antiguos quedan con id menor)
+    async function loadOlderMessages() {
+        if (!state.messages.length) return;
+        const oldestId = Math.min(...state.messages.map(m => m.id));
+        const btn = document.getElementById('tg-load-older');
+        if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+        try {
+            const tparam = state.currentTopic ? '&topic=' + state.currentTopic : '';
+            const r = await api(`/api/admin/group/${encodeURIComponent(state.currentPeer)}/messages?limit=80&offsetId=${oldestId}${tparam}`);
+            const more = r.messages || [];
+            if (!more.length) {
+                if (btn) { btn.textContent = '✓ No hay mas mensajes anteriores'; btn.disabled = true; setTimeout(() => btn.remove(), 1800); }
+                return;
+            }
+            // Conservar la posicion de scroll relativa al primer mensaje visible
+            const body = $('#tg-main-body');
+            const prevTopMsg = body.querySelector('.tg-msg');
+            const prevOffset = prevTopMsg ? prevTopMsg.getBoundingClientRect().top : 0;
+            // Anadir SIN reemplazar los existentes
+            const existingIds = new Set(state.messages.map(m => m.id));
+            for (const m of more) if (!existingIds.has(m.id)) state.messages.push(m);
+            renderMessages();
+            // Restaurar scroll para que no salte
+            requestAnimationFrame(() => {
+                const newTopMsg = body.querySelector(`.tg-msg[data-id="${prevTopMsg ? prevTopMsg.dataset.id : ''}"]`);
+                if (newTopMsg) {
+                    const newOffset = newTopMsg.getBoundingClientRect().top;
+                    body.scrollTop += (newOffset - prevOffset);
+                }
+            });
+        } catch (e) {
+            if (btn) { btn.textContent = 'Error: ' + e.message; btn.disabled = false; }
+        }
+    }
+
     function renderMessages() {
         const body = $('#tg-main-body');
         if (!state.messages.length) { body.innerHTML = '<div class="tg-empty">Sin mensajes recientes.</div>'; return; }
         const msgs = state.messages.slice().sort((a, b) => a.id - b.id);
-        body.innerHTML = msgs.map(msgHTML).join('');
+        // Indice rapido para preview de respuesta
+        state._msgIndex = {};
+        for (const m of msgs) state._msgIndex[m.id] = m;
+        const loadMoreBtn = `<button class="tg-load-more" id="tg-load-older">↑ Cargar mensajes anteriores</button>`;
+        body.innerHTML = loadMoreBtn + msgs.map(msgHTML).join('');
+        const olderBtn = document.getElementById('tg-load-older');
+        if (olderBtn) olderBtn.addEventListener('click', loadOlderMessages);
         $$('#tg-main-body .tg-msg').forEach(el => {
             const id = Number(el.dataset.id);
             // Modo seleccion: el body completo alterna seleccion (excepto botones)
             if (state.selecting) {
                 el.addEventListener('click', (ev) => {
-                    if (ev.target.closest('.tg-msg-actions') || ev.target.closest('button')) return;
+                    if (ev.target.closest('.tg-msg-actions') || ev.target.closest('button') || ev.target.closest('a')) return;
                     toggleMessageSelected(id);
                 });
             }
@@ -511,6 +623,29 @@
             if (play) play.addEventListener('click', () => onPlay(id));
             const dl = el.querySelector('[data-act="download"]');
             if (dl) dl.addEventListener('click', () => onDownload(id));
+            // Click en la propia tarjeta de media para reproducir/abrir (UX Telegram)
+            const card = el.querySelector('.tg-msg-card');
+            if (card) card.addEventListener('click', (ev) => {
+                if (state.selecting || ev.target.closest('button')) return;
+                const m = state._msgIndex[id];
+                if (m && (m.isVideo || m.isImage)) onPlay(id);
+                else if (m && m.hasMedia) onDownload(id);
+            });
+            // Click en preview de reply: scroll al mensaje original si esta cargado
+            const reply = el.querySelector('.tg-msg-reply');
+            if (reply) reply.addEventListener('click', () => {
+                const rid = Number(reply.dataset.replyId);
+                const target = body.querySelector(`.tg-msg[data-id="${rid}"]`);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.classList.add('tg-msg-flash');
+                    setTimeout(() => target.classList.remove('tg-msg-flash'), 1500);
+                } else {
+                    // Si no esta cargado, sugerir cargar mas
+                    const oBtn = document.getElementById('tg-load-older');
+                    if (oBtn) oBtn.classList.add('attention');
+                }
+            });
         });
         body.scrollTop = body.scrollHeight;
         msgs.filter(m => m.hasMedia && m.hasThumb && !state.thumbs.has(m.id)).forEach(loadThumb);
@@ -523,15 +658,46 @@
         const replaceBtn = (m.isVideo || m.isImage) ? `<button class="msg-act" data-act="replace" title="Reemplazar archivo">🔄</button>` : '';
         const dlBtn = m.hasMedia ? `<button class="msg-act" data-act="download" title="Descargar">⬇</button>` : '';
         const sendMineBtn = `<button class="msg-act tv-plus" data-act="send-mine" title="Enviar a TV+ (mi grupo)">📥</button>`;
-        const mediaIcon = m.isVideo ? '▶' : m.isImage ? '🖼' : '📎';
-        const mediaTitle = m.filename || (m.isVideo ? 'Video' : m.isImage ? 'Imagen' : 'Archivo');
-        const mediaLine = m.hasMedia ? `<div class="tg-msg-media">
-            <div class="tg-msg-thumb" id="thumb-${m.id}">${mediaIcon}</div>
-            <div class="tg-msg-mediainfo">
-                <div>${esc(mediaTitle)}</div>
-                <div class="tg-msg-mediameta">${fmtBytes(m.size)} ${m.duration ? '· ' + esc(m.duration) : ''}</div>
-            </div>
-        </div>` : '';
+
+        // === Render de la media al estilo Telegram ===
+        let mediaHTML = '';
+        if (m.hasMedia) {
+            if (m.isImage || m.isVideo) {
+                // Foto / video: tarjeta grande con thumbnail y overlay de play
+                const playOverlay = m.isVideo
+                    ? `<div class="tg-msg-play"><svg viewBox="0 0 24 24" width="48" height="48"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,0.55)"/><path fill="#fff" d="M9 7l8 5-8 5z"/></svg></div>`
+                    : '';
+                const meta = `${fmtBytes(m.size)}${m.duration ? ' · ' + esc(m.duration) : ''}`;
+                mediaHTML = `<div class="tg-msg-card photo${m.isVideo ? ' video' : ''}" id="card-${m.id}">
+                    <div class="tg-msg-card-img" id="thumb-${m.id}"></div>
+                    ${playOverlay}
+                    <div class="tg-msg-card-meta">${esc(meta)}</div>
+                </div>`;
+            } else {
+                // Documento generico: tarjeta tipo "archivo"
+                const ext = (m.filename || '').split('.').pop().toUpperCase().slice(0, 5) || 'FILE';
+                const title = m.filename || (m.mimeType || 'Archivo');
+                mediaHTML = `<div class="tg-msg-card doc" id="card-${m.id}">
+                    <div class="tg-msg-card-doc-ico"><span>${esc(ext)}</span></div>
+                    <div class="tg-msg-card-doc-info">
+                        <div class="tg-msg-card-doc-name">${esc(title)}</div>
+                        <div class="tg-msg-card-doc-meta">${fmtBytes(m.size)}${m.duration ? ' · ' + esc(m.duration) : ''}</div>
+                    </div>
+                </div>`;
+            }
+        }
+
+        // Preview de respuesta (si responde a otro mensaje)
+        let replyHTML = '';
+        if (m.replyToMsgId) {
+            const rep = state._msgIndex && state._msgIndex[m.replyToMsgId];
+            const repText = rep ? (rep.text ? rep.text.slice(0, 80) : (rep.isVideo ? '▶ Video' : rep.isImage ? '🖼 Foto' : rep.filename || '📎 Archivo')) : `Mensaje #${m.replyToMsgId}`;
+            replyHTML = `<div class="tg-msg-reply" data-reply-id="${m.replyToMsgId}" title="Ir al mensaje original">
+                <div class="tg-msg-reply-bar"></div>
+                <div class="tg-msg-reply-body"><span class="tg-msg-reply-label">↩ Respuesta</span> · ${esc(repText)}</div>
+            </div>`;
+        }
+
         const isSel = state.selected.has(m.id);
         const checkbox = state.selecting
             ? `<label class="tg-msg-checkbox"><input type="checkbox" class="tg-msg-check" ${isSel ? 'checked' : ''}><span></span></label>`
@@ -552,7 +718,8 @@
                         <button class="msg-act danger" data-act="delete" title="Borrar">🗑</button>
                     </div>
                 </div>
-                ${mediaLine}
+                ${replyHTML}
+                ${mediaHTML}
                 ${m.text ? `<div class="tg-msg-text">${esc(m.text)}</div>` : ''}
             </div>
         </div>`;
@@ -937,7 +1104,7 @@
         const btn = document.createElement('button');
         btn.id = 'tg-personal-btn';
         btn.className = 'icon-btn';
-        btn.title = 'Mi Telegram personal';
+        btn.title = 'Telegram TV+';
         btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>';
         btn.hidden = true;
         btn.addEventListener('click', open);

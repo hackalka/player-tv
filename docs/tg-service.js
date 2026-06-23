@@ -891,11 +891,12 @@
         }
 
         // Historial de mensajes de un peer (con tope opcional). Soporta tópicos
-        // del foro pasando topicId (replyTo).
-        async getChatHistory(peer, limit, topicId) {
+        // del foro pasando topicId (replyTo) y paginacion hacia atras con offsetId.
+        async getChatHistory(peer, limit, topicId, offsetId) {
             const entity = await this.resolvePeer(peer);
             const opts = { limit: Number(limit) || 50 };
             if (topicId && Number(topicId) !== 1) opts.replyTo = Number(topicId);
+            if (offsetId && Number(offsetId) > 0) opts.offsetId = Number(offsetId);
             const all = [];
             try {
                 for await (const m of this.client.iterMessages(entity, opts)) {

@@ -439,13 +439,14 @@
                 const r = await requireService(); if (r.err) return r.err;
                 return json({ groups: await r.svc.getMisGrupos() });
             }
-            // Historial de un grupo concreto: /api/admin/group/:peer/messages?topic=...&limit=...
+            // Historial de un grupo concreto: /api/admin/group/:peer/messages?topic=...&limit=...&offsetId=...
             if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'messages') {
                 const r = await requireService(); if (r.err) return r.err;
                 const peer = safeDecode(parts[2]);
                 const limit = Number(u.searchParams.get('limit') || 50);
                 const topic = Number(u.searchParams.get('topic') || 0);
-                return json({ messages: await r.svc.getChatHistory(peer, limit, topic) });
+                const offsetId = Number(u.searchParams.get('offsetId') || 0);
+                return json({ messages: await r.svc.getChatHistory(peer, limit, topic, offsetId) });
             }
             // Enviar texto: { peer, text, replyTo? }
             if (rest === 'admin/send-text' && method === 'POST') {
