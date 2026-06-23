@@ -760,6 +760,8 @@ const Detail = {
         el.playerVideo.hidden = true;
         try { el.playerVideo.pause(); } catch {}
         el.playerVideo.removeAttribute('src'); el.playerVideo.load();
+        // Destruir Artplayer + hls.js si estuvieran montados
+        if (window.ArtBridge) { try { window.ArtBridge.destroy(); } catch {} }
         el.playerIframe.hidden = true; el.playerIframe.src = '';
         el.detailBackdrop.hidden = false;
         el.detailHero.classList.remove('playing');
@@ -1023,13 +1025,13 @@ const Player = {
         }
         // 4) Enlace externo http(s): si parece vídeo directo, intentar dentro; si no, abrir externo
         if (playable.externalUrl) {
-            if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(playable.externalUrl)) {
+            if (/\.(mp4|m4v|webm|ogg|ogv|mov|m3u8)(\?|#|$)/i.test(playable.externalUrl)) {
                 el.detailHero.classList.add('playing'); el.detailBackdrop.hidden = true; el.playerStatus.hidden = true;
                 el.playerIframe.hidden = true; el.playerIframe.src = '';
-                el.playerVideo.hidden = false;
-                el.playerVideo.src = playable.externalUrl;
-                el.playerVideo.onerror = () => this._openExternal(playable.externalUrl, playable);
-                el.playerVideo.play().catch(() => {});
+                // Reusamos _playInside con un playable temporal cuyo streamUrl sea la externalUrl,
+                // asi entra por Artplayer/hls.js si .m3u8 o por <video> nativo si no.
+                const synthetic = Object.assign({}, playable, { streamUrl: playable.externalUrl });
+                this._playInside(synthetic, parent);
                 return;
             }
             this._openExternal(playable.externalUrl, playable);
@@ -1044,16 +1046,37 @@ const Player = {
         el.detailBackdrop.hidden = true;
         el.playerStatus.hidden = true;
         el.playerIframe.hidden = true; el.playerIframe.src = '';
+
+        const url = playable.streamUrl;
+        const resume = (Store.progress[playable.id] || {}).time || 0;
+
+        // Preferir Artplayer (mejor UX, gestos, DPad). Fallback a <video> nativo.
+        if (window.ArtBridge && typeof Artplayer !== 'undefined') {
+            el.playerVideo.hidden = true;
+            const ok = window.ArtBridge.load(url, {
+                title: (parent && parent.title) || playable.title || '',
+                poster: (parent && parent.poster) || playable.poster || '',
+                volume: Store.volume,
+                resume
+            });
+            if (ok) {
+                // Hooks: timeupdate guarda progreso, ended pasa al siguiente,
+                // error abre reproductor externo, volumechange persiste volumen.
+                window.ArtBridge.on('timeupdate', () => this._tickArt());
+                window.ArtBridge.on('ended', () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); });
+                window.ArtBridge.on('error', () => this._openExternal(absUrl(playable.streamUrl), playable));
+                window.ArtBridge.on('volumechange', () => { try { Store.volume = window.ArtBridge.volume; } catch {} });
+                return;
+            }
+        }
+
+        // Fallback: <video> nativo
         el.playerVideo.hidden = false;
         const v = el.playerVideo;
-        v.src = playable.streamUrl;
-        const resume = (Store.progress[playable.id] || {}).time || 0;
+        v.src = url;
         try { v.volume = Store.volume; } catch {}
         v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
-        v.onerror = () => {
-            // Si falla la reproducción interna, ofrecemos reproductor externo con la URL del servidor
-            this._openExternal(absUrl(playable.streamUrl), playable);
-        };
+        v.onerror = () => { this._openExternal(absUrl(playable.streamUrl), playable); };
         v.ontimeupdate = () => this._tick();
         v.onvolumechange = () => { Store.volume = v.volume; };
         v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
@@ -1070,6 +1093,8 @@ const Player = {
     // Abre el video con el reproductor externo del usuario (VLC/AceStream/etc.)
     _openExternal(url, playable) {
         el.detailHero.classList.remove('playing');
+        // Detener Artplayer si estaba activo
+        if (window.ArtBridge && !window.ArtBridge.hidden) { try { window.ArtBridge.destroy(); } catch {} }
         try { el.playerVideo.pause(); } catch {}
         el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src');
         el.playerIframe.hidden = true; el.playerIframe.src = '';
@@ -1119,9 +1144,28 @@ const Player = {
         const now = Date.now();
         if (now - this._lastSave > 5000) { this._lastSave = now; Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration); CloudStore.saveProgress(); }
     },
+    // Igual que _tick pero leyendo el tiempo desde Artplayer (cuando esta activo)
+    _tickArt() {
+        const c = this.current;
+        if (!c || !window.ArtBridge || !window.ArtBridge.duration) return;
+        const now = Date.now();
+        if (now - this._lastSave > 5000) {
+            this._lastSave = now;
+            Store.saveProgress(c.playable, c.parent, window.ArtBridge.currentTime, window.ArtBridge.duration);
+            CloudStore.saveProgress();
+        }
+    },
     flushProgress() {
-        const v = el.playerVideo, c = this.current;
-        if (c && !v.hidden && v.currentTime > 8 && v.duration) Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration);
+        const c = this.current;
+        if (!c) return;
+        // Si Artplayer esta activo, usar su tiempo
+        if (window.ArtBridge && !window.ArtBridge.hidden && window.ArtBridge.duration) {
+            const t = window.ArtBridge.currentTime;
+            if (t > 8) Store.saveProgress(c.playable, c.parent, t, window.ArtBridge.duration);
+            return;
+        }
+        const v = el.playerVideo;
+        if (!v.hidden && v.currentTime > 8 && v.duration) Store.saveProgress(c.playable, c.parent, v.currentTime, v.duration);
     },
 
     embed(url) {
@@ -2169,19 +2213,23 @@ function wireUi() {
     const tSearch = $('#tmdb-search'); if (tSearch) tSearch.onclick = () => AdminPanel.tmdbSearch();
     const tQuery = $('#tmdb-query'); if (tQuery) tQuery.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); AdminPanel.tmdbSearch(); } });
 
-    // Atajos de teclado del reproductor
+    // Atajos de teclado del reproductor (cuando se usa el <video> nativo).
+    // Si Artplayer esta activo, el ya gestiona sus atajos (hotkey: true).
     document.addEventListener('keydown', (e) => {
         if (el.playerModal.hidden) return;
+        // Cinema mode siempre disponible
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (e.key.toLowerCase() === 'c') { e.preventDefault(); el.body.classList.toggle('cinema-mode'); return; }
+        // Si Artplayer esta activo, dejar que sus hotkeys funcionen
+        if (window.ArtBridge && !window.ArtBridge.hidden) return;
         const v = el.playerVideo;
         if (v.hidden) return;
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
         const k = e.key.toLowerCase();
         if (k === ' ' || k === 'k') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); v.currentTime = Math.min((v.currentTime || 0) + 10, v.duration || Infinity); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); v.currentTime = Math.max((v.currentTime || 0) - 10, 0); }
         else if (k === 'f') { e.preventDefault(); if (document.fullscreenElement) document.exitFullscreen(); else v.requestFullscreen && v.requestFullscreen(); }
         else if (k === 'm') { e.preventDefault(); v.muted = !v.muted; }
-        else if (k === 'c') { e.preventDefault(); el.body.classList.toggle('cinema-mode'); }
     });
     window.addEventListener('scroll', () => { el.navbar.classList.toggle('scrolled', window.scrollY > 50); });
     // ocultar Chat hasta que haya admin

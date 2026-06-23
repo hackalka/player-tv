@@ -116,6 +116,7 @@
             </button>
             <div class="detail-hero" id="detail-hero">
                 <video id="player-video" controls playsinline hidden></video>
+                <div id="artplayer-mount" hidden></div>
                 <iframe id="player-iframe" allowfullscreen hidden></iframe>
                 <iframe id="trailer-iframe" class="trailer-iframe" allow="autoplay; encrypted-media" hidden></iframe>
                 <img id="detail-backdrop" class="detail-backdrop" alt="">
@@ -547,6 +548,10 @@
     <script src="script.js"></script>
     <!-- Reproductor avanzado MKV/AVI (FFmpeg.wasm, lazy load) -->
     <script src="mkv-player.js"></script>
+    <!-- Reproductor Artplayer (UI) + hls.js, inspirado en iptvnator (MIT) -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/artplayer@5.3.0/dist/artplayer.js" defer></script>
+    <script src="artplayer-bridge.js" defer></script>
     <!-- Gestor de grupos (admin) -->
     <script src="admin-tools.js"></script>
     <!-- Teclado virtual on-screen (TV-box / mando DPad) -->

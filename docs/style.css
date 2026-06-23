@@ -2000,3 +2000,46 @@ html.tv-mode a:focus {
     .tg-topic-all { padding: 6px 8px; font-size: 0.78rem; }
     .tg-topics-drawer { max-height: 60vh; }
 }
+
+
+
+/* ===================================================================
+ * Artplayer mount: ocupa el mismo sitio que #player-video. Cuando
+ * Artplayer esta activo, #player-video queda hidden.
+ * =================================================================== */
+#artplayer-mount {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    background: #000;
+}
+#artplayer-mount[hidden] { display: none; }
+
+/* Tema verde TV+ para Artplayer (override de algunos colores por defecto) */
+.detail-hero .art-video-player {
+    width: 100% !important;
+    height: 100% !important;
+}
+.detail-hero .art-control-progress .art-progress-played {
+    background-color: #3ee65c !important;
+}
+.detail-hero .art-control-progress .art-progress-indicator {
+    background-color: #3ee65c !important;
+}
+.detail-hero .art-volume-panel .art-volume-loaded {
+    background-color: #3ee65c !important;
+}
+
+/* En el detail-hero el modo "playing" oculta el shade y deja el video a pantalla completa.
+   Aseguramos que tanto #player-video como #artplayer-mount cogen TODO el espacio. */
+.detail-hero #artplayer-mount,
+.detail-hero #player-video,
+.detail-hero #player-iframe {
+    width: 100%; height: 100%;
+    aspect-ratio: 16 / 9;
+}
+.detail-hero.playing #artplayer-mount,
+.detail-hero.playing #player-video,
+.detail-hero.playing #player-iframe {
+    aspect-ratio: auto;
+    min-height: 56vw; max-height: 78vh;
+}
