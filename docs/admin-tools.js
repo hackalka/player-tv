@@ -105,9 +105,7 @@
                         <div class="tg-main-body" id="tg-main-body">
                             <div class="tg-welcome">
                                 <div class="tg-welcome-icon">📨</div>
-                                <h2><span class="tg-brand">Telegram</span><span class="tg-brand-plus">TV+</span></h2>
-                                <p>Tu Telegram completo dentro de la app: cualquier grupo, cualquier tema, cualquier vídeo.</p>
-                                <p class="tg-welcome-hint">Pulsa la <b>⭐ estrella</b> en cualquier chat para fijarlo como <b style="color:#3ee65c">📥 Fuente TV+</b> y reenviar contenido a tu grupo principal con un click.</p>
+                                <p class="tg-welcome-hint">Pulsa la <b>⭐ estrella</b> en cualquier chat para fijarlo como <b style="color:#3ee65c">Fuente TV+</b></p>
                             </div>
                         </div>
                         <footer class="tg-compose" id="tg-compose" hidden>

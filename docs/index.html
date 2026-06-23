@@ -499,6 +499,10 @@
             }
             (async function () {
                 await polyfills();
+                // Guardamos como "plan B" el bundle local si carga aunque el test
+                // de conexion previo falle (p.ej. corte de red puntual). Asi la app
+                // NO se queda bloqueada: la conexion real se intenta al iniciar sesion.
+                var localFallback = null;
                 // 1) UMD clasico (dist/index.js): expondria window.telegram con crypto nativo del navegador
                 for (var u = 0; u < UMD.length; u++) {
                     var src = UMD[u];
@@ -509,6 +513,10 @@
                     }
                     catch (e) { console.warn('[tg-loader] UMD no carga', src, e && e.message); continue; }
                     if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', src); continue; }
+                    // El bundle expone TelegramClient -> lo recordamos como plan B
+                    if (isLocal && !localFallback && window.telegram && window.telegram.TelegramClient) {
+                        localFallback = window.telegram;
+                    }
                     console.log('[tg-loader] UMD importado:', src, '— probando conexion...');
                     if (await connects(window.telegram)) {
                         console.log('[tg-loader] ✅ GramJS FUNCIONA (UMD) via', src);
@@ -523,6 +531,7 @@
                         var tg = await import(url);
                         var lib = pick(tg);
                         if (!lib) { console.warn('[tg-loader] sin exports utiles:', url); continue; }
+                        if (!localFallback) localFallback = lib; // otro plan B
                         console.log('[tg-loader] importado:', url, '— probando conexion...');
                         if (await connects(lib)) {
                             window.telegram = lib;
@@ -534,6 +543,14 @@
                     } catch (e) {
                         console.warn('[tg-loader] FALLO import', url, e && e.message);
                     }
+                }
+                // 3) Plan B: el bundle cargó pero la prueba de conexión no pasó.
+                //    No bloqueamos la app: seguimos con el bundle y dejamos que la
+                //    conexión real se haga al iniciar sesión (el QR/login reintenta).
+                if (localFallback && localFallback.TelegramClient) {
+                    window.telegram = localFallback;
+                    console.warn('[tg-loader] ⚠️ La prueba de conexión previa falló (posible corte de red), pero GramJS cargó bien. Continúo: la conexión se intentará al iniciar sesión.');
+                    return window.__tgResolve(window.telegram);
                 }
                 console.error('[tg-loader] Ningun metodo de GramJS funciono para conectar');
                 window.__tgReject(new Error('No se pudo cargar GramJS'));
