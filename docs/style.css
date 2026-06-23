@@ -1510,48 +1510,59 @@ html.tv-mode a:focus {
 
 
 
-/* ====== FAB de admin (esquina inferior derecha del modal de detalle) ====== */
+/* ====== FAB de admin: ahora FIXED en la pantalla, NO dentro del modal,
+   para que no se solape con el póster de la ficha. Visible solo cuando
+   el modal de detalle está abierto (se inserta dentro del .modal y queda
+   por encima de todo). ======================================================= */
 .admin-fab {
-    position: absolute;
-    right: 18px; bottom: 18px;
-    z-index: 50;
+    position: fixed;
+    right: 22px; bottom: 22px;
+    z-index: 9000;
 }
 .admin-fab-btn {
-    width: 52px; height: 52px; border-radius: 50%;
-    background: rgba(10, 26, 58, 0.92);
-    border: 2px solid #3ee65c; color: #3ee65c;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #3ee65c;
+    border: 2px solid #0a1a3a; color: #0a1a3a;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-    transition: transform 150ms, background 150ms;
+    font-size: 1.4rem; font-weight: 800;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.65), 0 0 0 4px rgba(62, 230, 92, 0.18);
+    transition: transform 150ms, box-shadow 150ms;
 }
 .admin-fab-btn:hover, .admin-fab-btn:focus {
     transform: scale(1.08);
-    background: #3ee65c; color: #0a1a3a;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7), 0 0 0 6px rgba(62, 230, 92, 0.28);
     outline: none;
 }
 .admin-fab-menu {
     position: absolute;
-    right: 0; bottom: 60px;
+    right: 0; bottom: 66px;
     background: rgba(10, 26, 58, 0.97);
     border: 1px solid #2a3d6e;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 6px;
-    min-width: 230px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+    min-width: 250px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(8px);
 }
 .admin-fab-item {
     display: block; width: 100%;
     text-align: left;
     background: transparent; border: none; color: #fff;
-    padding: 10px 14px; border-radius: 4px;
+    padding: 10px 14px; border-radius: 6px;
     cursor: pointer; font: inherit; font-size: 0.92rem;
 }
 .admin-fab-item:hover, .admin-fab-item:focus {
-    background: rgba(62, 230, 92, 0.15);
+    background: rgba(62, 230, 92, 0.18);
     color: #3ee65c;
     outline: none;
+}
+
+/* En móvil bajamos un poco más el FAB para que no choque con la barra
+   inferior del navegador (Safari/Chrome). */
+@media (max-width: 600px) {
+    .admin-fab { right: 14px; bottom: 14px; }
+    .admin-fab-menu { min-width: 220px; right: 0; bottom: 64px; }
 }
 
 /* ====== Selector de carátula TMDB ====== */

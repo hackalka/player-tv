@@ -231,6 +231,8 @@ const el = {
     watchedBtn: $('#watched-btn'),
     coverBtn: $('#cover-btn'),
     coverTmdbBtn: $('#cover-tmdb-btn'),
+    synopsisBtn: $('#synopsis-btn'),
+    synopsisTmdbBtn: $('#synopsis-tmdb-btn'),
     videoLinkBtn: $('#video-link-btn'),
     titleBtn: $('#title-btn'),
     adminFab: $('#admin-fab'),
@@ -241,6 +243,11 @@ const el = {
     coverType: $('#cover-type'),
     coverResults: $('#cover-results'),
     coverSearchGo: $('#cover-search-go'),
+    synopsisTmdbModal: $('#synopsis-tmdb-modal'),
+    synQ: $('#syn-q'),
+    synType: $('#syn-type'),
+    synResults: $('#syn-results'),
+    synSearchGo: $('#syn-search-go'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
@@ -552,8 +559,30 @@ const Detail = {
         if (el.coverTmdbBtn) {
             el.coverTmdbBtn.onclick = () => CoverPicker.open(item);
         }
+        if (el.synopsisBtn) {
+            el.synopsisBtn.onclick = () => {
+                const ov = Store.getOverride(item.id) || {};
+                const cur = ov.desc || item.description || '';
+                const t = prompt('Sinopsis para esta ficha (deja vacío para restaurar la original):', cur);
+                if (t === null) return;
+                Store.setOverride(item.id, { desc: (t || '').trim() });
+                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                Detail.open(item);
+                App.toast && App.toast('✅ Sinopsis actualizada', 1800);
+            };
+        }
+        if (el.synopsisTmdbBtn) {
+            el.synopsisTmdbBtn.onclick = () => SynopsisPicker.open(item);
+        }
         if (el.adminFab) {
             el.adminFab.hidden = !state.isAdmin;
+            // Si es admin, mover el FAB al <body> para que con position:fixed
+            // quede por encima del modal y NO se solape con el póster (antes
+            // estaba dentro de .detail-hero que tiene overflow:hidden y lo
+            // recortaba sobre el póster).
+            if (state.isAdmin && el.adminFab.parentNode !== document.body) {
+                document.body.appendChild(el.adminFab);
+            }
             if (el.adminFabToggle) el.adminFabToggle.onclick = () => {
                 if (el.adminFabMenu) el.adminFabMenu.hidden = !el.adminFabMenu.hidden;
             };
@@ -838,6 +867,9 @@ const Detail = {
         Detail.resetReco();
         el.playerModal.hidden = true;
         el.body.style.overflow = '';
+        // Ocultar FAB de admin y cerrar su menú al salir
+        if (el.adminFab) el.adminFab.hidden = true;
+        if (el.adminFabMenu) el.adminFabMenu.hidden = true;
         this.resetVideo();
         // refrescar filas (continuar viendo / favoritos)
         if (state.currentView !== 'telegram') Netflix.render();
@@ -1640,11 +1672,125 @@ const CoverPicker = {
         if (!posterUrl) { App.toast('Esa ficha no tiene carátula', 2500, true); return; }
         // Guarda como override de cover
         Store.setCover(this.item.id, posterUrl);
-        if (state.isAdmin) CloudStore.saveCovers();
-        App.toast('✅ Carátula actualizada', 1800);
+        // Si tenemos tmdbId, traer también la sinopsis y metadatos
+        if (tmdbId) {
+            try {
+                const dr = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId);
+                const info = dr && dr.details ? dr.details : null;
+                if (info) {
+                    Store.setOverride(this.item.id, {
+                        desc: info.overview || '',
+                        backdrop: info.backdrop || '',
+                        trailer: info.trailerKey || '',
+                        logo: info.logo || '',
+                        rating: info.rating || '',
+                        year: info.year || '',
+                        runtime: info.runtime || '',
+                        tmdbId: info.tmdbId || tmdbId,
+                        tmdbType: info.type || type || ''
+                    });
+                }
+            } catch (e) { /* si falla, ya tenemos al menos el poster */ }
+        }
+        if (state.isAdmin) { CloudStore.saveCovers(); CloudStore.saveOverrides && CloudStore.saveOverrides(); }
+        App.toast('✅ Carátula y sinopsis actualizadas', 2000);
         this.close();
         Detail.open(this.item);
         Netflix.render();
+    }
+};
+
+/* ===== Selector de sinopsis desde TMDB =====
+ * Mismo patrón que CoverPicker pero solo aplica la descripción + metadatos
+ * (no toca la carátula). Útil para fichas en las que el poster es el correcto
+ * pero la sinopsis está vacía o desactualizada.
+ */
+const SynopsisPicker = {
+    open(item) {
+        if (!el.synopsisTmdbModal) return;
+        this.item = item;
+        const ov = Store.getOverride(item.id) || {};
+        // Pre-rellenar el campo de búsqueda con el título actual
+        if (el.synQ) el.synQ.value = ov.title || item.title || '';
+        // Tipo según pista: serie/película
+        if (el.synType) {
+            const isSeries = item.isSeries || (item.episodes && item.episodes.length > 1) || (ov.tmdbType === 'tv');
+            el.synType.value = isSeries ? 'tv' : '';
+        }
+        if (el.synResults) el.synResults.innerHTML = '';
+        el.synopsisTmdbModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        if (!this._wired) {
+            this._wired = true;
+            $$('[data-syn-close]').forEach(b => b.onclick = () => this.close());
+            el.synSearchGo.onclick = () => this.search();
+            el.synQ.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.search(); } });
+        }
+        setTimeout(() => this.search(), 100);
+    },
+    close() {
+        if (!el.synopsisTmdbModal) return;
+        el.synopsisTmdbModal.hidden = true;
+        document.body.style.overflow = '';
+    },
+    async search() {
+        const q = (el.synQ.value || '').trim();
+        if (!q) return;
+        el.synResults.innerHTML = '<div class="cover-loading">Buscando…</div>';
+        try {
+            const type = el.synType.value || '';
+            const url = '/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '');
+            const r = await api(url);
+            const list = r.results || [];
+            if (!list.length) { el.synResults.innerHTML = '<div class="cover-empty">Sin resultados.</div>'; return; }
+            // Renderizamos cada resultado mostrando ya un trozo de sinopsis para que
+            // el admin elija con criterio (no a ciegas como en el cover picker).
+            el.synResults.innerHTML = list.map(c => {
+                const desc = (c.description || c.overview || '').slice(0, 220);
+                return `
+                <div class="cover-card syn-card focusable" tabindex="0" data-id="${c.id}" data-type="${c.type}">
+                    <img src="${escapeHtml(c.poster || placeholderImage(c.id, c.title))}" alt="${escapeHtml(c.title)}" onerror="this.src='${placeholderImage(c.id, c.title)}'">
+                    <div class="cover-card-info">
+                        <div class="cover-card-title">${escapeHtml(c.title)}</div>
+                        <div class="cover-card-sub">${c.year ? c.year + ' · ' : ''}${c.type === 'tv' ? 'Serie' : 'Película'}${c.rating ? ' · ⭐ ' + c.rating : ''}</div>
+                        <div class="syn-card-desc">${desc ? escapeHtml(desc) + (desc.length === 220 ? '…' : '') : '<i style="color:#666">Sin sinopsis disponible</i>'}</div>
+                        <div class="syn-card-actions"><button class="btn btn-play syn-pick-btn">📝 Usar esta sinopsis</button></div>
+                    </div>
+                </div>`;
+            }).join('');
+            $$('#syn-results .syn-card').forEach(card => {
+                const btn = card.querySelector('.syn-pick-btn');
+                if (btn) btn.onclick = () => this.pick(card.dataset.type, card.dataset.id);
+            });
+        } catch (e) {
+            el.synResults.innerHTML = `<div class="cover-error">Error: ${escapeHtml(e.message)}</div>`;
+        }
+    },
+    async pick(type, tmdbId) {
+        if (!this.item || !tmdbId) return;
+        try {
+            const dr = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId);
+            const info = dr && dr.details ? dr.details : null;
+            if (!info || !info.overview) { App.toast('Esa ficha no tiene sinopsis en TMDB', 2500, true); return; }
+            // Solo actualizamos descripción + metadatos asociados; la carátula NO se toca.
+            Store.setOverride(this.item.id, {
+                desc: info.overview,
+                backdrop: info.backdrop || '',
+                trailer: info.trailerKey || '',
+                logo: info.logo || '',
+                rating: info.rating || '',
+                year: info.year || '',
+                runtime: info.runtime || '',
+                tmdbId: info.tmdbId || tmdbId,
+                tmdbType: info.type || type || ''
+            });
+            if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+            App.toast('✅ Sinopsis actualizada', 1800);
+            this.close();
+            Detail.open(this.item);
+        } catch (e) {
+            App.toast('Error: ' + e.message, 3000, true);
+        }
     }
 };
 

@@ -148,6 +148,8 @@
                     </button>
                     <div class="admin-fab-menu" id="admin-fab-menu" hidden>
                         <button class="admin-fab-item focusable" id="title-btn">✏ Cambiar título</button>
+                        <button class="admin-fab-item focusable" id="synopsis-btn">📝 Cambiar sinopsis</button>
+                        <button class="admin-fab-item focusable" id="synopsis-tmdb-btn">🔎 Buscar sinopsis en TMDB</button>
                         <button class="admin-fab-item focusable" id="cover-btn">🖼 Cambiar carátula</button>
                         <button class="admin-fab-item focusable" id="cover-tmdb-btn">🔍 Buscar carátula en TMDB</button>
                         <button class="admin-fab-item focusable" id="video-link-btn">🔗 Cambiar enlace del vídeo</button>
@@ -226,6 +228,27 @@
                 <button class="btn btn-play" id="cover-search-go">Buscar</button>
             </div>
             <div class="cover-results" id="cover-results"></div>
+        </div>
+    </div>
+
+    <!-- Modal: buscar sinopsis en TMDB -->
+    <div class="modal" id="synopsis-tmdb-modal" hidden>
+        <div class="modal-overlay" data-syn-close></div>
+        <div class="modal-content cover-tmdb-card">
+            <button class="modal-close" data-syn-close aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+            <h2 class="modal-title">🔎 Buscar sinopsis en TMDB</h2>
+            <div class="cover-search-row">
+                <input id="syn-q" class="admin-input" type="text" placeholder="Título a buscar...">
+                <select id="syn-type" class="admin-input cover-type-sel">
+                    <option value="">Auto</option>
+                    <option value="movie">Película</option>
+                    <option value="tv">Serie</option>
+                </select>
+                <button class="btn btn-play" id="syn-search-go">Buscar</button>
+            </div>
+            <div class="cover-results syn-results" id="syn-results"></div>
         </div>
     </div>
 
