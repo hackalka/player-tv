@@ -903,6 +903,40 @@ const ExternalPlayers = {
         return url; // iOS / macOS / Windows: el SO enruta el esquema tvgram://
     },
 
+    // Construye el enlace t.me del mensaje de Telegram a partir del streamUrl.
+    // - tgstream/<topic>/<msg>      -> grupo principal (cfg.groupId) => t.me/c/<id>[/<topic>]/<msg>
+    // - tgstreamlink/<canal>/<msg>  -> enlace t.me ya conocido (canal con -100 o @usuario)
+    tmeLink(playable) {
+        if (!playable || !playable.streamUrl) return '';
+        const su = String(playable.streamUrl);
+        let m = su.match(/^tgstream\/(\d+)\/(\d+)/);
+        if (m) {
+            const topic = m[1], msg = m[2];
+            const cfg = window.TVP_CONFIG || {};
+            const gid = String(cfg.groupId || '').replace(/^-100/, '').replace(/^-/, '');
+            if (!gid) return '';
+            return (topic && topic !== '0' && topic !== '1')
+                ? `https://t.me/c/${gid}/${topic}/${msg}`
+                : `https://t.me/c/${gid}/${msg}`;
+        }
+        m = su.match(/^tgstreamlink\/([^/]+)\/(\d+)/);
+        if (m) {
+            const ch = decodeURIComponent(m[1]), msg = m[2];
+            if (/^-100\d+$/.test(ch)) return `https://t.me/c/${ch.replace(/^-100/, '')}/${msg}`;
+            if (/^-?\d+$/.test(ch)) return `https://t.me/c/${ch.replace(/^-/, '')}/${msg}`;
+            return `https://t.me/${ch.replace(/^@/, '')}/${msg}`;
+        }
+        return '';
+    },
+
+    // Enlace para abrir el vídeo de Telegram en TVGram Player:
+    //   tvgram://play?url=<enlace t.me>   (envuelto en intent:// en Android)
+    tvgramPlayHref(playable) {
+        const tme = this.tmeLink(playable);
+        if (!tme) return '';
+        return this.tvgramHref('tvgram://play?url=' + encodeURIComponent(tme));
+    },
+
     // Panel dedicado para un enlace tvgram:// con botón destacado.
     renderTvgram(url, playable) {
         const box = el.playerOptions; if (!box) return;
@@ -940,6 +974,16 @@ const ExternalPlayers = {
         }
 
         const notBrowser = playable.streamUrl && playable.playableInBrowser === false;
+
+        // Botón "Abrir en TVGram Player" para vídeos de Telegram (ideal para AVI/MKV/4K).
+        // TVGram Player se conecta a Telegram y reproduce el archivo nativo, sin
+        // depender del navegador ni del Service Worker.
+        const tvgramPlay = (playable.streamUrl && !playable.tvgramUrl) ? this.tvgramPlayHref(playable) : '';
+        if (tvgramPlay) {
+            const cls = notBrowser ? 'opt-btn primary tvgram focusable' : 'opt-btn tvgram focusable';
+            items.unshift(`<a class="${cls}" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player${notBrowser ? ' (AVI/MKV)' : ''}</a>`);
+        }
+
         const label = playable.tvgramUrl
             ? 'Este enlace se abre en la app TVGram Player:'
             : playable.aceUrl
@@ -968,10 +1012,15 @@ const ExternalPlayers = {
             // con el reproductor del sistema (VLC/MX Player/MPV).
             const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
             const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
-            // BOTON PRINCIPAL: reproducir aqui mismo. Primero intenta nativo
-            // (rapido, sin descargar); si el formato no va, salta al motor
-            // avanzado (FFmpeg.wasm) que convierte sobre la marcha.
-            items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
+            // OPCION RECOMENDADA para AVI/MKV/4K: abrir en TVGram Player (reproduce
+            // el archivo nativo de Telegram, sin convertir ni depender del navegador).
+            const tvgramPlay = playable ? ExternalPlayers.tvgramPlayHref(playable) : '';
+            if (tvgramPlay) {
+                items.push(`<a class="opt-btn primary tvgram focusable" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player (recomendado)</a>`);
+            }
+            // BOTON: reproducir aqui mismo. Primero intenta nativo (rapido, sin
+            // descargar); si el formato no va, salta al motor avanzado (FFmpeg.wasm).
+            items.push(`<button class="opt-btn${tvgramPlay ? '' : ' primary'} focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí (navegador)</button>`);
             // Reproducir con FFmpeg.wasm directamente (por si quiere forzar el avanzado)
             items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
             // Descargar para abrir con el reproductor del sistema.
