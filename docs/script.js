@@ -271,7 +271,6 @@ const el = {
     loadingText: $('#loading-text'),
     loginModal: $('#login-modal'),
     adminPanelBtn: $('#admin-panel-btn'),
-    iptvBtn: $('#iptv-btn'),
     adminPanel: $('#admin-panel'),
     adminStats: $('#admin-stats'),
     adminFilters: $('#admin-filters'),
@@ -2274,115 +2273,6 @@ const TVNav = {
     }
 };
 
-/* ===== IPTV / listas M3U ===== */
-const IPTV = {
-    channels: [], group: 'all', q: '',
-    open() {
-        this.build();
-        document.getElementById('iptv-modal').hidden = false;
-        document.body.style.overflow = 'hidden';
-        if (!this._loaded) this.load();
-    },
-    close() {
-        const m = document.getElementById('iptv-modal');
-        if (m) m.hidden = true;
-        document.body.style.overflow = '';
-    },
-    build() {
-        if (document.getElementById('iptv-modal')) return;
-        const w = document.createElement('div');
-        w.innerHTML = `
-        <div class="modal" id="iptv-modal" hidden>
-            <div class="modal-overlay" data-iptv-close></div>
-            <div class="modal-content iptv-card">
-                <button class="modal-close focusable" data-iptv-close tabindex="0" aria-label="Cerrar">✕</button>
-                <h2 class="modal-title">📡 IPTV / En directo</h2>
-                <input id="iptv-search" class="iptv-search" type="search" placeholder="🔎 Buscar canal...">
-                <div class="iptv-groups" id="iptv-groups"></div>
-                <div class="iptv-list" id="iptv-list"><div class="iptv-msg">Cargando…</div></div>
-            </div>
-        </div>`;
-        document.body.appendChild(w.firstElementChild);
-        $$('#iptv-modal [data-iptv-close]').forEach(b => b.addEventListener('click', () => this.close()));
-        const s = document.getElementById('iptv-search');
-        s.addEventListener('input', () => { this.q = s.value.trim().toLowerCase(); this.renderList(); });
-    },
-    async load() {
-        const list = document.getElementById('iptv-list');
-        list.innerHTML = '<div class="iptv-msg">Cargando listas M3U del tema "IPTV"…</div>';
-        try {
-            const r = await api('/api/iptv');
-            this.channels = r.channels || [];
-            this._loaded = true;
-            if (!this.channels.length) {
-                list.innerHTML = `<div class="iptv-msg">
-                    No se encontraron canales.<br><br>
-                    Sube un archivo <b>.m3u</b> o <b>.m3u8</b> a cualquier tema de tu grupo TV+
-                    (o pega el enlace de la lista) y pulsa recargar.<br>
-                    <small style="color:#777">Mensajes escaneados: ${r.scanned || 0} · archivos m3u: ${r.files || 0} · enlaces: ${r.links || 0}${r.error ? ' · error: ' + escapeHtml(r.error) : ''}</small>
-                    <br><br><button class="btn btn-play focusable" tabindex="0" onclick="IPTV.load()">↻ Recargar</button>
-                </div>`;
-                document.getElementById('iptv-groups').innerHTML = '';
-                return;
-            }
-            this.renderGroups();
-            this.renderList();
-        } catch (e) {
-            list.innerHTML = `<div class="iptv-msg">Error: ${escapeHtml(e.message)}<br><button class="btn btn-play focusable" tabindex="0" onclick="IPTV.load()">↻ Reintentar</button></div>`;
-        }
-    },
-    renderGroups() {
-        const groups = ['all'].concat(Array.from(new Set(this.channels.map(c => c.group || 'Sin grupo'))));
-        const box = document.getElementById('iptv-groups');
-        box.innerHTML = groups.map(g => `<button class="iptv-group focusable${g === this.group ? ' active' : ''}" tabindex="0" data-g="${escapeHtml(g)}">${g === 'all' ? 'Todos' : escapeHtml(g)}</button>`).join('');
-        $$('#iptv-groups .iptv-group').forEach(b => b.addEventListener('click', () => { this.group = b.dataset.g; this.renderGroups(); this.renderList(); }));
-    },
-    renderList() {
-        const box = document.getElementById('iptv-list');
-        let chans = this.channels;
-        if (this.group !== 'all') chans = chans.filter(c => (c.group || 'Sin grupo') === this.group);
-        if (this.q) chans = chans.filter(c => (c.name || '').toLowerCase().includes(this.q));
-        if (!chans.length) { box.innerHTML = '<div class="iptv-msg">Sin canales.</div>'; return; }
-        box.innerHTML = chans.slice(0, 600).map((c, i) => `
-            <div class="iptv-ch focusable" tabindex="0" data-i="${this.channels.indexOf(c)}">
-                <div class="iptv-ch-logo" style="${c.logo ? `background-image:url('${escapeHtml(c.logo)}')` : ''}">${c.logo ? '' : '📺'}</div>
-                <div class="iptv-ch-name">${escapeHtml(c.name || 'Canal')}</div>
-            </div>`).join('') + (chans.length > 600 ? `<div class="iptv-msg">Mostrando 600 de ${chans.length}. Filtra por grupo o busca.</div>` : '');
-        $$('#iptv-list .iptv-ch').forEach(el2 => el2.addEventListener('click', () => this.play(this.channels[Number(el2.dataset.i)])));
-        TVNav.refresh();
-    },
-    play(ch) {
-        if (!ch || !ch.url) return;
-        const u = ch.url;
-        const ext = (u.split('?')[0].match(/\.([a-z0-9]{2,4})$/i) || [])[1] || (/\.m3u8/i.test(u) ? 'm3u8' : '');
-        // En la APK: reproductor nativo (libVLC para .ts/.m3u, ExoPlayer-HLS para .m3u8).
-        if (Player._hasNative && Player._hasNative()) {
-            try {
-                const isVlc = ['ts', 'm3u', 'mkv', 'avi', 'flv'].indexOf((ext || '').toLowerCase()) >= 0;
-                NativeHost.playUrl(u, ch.name || 'Canal', ext ? 'video/' + ext : '', isVlc ? 'vlc' : 'exo');
-                return;
-            } catch (e) {}
-        }
-        // En navegador: abrir la ficha con el canal como enlace externo
-        // (.m3u8 se reproduce con Artplayer/hls; otros formatos -> menú).
-        this.close();
-        try {
-            const synth = {
-                id: 'iptv-' + (ch.url.length) + '-' + (ch.name || '').slice(0, 20),
-                title: ch.name || 'Canal',
-                description: 'Canal en directo (IPTV)',
-                year: '', meta: {}, links: [],
-                externalUrl: u, ext, playableInBrowser: /\.m3u8/i.test(u),
-                thumbUrl: ch.logo || ''
-            };
-            Detail.open(synth);
-        } catch (e) {
-            window.open(u, '_blank');
-        }
-    }
-};
-window.IPTV = IPTV;
-
 /* ===== ARRANQUE ===== */
 // Llamado por la APK Android al pulsar ATRAS: cierra el modal/panel abierto y
 // devuelve true si manejó la accion; si no, la app hara back/salir.
@@ -2406,8 +2296,6 @@ window.TVPlus_onBack = function () {
         }
         const synm = document.getElementById('synopsis-tmdb-modal');
         if (synm && !synm.hidden) { synm.hidden = true; document.body.style.overflow = ''; return true; }
-        const iptvm = document.getElementById('iptv-modal');
-        if (iptvm && !iptvm.hidden) { IPTV.close(); return true; }
         const covm = document.getElementById('cover-tmdb-modal');
         if (covm && !covm.hidden) { covm.hidden = true; document.body.style.overflow = ''; return true; }
         const tp = document.getElementById('tg-personal');
@@ -2554,7 +2442,6 @@ function wireUi() {
 
     // ----- Panel de administración -----
     if (el.adminPanelBtn) el.adminPanelBtn.onclick = () => AdminPanel.open();
-    if (el.iptvBtn) el.iptvBtn.onclick = () => IPTV.open();
     if (el.adminPanel) {
         $$('[data-admin-close]', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.close());
         $$('.admin-tab', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.showTab(b.dataset.tab));
