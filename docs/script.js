@@ -1250,14 +1250,18 @@ const Player = {
         try { return !!(window.NativeHost && NativeHost.isAvailable && NativeHost.isAvailable()); }
         catch (e) { return false; }
     },
-    // Lanza el reproductor nativo ExoPlayer con el vídeo de Telegram.
+    // Lanza el reproductor nativo (ExoPlayer/libVLC) con el vídeo de Telegram.
     _playNative(playable, parent) {
         const ref = this._streamRef(playable);
         if (!ref) return false;
         try {
             const title = (parent && parent.title) || playable.title || '';
-            const mime = playable.mime || (playable.ext ? 'video/' + playable.ext : '');
-            NativeHost.play(ref, title, mime);
+            const ext = (playable.ext || '').toLowerCase();
+            const mime = playable.mime || (ext ? 'video/' + ext : '');
+            // AVI/WMV/FLV/etc -> libVLC; resto -> ExoPlayer (auto-fallback a VLC si falla)
+            const vlcExt = ['avi', 'wmv', 'flv', 'rmvb', 'rm', 'mpg', 'mpeg', 'vob', 'divx', 'ogm', 'asf', '3gp', 'm2ts', 'mts'];
+            const engine = vlcExt.indexOf(ext) >= 0 ? 'vlc' : 'exo';
+            NativeHost.play(ref, title, mime, engine);
             return true;
         } catch (e) { return false; }
     },

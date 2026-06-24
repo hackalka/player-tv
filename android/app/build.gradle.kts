@@ -83,7 +83,10 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.3.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
     implementation("androidx.media3:media3-datasource:1.3.1")
-    // Servidor HTTP local minusculo: hace de puente para que ExoPlayer pida
-    // rangos del video que la WebView (GramJS) descarga de Telegram.
+    // libVLC: reproduce TODO (AVI, WMV, FLV, RMVB, VOB, DivX y codecs raros).
+    // Se usa para formatos que ExoPlayer no decodifica y como fallback.
+    implementation("org.videolan.android:libvlc-all:3.6.0")
+    // Servidor HTTP local minusculo: hace de puente para que ExoPlayer/libVLC
+    // pidan rangos del video que la WebView (GramJS) descarga de Telegram.
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 }

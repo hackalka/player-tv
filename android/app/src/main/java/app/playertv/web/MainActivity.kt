@@ -234,15 +234,17 @@ class MainActivity : AppCompatActivity() {
      * en el reproductor NATIVO ExoPlayer dentro de esta misma app.
      */
     inner class NativeHost {
-        /** ref = JSON {kind,a,b} que identifica el mensaje de Telegram. */
+        /** ref = JSON {kind,a,b} que identifica el mensaje de Telegram.
+         *  engine = "exo" | "vlc" | "" (auto segun formato). */
         @JavascriptInterface
-        fun play(refJson: String, title: String?, mime: String?) {
+        fun play(refJson: String, title: String?, mime: String?, engine: String?) {
             val srv = streamServer ?: return
             val url = srv.prepare(refJson, mime ?: "")
             val it = Intent(this@MainActivity, NativePlayerActivity::class.java)
             it.putExtra(NativePlayerActivity.EXTRA_URL, url)
             it.putExtra(NativePlayerActivity.EXTRA_TITLE, title ?: "")
             it.putExtra(NativePlayerActivity.EXTRA_MIME, mime ?: "")
+            it.putExtra(NativePlayerActivity.EXTRA_ENGINE, engine ?: "")
             runOnUiThread { startActivity(it) }
         }
 
