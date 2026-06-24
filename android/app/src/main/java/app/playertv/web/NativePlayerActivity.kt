@@ -36,7 +36,9 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MIME = "extra_mime"
         const val EXTRA_ENGINE = "extra_engine"
-        private val VLC_EXT = listOf(".avi", ".wmv", ".flv", ".rmvb", ".rm", ".mpg", ".mpeg", ".vob", ".divx", ".ogm", ".asf", ".3gp", ".m2ts", ".mts")
+        // MKV se manda a libVLC porque suele llevar audio AC3/EAC3/DTS que
+        // ExoPlayer NO decodifica (se veria sin sonido). libVLC decodifica todo.
+        private val VLC_EXT = listOf(".mkv", ".avi", ".wmv", ".flv", ".rmvb", ".rm", ".mpg", ".mpeg", ".vob", ".divx", ".ogm", ".asf", ".3gp", ".m2ts", ".mts", ".ts")
     }
 
 

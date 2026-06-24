@@ -1400,7 +1400,8 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
 #tg-player-overlay { position: fixed; inset: 0; z-index: 10001; }
 #tg-player-overlay .tg-pl-back { position: absolute; inset: 0; background: rgba(0,0,0,.85); }
 #tg-player-overlay .tg-pl-card { position: relative; width: 92%; max-width: 1100px; margin: 4vh auto; background: #181818; border-radius: 10px; padding: 16px; }
-#tg-player-overlay .tg-pl-close { position: absolute; top: 8px; right: 12px; background: transparent; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; z-index: 2; }
+#tg-player-overlay .tg-pl-close { position: absolute; top: 8px; right: 12px; background: rgba(0,0,0,.6); border: 2px solid transparent; color: #fff; font-size: 1.4rem; line-height: 1; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; z-index: 5; display: flex; align-items: center; justify-content: center; }
+#tg-player-overlay .tg-pl-close:hover, #tg-player-overlay .tg-pl-close:focus { background: #3ee65c; color: #0a1a3a; border-color: #fff; outline: none; }
 #tg-player-overlay #tg-pl-video { width: 100%; max-height: 75vh; background: #000; border-radius: 6px; }
 #tg-player-overlay .tg-pl-info { color: #aaa; font-size: 0.85rem; padding: 8px 4px 0; display: flex; align-items: center; gap: 10px; }
 

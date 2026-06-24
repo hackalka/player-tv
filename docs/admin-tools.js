@@ -798,7 +798,7 @@
         <div id="tg-player-overlay" hidden>
             <div class="tg-pl-back"></div>
             <div class="tg-pl-card">
-                <button class="tg-pl-close" type="button">×</button>
+                <button class="tg-pl-close focusable" type="button" tabindex="0" title="Cerrar (o pulsa ATRÁS)">✕</button>
                 <video id="tg-pl-video" controls playsinline></video>
                 <div class="tg-pl-info" id="tg-pl-info"></div>
             </div>

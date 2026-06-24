@@ -1240,8 +1240,9 @@ const Player = {
             const title = (parent && parent.title) || playable.title || '';
             const ext = (playable.ext || '').toLowerCase();
             const mime = playable.mime || (ext ? 'video/' + ext : '');
-            // AVI/WMV/FLV/etc -> libVLC; resto -> ExoPlayer (auto-fallback a VLC si falla)
-            const vlcExt = ['avi', 'wmv', 'flv', 'rmvb', 'rm', 'mpg', 'mpeg', 'vob', 'divx', 'ogm', 'asf', '3gp', 'm2ts', 'mts'];
+            // MKV -> libVLC (audio AC3/DTS que ExoPlayer no decodifica); AVI/WMV/etc
+            // tambien libVLC. El resto (mp4/webm/mov) -> ExoPlayer (HW, ligero).
+            const vlcExt = ['mkv', 'avi', 'wmv', 'flv', 'rmvb', 'rm', 'mpg', 'mpeg', 'vob', 'divx', 'ogm', 'asf', '3gp', 'm2ts', 'mts', 'ts'];
             const engine = vlcExt.indexOf(ext) >= 0 ? 'vlc' : 'exo';
             NativeHost.play(ref, title, mime, engine);
             return true;
@@ -2277,19 +2278,39 @@ const TVNav = {
 // devuelve true si manejó la accion; si no, la app hara back/salir.
 window.TVPlus_onBack = function () {
     try {
-        const tp = document.getElementById('tg-personal');
-        if (el.adminEditor && !el.adminEditor.hidden) { AdminPanel.closeEditor(); return true; }
-        if (el.adminPanel && !el.adminPanel.hidden) { AdminPanel.close(); return true; }
-        if (tp && !tp.hidden) { const b = tp.querySelector('[data-tg-close]'); if (b) { b.click(); return true; } }
+        // 1) Overlays del panel "Mi Telegram" (reproductor inline, diálogos)
+        //    — primero los de encima. Cerramos pulsando su botón cerrar.
+        const overlays = [
+            ['tg-player-overlay', '.tg-pl-close'],
+            ['tg-mine-dialog', '.tg-mine-close'],
+            ['tg-fwd-dialog', '.tg-fwd-close'],
+            ['tg-topics-drawer', '#tg-topics-close']
+        ];
+        for (const [id, sel] of overlays) {
+            const o = document.getElementById(id);
+            if (o && !o.hidden && o.offsetParent !== null) {
+                const b = o.querySelector(sel);
+                if (b) { b.click(); return true; }
+                o.hidden = true; return true;
+            }
+        }
         const synm = document.getElementById('synopsis-tmdb-modal');
         if (synm && !synm.hidden) { synm.hidden = true; document.body.style.overflow = ''; return true; }
         const covm = document.getElementById('cover-tmdb-modal');
         if (covm && !covm.hidden) { covm.hidden = true; document.body.style.overflow = ''; return true; }
+        const tp = document.getElementById('tg-personal');
+        if (el.adminEditor && !el.adminEditor.hidden) { AdminPanel.closeEditor(); return true; }
+        if (el.adminPanel && !el.adminPanel.hidden) { AdminPanel.close(); return true; }
+        if (tp && !tp.hidden) { const b = tp.querySelector('[data-tg-close]'); if (b) { b.click(); return true; } }
         if (el.searchOverlay && !el.searchOverlay.hidden) { App.closeSearch(); return true; }
         if (el.playerModal && !el.playerModal.hidden) { Detail.close(); return true; }
     } catch (e) {}
     return false;
 };
+// ESC tambien cierra el overlay/modal de encima (teclado / navegador)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (window.TVPlus_onBack()) { e.preventDefault(); e.stopPropagation(); } }
+}, { capture: true });
 
 async function boot() {
     try {
