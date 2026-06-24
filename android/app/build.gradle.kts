@@ -15,13 +15,16 @@ android {
         versionName = "1.0.0"
     }
 
-    // Nombre del APK al compilar: "TvPlayerPlus-<version>-<debug|release>.apk"
-    // (sin espacios para evitar problemas con rutas en Windows/Linux/Mac).
+    // Nombre del APK al compilar: "TvPlayerPlus-<version>-<abi>-<debug|release>.apk"
+    // Incluimos el ABI porque con los splits se generan varios APK y no deben
+    // colisionar de nombre (sin espacios para evitar problemas de rutas).
     applicationVariants.all {
         val variant = this
         outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "TvPlayerPlus-${variant.versionName}-${variant.buildType.name}.apk"
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
+            output.outputFileName =
+                "TvPlayerPlus-${variant.versionName}-${abi}-${variant.buildType.name}.apk"
         }
     }
 
@@ -38,6 +41,25 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { viewBinding = true }
+
+    // ============================================================
+    //  SPLITS POR ABI: con libVLC el APK engorda (~30-40 MB por
+    //  arquitectura). En vez de un unico APK gigante con TODAS las
+    //  arquitecturas, generamos un APK por ABI (mas un APK universal
+    //  por si quieres uno que funcione en todo).
+    //  - arm64-v8a    -> moviles/TV modernos (el mas comun)
+    //  - armeabi-v7a  -> moviles/TV antiguos
+    //  - x86 / x86_64 -> emuladores y algun TV-box Intel
+    //  Cada usuario instala SOLO el de su arquitectura (menos MB).
+    // ============================================================
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true   // genera ademas un APK que vale para todo
+        }
+    }
 }
 
 // ============================================================
