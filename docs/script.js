@@ -2316,9 +2316,10 @@ const IPTV = {
             this._loaded = true;
             if (!this.channels.length) {
                 list.innerHTML = `<div class="iptv-msg">
-                    ${r.hasTopic ? 'El tema IPTV no tiene listas válidas todavía.' : 'No hay ningún tema de IPTV.'}<br><br>
-                    Crea un tema llamado <b>IPTV</b> (o "M3U", "Directo", "Canales") en tu grupo TV+ y
-                    <b>sube un archivo .m3u/.m3u8</b> o <b>pega el enlace</b> de tu lista. Luego pulsa recargar.
+                    No se encontraron canales.<br><br>
+                    Sube un archivo <b>.m3u</b> o <b>.m3u8</b> a cualquier tema de tu grupo TV+
+                    (o pega el enlace de la lista) y pulsa recargar.<br>
+                    <small style="color:#777">Mensajes escaneados: ${r.scanned || 0} · archivos m3u: ${r.files || 0} · enlaces: ${r.links || 0}${r.error ? ' · error: ' + escapeHtml(r.error) : ''}</small>
                     <br><br><button class="btn btn-play focusable" tabindex="0" onclick="IPTV.load()">↻ Recargar</button>
                 </div>`;
                 document.getElementById('iptv-groups').innerHTML = '';
