@@ -487,6 +487,12 @@
                 try { topics = await r.svc.getGroupTopics(cfg.groupId); } catch (e) { console.warn('[api] dest-topics:', e.message); }
                 return json({ groupId: cfg.groupId, topics });
             }
+            // IPTV: canales de las listas M3U publicadas en el tema "IPTV"
+            if (rest === 'iptv') {
+                const r = await requireService(); if (r.err) return r.err;
+                try { return json(await r.svc.getIptv()); }
+                catch (e) { return json({ channels: [], hasTopic: false, error: e.message }); }
+            }
             // Lista de topicos de un grupo foro: /api/admin/group/:peer/topics
             if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'topics') {
                 const r = await requireService(); if (r.err) return r.err;

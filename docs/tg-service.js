@@ -371,6 +371,83 @@
             return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
         }
 
+        // ---------- IPTV / listas M3U ----------
+        _bufToText(buf) {
+            try {
+                if (typeof buf === 'string') return buf;
+                if (buf && buf.buffer) return new TextDecoder('utf-8').decode(buf);
+                if (buf instanceof ArrayBuffer) return new TextDecoder('utf-8').decode(new Uint8Array(buf));
+                return String(buf);
+            } catch (e) { return ''; }
+        }
+        // Parsea texto M3U/M3U8 -> lista de canales {name, logo, group, url}
+        _parseM3U(text) {
+            const out = [];
+            const lines = String(text || '').split(/\r?\n/);
+            let cur = null;
+            for (const raw of lines) {
+                const line = raw.trim();
+                if (!line) continue;
+                if (/^#EXTINF/i.test(line)) {
+                    const name = (line.split(',').slice(1).join(',') || '').trim();
+                    const logo = (line.match(/tvg-logo="([^"]*)"/i) || [])[1] || '';
+                    const group = (line.match(/group-title="([^"]*)"/i) || [])[1] || '';
+                    cur = { name: name || 'Canal', logo, group: group || 'Sin grupo' };
+                } else if (line[0] !== '#') {
+                    if (cur) { cur.url = line; out.push(cur); cur = null; }
+                    else out.push({ name: decodeURIComponent(line.split('/').pop() || 'Canal'), url: line, logo: '', group: 'Sin grupo' });
+                }
+            }
+            return out;
+        }
+        // Recoge canales IPTV: busca temas con nombre tipo "IPTV/M3U/Directo" y
+        // dentro lee archivos .m3u/.m3u8 (los baja de Telegram) y enlaces .m3u.
+        async getIptv() {
+            const rx = /iptv|m3u|directo|en\s*vivo|canal(es)?|tv\s*en\s*vivo/i;
+            let topics = [];
+            try { topics = await this.getGroupTopics(this.cfg.groupId); } catch (e) {}
+            const target = topics.filter(t => rx.test(t.title || ''));
+            const channels = [];
+            const seen = new Set();
+            const add = (ch) => { if (ch && ch.url && !seen.has(ch.url)) { seen.add(ch.url); channels.push(ch); } };
+            const scan = async (tid) => {
+                let msgs = [];
+                try { msgs = await this.getTopicMessages(tid, 400); } catch (e) { return; }
+                for (const m of msgs) {
+                    const doc = m.media && m.media.document;
+                    let fn = '';
+                    if (doc) { const a = (doc.attributes || []).find(x => x.className === 'DocumentAttributeFilename'); fn = (a && a.fileName) || ''; }
+                    // 1) Archivo .m3u/.m3u8 adjunto -> descargar y parsear
+                    if (doc && /\.m3u8?$/i.test(fn)) {
+                        try { const buf = await this.client.downloadMedia(m, {}); this._parseM3U(this._bufToText(buf)).forEach(add); } catch (e) {}
+                        continue;
+                    }
+                    // 2) Enlaces .m3u/.m3u8 en el texto -> intentar descargar (puede fallar por CORS)
+                    const text = m.message || '';
+                    const urls = text.match(/https?:\/\/\S+/g) || [];
+                    for (const u of urls) {
+                        if (/\.m3u8?(\?|#|$)/i.test(u)) {
+                            let parsed = false;
+                            try {
+                                if (typeof fetch === 'function') {
+                                    const r = await fetch(u);
+                                    if (r.ok) { const txt = await r.text(); const list = this._parseM3U(txt); if (list.length) { list.forEach(add); parsed = true; } }
+                                }
+                            } catch (e) {}
+                            // Si no se pudo leer (CORS) o es un stream HLS suelto, lo dejamos como 1 canal
+                            if (!parsed) {
+                                const nameLine = (text.split('\n').map(s => s.trim()).find(s => s && !/^https?:/i.test(s))) || (u.split('/').pop());
+                                add({ name: nameLine, url: u, logo: '', group: 'Directo' });
+                            }
+                        }
+                    }
+                }
+            };
+            if (target.length) { for (const t of target) await scan(t.id); }
+            return { channels, hasTopic: target.length > 0, topicNames: target.map(t => t.title) };
+        }
+
+
         // Catalogo. Si pasas {limit: N} solo trae N mensajes por tema (carga rapida).
         // Si no, usa cfg.messagesPerTopic completo (carga total).
         async getCatalog(opts) {

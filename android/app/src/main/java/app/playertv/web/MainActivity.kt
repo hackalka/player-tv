@@ -255,6 +255,19 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { startActivity(it) }
         }
 
+        /** Reproduce una URL PUBLICA directa (IPTV/M3U8/MP4...) en el reproductor
+         *  nativo, sin puente (estas URLs no son de Telegram). */
+        @JavascriptInterface
+        fun playUrl(url: String, title: String?, mime: String?, engine: String?) {
+            if (url.isBlank()) return
+            val it = Intent(this@MainActivity, NativePlayerActivity::class.java)
+            it.putExtra(NativePlayerActivity.EXTRA_URL, url)
+            it.putExtra(NativePlayerActivity.EXTRA_TITLE, title ?: "")
+            it.putExtra(NativePlayerActivity.EXTRA_MIME, mime ?: "")
+            it.putExtra(NativePlayerActivity.EXTRA_ENGINE, engine ?: "")
+            runOnUiThread { startActivity(it) }
+        }
+
         /** La web comprueba si el reproductor nativo esta disponible. */
         @JavascriptInterface
         fun isAvailable(): Boolean = streamServer != null
