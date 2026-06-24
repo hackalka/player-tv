@@ -400,62 +400,68 @@
             }
             return out;
         }
-        // Recoge canales IPTV: escanea los mensajes recientes del grupo (en
-        // cualquier tema) y lee archivos .m3u/.m3u8 adjuntos (los baja de
-        // Telegram) y enlaces .m3u. NO depende del nombre del tema.
-        async getIptv() {
-            const channels = [];
-            const seen = new Set();
-            let files = 0, links = 0;
-            const add = (ch) => { if (ch && ch.url && !seen.has(ch.url)) { seen.add(ch.url); channels.push(ch); } };
-
+        // Escanea una tanda de mensajes buscando archivos .m3u/.m3u8 y enlaces.
+        async _scanMsgsForM3U(msgs, add, counts) {
             const isM3uName = (fn) => /\.m3u8?$/i.test(fn || '');
             const isM3uMime = (mime) => /mpegurl|x-mpegurl|vnd\.apple\.mpegurl/i.test(mime || '');
-
-            let msgs = [];
-            try { msgs = await this.getTopicMessages(0, 800); } catch (e) { console.warn('[iptv] getTopicMessages:', e && e.message); }
-            console.log('[iptv] mensajes escaneados:', msgs.length);
-
             for (const m of msgs) {
-                // Documento adjunto (GramJS: m.document o m.media.document)
                 const doc = (m && m.document) || (m && m.media && m.media.document);
                 if (doc) {
                     let fn = '';
-                    try {
-                        const a = (doc.attributes || []).find(x => x && (x.fileName || x.className === 'DocumentAttributeFilename'));
-                        fn = (a && a.fileName) || '';
-                    } catch (e) {}
+                    try { const a = (doc.attributes || []).find(x => x && (x.fileName || x.className === 'DocumentAttributeFilename')); fn = (a && a.fileName) || ''; } catch (e) {}
                     if (isM3uName(fn) || isM3uMime(doc.mimeType)) {
                         try {
                             const buf = await this.client.downloadMedia(m, {});
                             const list = this._parseM3U(this._bufToText(buf));
                             console.log('[iptv] archivo', fn || doc.mimeType, '->', list.length, 'canales');
-                            list.forEach(add); files++;
+                            list.forEach(add); counts.files++;
                         } catch (e) { console.warn('[iptv] download m3u fallo:', e && e.message); }
                         continue;
                     }
                 }
-                // Enlaces .m3u/.m3u8 en el texto
                 const text = (m && (m.message || m.text)) || '';
                 const urls = text.match(/https?:\/\/\S+/g) || [];
                 for (const u of urls) {
                     if (!/\.m3u8?(\?|#|$)/i.test(u)) continue;
-                    links++;
+                    counts.links++;
                     let parsed = false;
-                    try {
-                        if (typeof fetch === 'function') {
-                            const r = await fetch(u);
-                            if (r.ok) { const list = this._parseM3U(await r.text()); if (list.length) { list.forEach(add); parsed = true; } }
-                        }
-                    } catch (e) {}
+                    try { if (typeof fetch === 'function') { const r = await fetch(u); if (r.ok) { const list = this._parseM3U(await r.text()); if (list.length) { list.forEach(add); parsed = true; } } } } catch (e) {}
                     if (!parsed) {
                         const nameLine = (text.split('\n').map(s => s.trim()).find(s => s && !/^https?:/i.test(s))) || u.split('/').pop();
                         add({ name: nameLine, url: u, logo: '', group: 'Directo' });
                     }
                 }
             }
-            console.log('[iptv] total canales:', channels.length, '(archivos:', files, 'enlaces:', links, ')');
-            return { channels, hasTopic: (files + links) > 0, scanned: msgs.length, files, links };
+        }
+
+        // Recoge canales IPTV: escanea TODOS los temas del foro (donde puede estar
+        // el .m3u, p.ej. un tema con tag playertv:auto) + el chat general.
+        async getIptv() {
+            const channels = [];
+            const seen = new Set();
+            const counts = { files: 0, links: 0 };
+            let scanned = 0;
+            const add = (ch) => { if (ch && ch.url && !seen.has(ch.url)) { seen.add(ch.url); channels.push(ch); } };
+
+            // 1) Todos los temas del foro (si es foro)
+            let topics = [];
+            try { topics = await this.getForumTopics(); } catch (e) { console.warn('[iptv] getForumTopics:', e && e.message); }
+            console.log('[iptv] temas encontrados:', topics.length);
+            for (const t of topics.slice(0, 80)) {
+                let msgs = [];
+                try { msgs = await this.getTopicMessages(t.id, 200); } catch (e) { continue; }
+                scanned += msgs.length;
+                await this._scanMsgsForM3U(msgs, add, counts);
+            }
+            // 2) Chat general / grupos sin temas
+            try {
+                const g = await this.getTopicMessages(0, 400);
+                scanned += g.length;
+                await this._scanMsgsForM3U(g, add, counts);
+            } catch (e) { console.warn('[iptv] scan general:', e && e.message); }
+
+            console.log('[iptv] total canales:', channels.length, '(archivos:', counts.files, 'enlaces:', counts.links, 'mensajes:', scanned, ')');
+            return { channels, hasTopic: (counts.files + counts.links) > 0, scanned, files: counts.files, links: counts.links };
         }
 
 
