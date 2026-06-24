@@ -255,5 +255,24 @@ class MainActivity : AppCompatActivity() {
         /** Puerto del servidor local al que la web sube los bytes (meta/feed). */
         @JavascriptInterface
         fun serverPort(): Int = streamServer?.listeningPort ?: 0
+
+        /**
+         * "Abrir con...": muestra el selector del sistema para que el usuario
+         * elija CON QUE app abrir el video (VLC, MX Player, etc.). Usa la URL del
+         * servidor local (127.0.0.1) que esas apps SI pueden leer.
+         */
+        @JavascriptInterface
+        fun openWith(refJson: String, title: String?, mime: String?) {
+            val srv = streamServer ?: return
+            val url = srv.prepare(refJson, mime ?: "")
+            runOnUiThread {
+                try {
+                    val view = Intent(Intent.ACTION_VIEW)
+                    view.setDataAndType(Uri.parse(url), if (mime.isNullOrBlank()) "video/*" else mime)
+                    view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    startActivity(Intent.createChooser(view, "Abrir con"))
+                } catch (e: Exception) { /* ignore */ }
+            }
+        }
     }
 }

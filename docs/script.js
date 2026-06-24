@@ -954,41 +954,36 @@ const ExternalPlayers = {
         const box = el.playerOptions;
         box.innerHTML = '';
         if (!playable) { box.hidden = true; return; }
-        const stream = playable.streamUrl ? absUrl(playable.streamUrl) : '';
         const items = [];
+        let label = 'Otros reproductores:';
 
-        if (playable.tvgramUrl) {
-            const href = this.tvgramHref(playable.tvgramUrl);
-            items.push(`<a class="opt-btn primary tvgram focusable" tabindex="0" href="${escapeHtml(href)}">📺 Abrir en TVGram Player</a>`);
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.tvgramUrl)}">📺 Abrir (esquema directo)</a>`);
-        }
         if (playable.aceUrl) {
+            // AceStream: reproductor dedicado.
             items.push(`<a class="opt-btn ace focusable" tabindex="0" href="${escapeHtml(playable.aceUrl)}">▶ AceStream</a>`);
             const id = (playable.aceUrl.match(/[0-9a-fA-F]{40}/) || [''])[0];
             if (id) items.push(`<a class="opt-btn focusable" tabindex="0" href="intent:#Intent;scheme=acestream;package=org.acestream.media;S.content_id=${id};end">AceStream (Android)</a>`);
-        }
-        if (stream) {
-            items.push(`<a class="opt-btn focusable" tabindex="0" href="vlc://${escapeHtml(stream)}">Abrir en VLC</a>`);
-        } else if (playable.externalUrl) {
+            label = 'Enlace AceStream: ábrelo con tu reproductor.';
+        } else if (playable.tvgramUrl) {
+            // Enlace tvgram:// explícito (lo puso un admin): abrir en TVGram Player.
+            items.push(`<a class="opt-btn primary tvgram focusable" tabindex="0" href="${escapeHtml(this.tvgramHref(playable.tvgramUrl))}">📺 Abrir en TVGram Player</a>`);
+            label = 'Este enlace se abre en la app TVGram Player:';
+        } else if (playable.streamUrl && playable.playableInBrowser === false) {
+            // Vídeo de Telegram que el navegador no puede decodificar (MKV/AVI/4K).
+            const hasNative = Player._hasNative() && Player._streamRef(playable);
+            if (hasNative) {
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">▶ Reproducir</button>`);
+                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._openWithNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">📂 Abrir con...</button>`);
+                label = `Formato ${(playable.ext || '').toUpperCase()} — reprodúcelo en la app o elige otro reproductor:`;
+            } else {
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
+                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado</button>`);
+                const dl = absUrl(playable.streamUrl) + (absUrl(playable.streamUrl).indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+                items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download>⬇ Descargar</a>`);
+                label = `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Elige cómo verlo:`;
+            }
+        } else if (!playable.streamUrl && playable.externalUrl) {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
         }
-
-        const notBrowser = playable.streamUrl && playable.playableInBrowser === false;
-
-        // Botón "Abrir en TVGram Player" para vídeos de Telegram (ideal para AVI/MKV/4K).
-        // TVGram Player se conecta a Telegram y reproduce el archivo nativo, sin
-        // depender del navegador ni del Service Worker.
-        const tvgramPlay = (playable.streamUrl && !playable.tvgramUrl) ? this.tvgramPlayHref(playable) : '';
-        if (tvgramPlay) {
-            const cls = notBrowser ? 'opt-btn primary tvgram focusable' : 'opt-btn tvgram focusable';
-            items.unshift(`<a class="${cls}" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player${notBrowser ? ' (AVI/MKV)' : ''}</a>`);
-        }
-
-        const label = playable.tvgramUrl
-            ? 'Este enlace se abre en la app TVGram Player:'
-            : playable.aceUrl
-                ? 'Enlace AceStream: ábrelo con tu reproductor.'
-                : (notBrowser ? `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Ábrelo con un reproductor externo:` : 'Otros reproductores:');
 
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
@@ -1012,33 +1007,20 @@ const ExternalPlayers = {
             // con el reproductor del sistema (VLC/MX Player/MPV).
             const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
             const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
-            // OPCION RECOMENDADA para AVI/MKV/4K: abrir en TVGram Player (reproduce
-            // el archivo nativo de Telegram, sin convertir ni depender del navegador).
-            const tvgramPlay = playable ? ExternalPlayers.tvgramPlayHref(playable) : '';
-            // Reproductor NATIVO de la APK (ExoPlayer) — máxima prioridad si existe
+            // Reproductor NATIVO de la APK (ExoPlayer/libVLC) — máxima prioridad.
             const hasNative = Player._hasNative() && Player._streamRef(playable);
             if (hasNative) {
-                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">📺 Reproducir nativo (ExoPlayer)</button>`);
+                // Reproducir dentro de la app con el motor nativo (MKV/AVI/4K).
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">▶ Reproducir</button>`);
+                // "Abrir con...": selector del sistema para elegir OTRO reproductor.
+                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._openWithNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">📂 Abrir con...</button>`);
+            } else {
+                // Navegador (sin APK nativa): intentar reproducir aquí o motor avanzado.
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
+                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
             }
-            if (tvgramPlay) {
-                items.push(`<a class="opt-btn${hasNative ? '' : ' primary'} tvgram focusable" tabindex="0" href="${escapeHtml(tvgramPlay)}">📺 Abrir en TVGram Player${hasNative ? '' : ' (recomendado)'}</a>`);
-            }
-            // BOTON: reproducir aqui mismo. Primero intenta nativo (rapido, sin
-            // descargar); si el formato no va, salta al motor avanzado (FFmpeg.wasm).
-            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí (navegador)</button>`);
-            // Reproducir con FFmpeg.wasm directamente (por si quiere forzar el avanzado)
-            items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
-            // Descargar para abrir con el reproductor del sistema.
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar (${playable && playable.sizeStr ? escapeHtml(playable.sizeStr) : 'abrir con VLC/MX'})</a>`);
-            // Compartir con app del sistema (móvil): tras descargar, mostramos el menú nativo
-            if (navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x')] })) {
-                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="ExternalPlayers.shareDownloaded(${JSON.stringify(dl)},${JSON.stringify(fn)})">📤 Compartir con otra app</button>`);
-            }
-            // Apps externas (Android/iOS/desktop) — funcionan mejor tras descargar
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="vlc://${escapeHtml(url)}">▶ VLC (PC)</a>`);
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="intent:${escapeHtml(url)}#Intent;type=video/*;action=android.intent.action.VIEW;end" title="Abre el selector de apps de Android">▶ MX Player / Android</a>`);
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="infuse://${encodeURIComponent(url)}">▶ Infuse (iOS/macOS)</a>`);
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="nplayer-${escapeHtml(url)}">▶ nPlayer (iOS)</a>`);
+            // Descargar siempre disponible.
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar</a>`);
         }
         const label = isAce
             ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
@@ -1262,6 +1244,19 @@ const Player = {
             const vlcExt = ['avi', 'wmv', 'flv', 'rmvb', 'rm', 'mpg', 'mpeg', 'vob', 'divx', 'ogm', 'asf', '3gp', 'm2ts', 'mts'];
             const engine = vlcExt.indexOf(ext) >= 0 ? 'vlc' : 'exo';
             NativeHost.play(ref, title, mime, engine);
+            return true;
+        } catch (e) { return false; }
+    },
+
+    // "Abrir con..." nativo: selector del sistema para elegir reproductor.
+    _openWithNative(playable, parent) {
+        const ref = this._streamRef(playable);
+        if (!ref) return false;
+        try {
+            const title = (parent && parent.title) || playable.title || '';
+            const ext = (playable.ext || '').toLowerCase();
+            const mime = playable.mime || (ext ? 'video/' + ext : 'video/*');
+            NativeHost.openWith(ref, title, mime);
             return true;
         } catch (e) { return false; }
     },

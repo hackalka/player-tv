@@ -1,11 +1,18 @@
 package app.playertv.web
 
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -19,18 +26,8 @@ import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
- * Reproductor NATIVO a pantalla completa con DOS motores:
- *
- *  - ExoPlayer (media3): ligero, aceleracion hardware. MKV/MP4/WebM/TS/MOV.
- *  - libVLC: reproduce TODO (AVI, WMV, FLV, RMVB, VOB, DivX, codecs raros).
- *
- * Estrategia:
- *  - Se elige el motor por el formato (EXTRA_ENGINE o por extension/mime).
- *  - Por defecto ExoPlayer; libVLC para AVI/WMV/FLV/etc.
- *  - Si ExoPlayer falla al decodificar, se RELANZA automaticamente con libVLC.
- *
- * Reproduce tanto la URL del servidor local (videos de Telegram via puente
- * GramJS) como cualquier video que otra app envie por un intent VIEW.
+ * Reproductor NATIVO a pantalla completa con dos motores (ExoPlayer + libVLC) y
+ * barra superior con TITULO y boton CERRAR (X) accesible con el mando (focusable).
  */
 class NativePlayerActivity : AppCompatActivity() {
 
@@ -38,20 +35,18 @@ class NativePlayerActivity : AppCompatActivity() {
         const val EXTRA_URL = "extra_url"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MIME = "extra_mime"
-        const val EXTRA_ENGINE = "extra_engine" // "exo" | "vlc" | "" (auto)
-
-        // Formatos que conviene mandar directamente a libVLC.
+        const val EXTRA_ENGINE = "extra_engine"
         private val VLC_EXT = listOf(".avi", ".wmv", ".flv", ".rmvb", ".rm", ".mpg", ".mpeg", ".vob", ".divx", ".ogm", ".asf", ".3gp", ".m2ts", ".mts")
     }
 
-    // ExoPlayer
+
     private var exo: ExoPlayer? = null
     private var playerView: PlayerView? = null
-    // libVLC
     private var libVlc: LibVLC? = null
     private var vlcPlayer: MediaPlayer? = null
     private var vlcLayout: VLCVideoLayout? = null
 
+    private lateinit var root: FrameLayout
     private var url: String = ""
     private var title: String = ""
     private var mime: String? = null
@@ -70,11 +65,64 @@ class NativePlayerActivity : AppCompatActivity() {
             finish(); return
         }
 
+        root = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(-1, -1)
+            setBackgroundColor(Color.BLACK)
+        }
+        setContentView(root)
+
         val engine = (intent.getStringExtra(EXTRA_ENGINE) ?: "").ifBlank { pickEngine(url, mime) }
         if (engine == "vlc") startVlc() else startExo()
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { finish() }
+        })
     }
 
-    /** Elige motor segun extension/mime. AVI y similares -> libVLC. */
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+
+    /** Coloca la superficie del reproductor + la barra superior con boton cerrar. */
+    private fun mount(surface: View) {
+        root.removeAllViews()
+        root.addView(surface, FrameLayout.LayoutParams(-1, -1))
+
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#99000000"))
+            val pad = dp(6)
+            setPadding(pad, pad, pad, pad)
+        }
+        val close = TextView(this).apply {
+            text = "✕"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            isFocusable = true
+            isClickable = true
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnFocusChangeListener { v, has ->
+                v.setBackgroundColor(if (has) Color.parseColor("#3ee65c") else Color.TRANSPARENT)
+            }
+            setOnClickListener { finish() }
+        }
+        val tv = TextView(this).apply {
+            text = title
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            lp.leftMargin = dp(8)
+            layoutParams = lp
+        }
+        bar.addView(close)
+        bar.addView(tv)
+        root.addView(bar, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        close.requestFocus()
+    }
+
     private fun pickEngine(u: String, m: String?): String {
         val low = u.lowercase()
         if (VLC_EXT.any { low.contains(it) }) return "vlc"
@@ -82,33 +130,30 @@ class NativePlayerActivity : AppCompatActivity() {
         return "exo"
     }
 
+
     // ---------------- ExoPlayer ----------------
     private fun startExo() {
         releaseVlc()
         val pv = PlayerView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(-1, -1)
             keepScreenOn = true
             useController = true
             setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
         }
         playerView = pv
-        setContentView(pv)
+        mount(pv)
 
         val p = ExoPlayer.Builder(this).build()
         exo = p
         pv.player = p
-
         val builder = MediaItem.Builder().setUri(Uri.parse(url))
         normalizeMime(mime, url)?.let { builder.setMimeType(it) }
         p.setMediaItem(builder.build())
         p.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                // Si ExoPlayer no puede, probamos libVLC (reproduce casi todo).
                 if (!triedVlcFallback) {
                     triedVlcFallback = true
                     Toast.makeText(this@NativePlayerActivity, "Cambiando a motor libVLC...", Toast.LENGTH_SHORT).show()
-                    releaseExo()
-                    startVlc()
+                    releaseExo(); startVlc()
                 } else {
                     Toast.makeText(this@NativePlayerActivity, "No se pudo reproducir: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
                 }
@@ -130,23 +175,19 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
+
     // ---------------- libVLC ----------------
     private fun startVlc() {
         releaseExo()
         val args = ArrayList<String>().apply {
-            add("--no-drop-late-frames")
-            add("--no-skip-frames")
-            add("--network-caching=1500")
-            add("--http-reconnect")
+            add("--no-drop-late-frames"); add("--no-skip-frames")
+            add("--network-caching=1500"); add("--http-reconnect")
         }
         val vlc = LibVLC(this, args)
         libVlc = vlc
-        val layout = VLCVideoLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(-1, -1)
-            keepScreenOn = true
-        }
+        val layout = VLCVideoLayout(this).apply { keepScreenOn = true }
         vlcLayout = layout
-        setContentView(layout)
+        mount(layout)
 
         val mp = MediaPlayer(vlc)
         vlcPlayer = mp
@@ -162,7 +203,6 @@ class NativePlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ---------------- Limpieza ----------------
     private fun releaseExo() {
         try { exo?.release() } catch (_: Exception) {}
         exo = null
@@ -179,6 +219,7 @@ class NativePlayerActivity : AppCompatActivity() {
         libVlc = null
         vlcLayout = null
     }
+
 
     private fun hideSystemBars() {
         window.decorView.systemUiVisibility = (

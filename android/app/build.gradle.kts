@@ -13,10 +13,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        manifestPlaceholders["appLabel"] = "TV+"
     }
 
-    // Nombre del APK al compilar: "TvPlayerPlus-<version>-<abi>-<debug|release>.apk"
-    // Incluimos el ABI porque con los splits se generan varios APK y no deben
+    // Nombre del APK: "TvPlayerPlus-<flavor>-<version>-<abi>-<debug|release>.apk"
+    // Incluye flavor (movil/tvbox) y ABI porque se generan varios APK y no deben
     // colisionar de nombre (sin espacios para evitar problemas de rutas).
     applicationVariants.all {
         val variant = this
@@ -24,7 +25,7 @@ android {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
             output.outputFileName =
-                "TvPlayerPlus-${variant.versionName}-${abi}-${variant.buildType.name}.apk"
+                "TvPlayerPlus-${variant.flavorName}-${variant.versionName}-${abi}-${variant.buildType.name}.apk"
         }
     }
 
@@ -58,6 +59,28 @@ android {
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
             isUniversalApk = true   // genera ademas un APK que vale para todo
+        }
+    }
+
+    // ============================================================
+    //  VARIANTES (product flavors): generamos DOS apps distintas para
+    //  que NO se mezclen/pisen al instalarlas:
+    //   - "movil": app normal (telefono/tablet).      app.playertv.web
+    //   - "tvbox": exclusiva TV-box/Android TV.        app.playertv.web.tv
+    //  Al tener distinto applicationId, se pueden tener las dos
+    //  instaladas a la vez en el mismo aparato sin conflicto.
+    // ============================================================
+    flavorDimensions += "tipo"
+    productFlavors {
+        create("movil") {
+            dimension = "tipo"
+            manifestPlaceholders["appLabel"] = "TV+"
+        }
+        create("tvbox") {
+            dimension = "tipo"
+            applicationIdSuffix = ".tv"
+            versionNameSuffix = "-tv"
+            manifestPlaceholders["appLabel"] = "TV+ TV-box"
         }
     }
 }
