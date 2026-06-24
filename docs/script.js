@@ -2219,31 +2219,78 @@ const TVNav = {
         }
         if (best) { best.focus(); best.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
     },
+    // Normaliza la direccion desde cualquier mando: e.key moderno (ArrowX),
+    // e.key antiguo (Up/Down/Left/Right), o e.keyCode (37-40). Algunos TV-box
+    // solo mandan uno de los tres.
+    _dir(e) {
+        const k = e.key, c = e.keyCode || e.which;
+        if (k === 'ArrowUp' || k === 'Up' || c === 38) return 'up';
+        if (k === 'ArrowDown' || k === 'Down' || c === 40) return 'down';
+        if (k === 'ArrowLeft' || k === 'Left' || c === 37) return 'left';
+        if (k === 'ArrowRight' || k === 'Right' || c === 39) return 'right';
+        return null;
+    },
+    _isEnter(e) {
+        const k = e.key, c = e.keyCode || e.which;
+        // 13=Enter, 23=DPAD_CENTER (algunos WebView), 'Select'/'Enter'
+        return k === 'Enter' || k === 'Select' || k === 'OK' || c === 13 || c === 23;
+    },
+    _isBack(e) {
+        const k = e.key, c = e.keyCode || e.which;
+        // 8=Backspace, 10009=Tizen back, 461=algunos TV, 27=Esc
+        return k === 'Backspace' || k === 'GoBack' || k === 'BrowserBack' || c === 8 || c === 10009 || c === 461;
+    },
     init() {
+        // capture:true -> interceptamos ANTES de que el WebView consuma la tecla
         document.addEventListener('keydown', (e) => {
-            const k = e.key;
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) {
-                if (k === 'ArrowLeft' || k === 'ArrowRight') {
-                    if (document.activeElement === el.searchInput) return; // dejar mover el cursor en el buscador
-                }
+            const ae = document.activeElement;
+            const inField = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+            const dir = this._dir(e);
+            if (dir) {
+                // Si Artplayer (navegador) está reproduciendo, que gestione él el
+                // seek con izq/der; no robamos las flechas.
+                if (window.ArtBridge && !window.ArtBridge.hidden) return;
+                // En campos de texto dejamos mover el cursor con izq/der
+                if (inField && (dir === 'left' || dir === 'right')) return;
                 e.preventDefault();
-                this.move(k.replace('Arrow', '').toLowerCase());
-            } else if (k === 'Enter') {
-                const a = document.activeElement;
-                if (a && a !== el.searchInput && a.click) { e.preventDefault(); a.click(); }
-            } else if (k === 'Backspace' || k === 'GoBack' || k === 'BrowserBack') {
-                const ae = document.activeElement;
-                if (ae === el.searchInput || (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA'))) return;
+                e.stopPropagation();
+                this.move(dir);
+                return;
+            }
+            if (this._isEnter(e)) {
+                if (ae && !inField && ae.click) { e.preventDefault(); e.stopPropagation(); ae.click(); }
+                return;
+            }
+            if (this._isBack(e)) {
+                if (inField) return;
                 if (el.adminEditor && !el.adminEditor.hidden) { e.preventDefault(); AdminPanel.closeEditor(); }
                 else if (el.adminPanel && !el.adminPanel.hidden) { e.preventDefault(); AdminPanel.close(); }
                 else if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
                 else if (!el.searchOverlay.hidden) { e.preventDefault(); App.closeSearch(); }
             }
-        });
+        }, { capture: true });
     }
 };
 
 /* ===== ARRANQUE ===== */
+// Llamado por la APK Android al pulsar ATRAS: cierra el modal/panel abierto y
+// devuelve true si manejó la accion; si no, la app hara back/salir.
+window.TVPlus_onBack = function () {
+    try {
+        const tp = document.getElementById('tg-personal');
+        if (el.adminEditor && !el.adminEditor.hidden) { AdminPanel.closeEditor(); return true; }
+        if (el.adminPanel && !el.adminPanel.hidden) { AdminPanel.close(); return true; }
+        if (tp && !tp.hidden) { const b = tp.querySelector('[data-tg-close]'); if (b) { b.click(); return true; } }
+        const synm = document.getElementById('synopsis-tmdb-modal');
+        if (synm && !synm.hidden) { synm.hidden = true; document.body.style.overflow = ''; return true; }
+        const covm = document.getElementById('cover-tmdb-modal');
+        if (covm && !covm.hidden) { covm.hidden = true; document.body.style.overflow = ''; return true; }
+        if (el.searchOverlay && !el.searchOverlay.hidden) { App.closeSearch(); return true; }
+        if (el.playerModal && !el.playerModal.hidden) { Detail.close(); return true; }
+    } catch (e) {}
+    return false;
+};
+
 async function boot() {
     try {
         const info = await api('/api/app').catch(() => null);

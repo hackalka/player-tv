@@ -99,12 +99,11 @@ class NativePlayerActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             setPadding(dp(16), dp(8), dp(16), dp(8))
-            isFocusable = true
+            // En TV-box NO es focusable (para no robar el foco): se cierra con ATRAS.
+            // En movil/tablet se cierra tocandolo.
+            isFocusable = false
             isClickable = true
             setBackgroundColor(Color.TRANSPARENT)
-            setOnFocusChangeListener { v, has ->
-                v.setBackgroundColor(if (has) Color.parseColor("#3ee65c") else Color.TRANSPARENT)
-            }
             setOnClickListener { finish() }
         }
         val tv = TextView(this).apply {
@@ -120,7 +119,6 @@ class NativePlayerActivity : AppCompatActivity() {
         bar.addView(close)
         bar.addView(tv)
         root.addView(bar, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
-        close.requestFocus()
     }
 
     private fun pickEngine(u: String, m: String?): String {
@@ -228,6 +226,54 @@ class NativePlayerActivity : AppCompatActivity() {
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         )
+    }
+
+    // ---------------- Mando / teclado (TV-box) ----------------
+    // LEFT/RIGHT = saltar -+10s · OK/CENTER = pausa/play · ATRAS = cerrar
+    // MENU = mostrar controles. Funciona con ExoPlayer y con libVLC.
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        when (keyCode) {
+            android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+            android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> { seekBy(-10000); return true }
+            android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+            android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { seekBy(10000); return true }
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+            android.view.KeyEvent.KEYCODE_ENTER,
+            android.view.KeyEvent.KEYCODE_SPACE,
+            android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { togglePlay(); return true }
+            android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> { setPlaying(true); return true }
+            android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> { setPlaying(false); return true }
+            android.view.KeyEvent.KEYCODE_MEDIA_STOP,
+            android.view.KeyEvent.KEYCODE_BACK -> { finish(); return true }
+            android.view.KeyEvent.KEYCODE_MENU,
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> { playerView?.showController(); return true }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun seekBy(deltaMs: Long) {
+        exo?.let {
+            val dur = if (it.duration > 0) it.duration else Long.MAX_VALUE
+            it.seekTo((it.currentPosition + deltaMs).coerceIn(0, dur))
+            playerView?.showController()
+            return
+        }
+        vlcPlayer?.let {
+            val len = it.length
+            val t = (it.time + deltaMs)
+            it.time = if (len > 0) t.coerceIn(0, len) else maxOf(0, t)
+            Toast.makeText(this, if (deltaMs >= 0) "⏩ +10s" else "⏪ -10s", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun togglePlay() {
+        exo?.let { if (it.isPlaying) it.pause() else it.play(); playerView?.showController(); return }
+        vlcPlayer?.let { if (it.isPlaying) it.pause() else it.play() }
+    }
+
+    private fun setPlaying(play: Boolean) {
+        exo?.let { if (play) it.play() else it.pause(); return }
+        vlcPlayer?.let { if (play) it.play() else it.pause() }
     }
 
     override fun onPause() {

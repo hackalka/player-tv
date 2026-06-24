@@ -169,13 +169,20 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {}
         }
 
-        // Boton atras: navegar atras en el WebView si puede
+        // Boton atras: 1) cerrar modales de la web, 2) historial, 3) salir
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (fullscreenView != null) {
                     web.webChromeClient?.onHideCustomView(); return
                 }
-                if (web.canGoBack()) web.goBack() else { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
+                // Preguntar a la web si tiene un modal abierto que cerrar
+                web.evaluateJavascript("(window.TVPlus_onBack && TVPlus_onBack())") { res ->
+                    if (res == "true") return@evaluateJavascript
+                    runOnUiThread {
+                        if (web.canGoBack()) web.goBack()
+                        else { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
+                    }
+                }
             }
         })
 
