@@ -465,6 +465,16 @@
                 await r.svc.deleteMessagesIn(body.peer, body.msgIds || []);
                 return json({ ok: true });
             }
+            // Incrustar metadatos del admin en el mensaje del grupo:
+            // { msgId, patch: {cover?, backdrop?, title?, desc?, video?, tmdb?, year?, rating?, ...} }
+            if (rest === 'admin/embed' && method === 'POST') {
+                const r = await requireService(); if (r.err) return r.err;
+                try {
+                    const res = await r.svc.embedMeta(body.msgId, body.patch || {});
+                    _catalog = null; // refrescar catalogo
+                    return json(res);
+                } catch (e) { return json({ ok: false, error: e.message }); }
+            }
             // Reenviar mensajes: { fromPeer, msgIds: [], toPeer, asCopy, topMsgId? }
             if (rest === 'admin/forward' && method === 'POST') {
                 const r = await requireService(); if (r.err) return r.err;

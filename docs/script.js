@@ -393,7 +393,7 @@ const Netflix = {
         const ov = Store.getOverride(item.id);
         const title = ov.title || item.title || item.epTitle || '';
         const year = ov.year || item.year || '';
-        const img = Store.getCover(item.id) || ov.backdrop || item.thumbUrl || placeholderImage(item.id, title);
+        const img = Store.getCover(item.id) || item.cover || ov.backdrop || item.thumbUrl || placeholderImage(item.id, title);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
             ${kind === 'top' && item._rank ? `<div class="card-rank">${item._rank}</div>` : ''}
@@ -429,7 +429,7 @@ const Netflix = {
         if (!item) return;
         const ov = Store.getOverride(item.id);
         const logo = ov.logo || item.tmdbLogo;
-        el.heroImage.src = Store.getCover(item.id) || ov.backdrop || item.backdropUrl || item.thumbUrl || placeholderImage(item.id, item.title);
+        el.heroImage.src = Store.getCover(item.id) || item.backdrop || item.cover || ov.backdrop || item.backdropUrl || item.thumbUrl || placeholderImage(item.id, item.title);
         el.heroImage.onerror = () => { el.heroImage.src = placeholderImage(item.id, item.title); };
         const title = ov.title || item.title || '';
         if (logo && !ov.title) {
@@ -445,6 +445,17 @@ const Netflix = {
 };
 
 /* ===== DETALLE + favoritos + reproductores externos ===== */
+// Escribe los cambios del admin (carátula, sinopsis, título, TMDB, vídeo) DENTRO
+// del mensaje del grupo (#tvplus:{...}) para tenerlo controlado por las dos vías.
+// Solo aplica a fichas que son un mensaje real (id numérico).
+async function embedToGroup(item, patch) {
+    try {
+        if (!item || !/^\d+$/.test(String(item.id))) return;
+        if (!state.isAdmin) return;
+        await api('/api/admin/embed', { method: 'POST', body: JSON.stringify({ msgId: Number(item.id), patch: patch || {} }) });
+    } catch (e) { console.warn('[embed] ', e && e.message); }
+}
+
 const Detail = {
     current: null,
     primary: null,
@@ -484,9 +495,9 @@ const Detail = {
             el.detailFinancials.innerHTML = bits.map(b => `<span>${escapeHtml(b)}</span>`).join('');
             el.detailFinancials.hidden = bits.length === 0;
         }
-        const cover = Store.getCover(item.id);
-        const backdrop = cover || ov.backdrop || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
-        const poster = cover || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const cover = Store.getCover(item.id) || item.cover;
+        const backdrop = cover || ov.backdrop || item.backdrop || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const poster = (Store.getCover(item.id) || item.cover) || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
@@ -540,6 +551,7 @@ const Detail = {
                 if (url === null) return;
                 Store.setCover(item.id, url.trim());
                 if (state.isAdmin) CloudStore.saveCovers();
+                embedToGroup(item, { cover: url.trim() });
                 Detail.open(item);
                 Netflix.render();   // refresca tarjetas
             };
@@ -552,9 +564,10 @@ const Detail = {
                 if (t === null) return;
                 Store.setOverride(item.id, { title: (t || '').trim() });
                 if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                embedToGroup(item, { title: (t || '').trim() });
                 Detail.open(item);
                 Netflix.render();
-                App.toast && App.toast('✅ Título actualizado', 1800);
+                App.toast && App.toast('✅ Título actualizado (web + grupo)', 1800);
             };
         }
         if (el.coverTmdbBtn) {
@@ -568,8 +581,9 @@ const Detail = {
                 if (t === null) return;
                 Store.setOverride(item.id, { desc: (t || '').trim() });
                 if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                embedToGroup(item, { desc: (t || '').trim() });
                 Detail.open(item);
-                App.toast && App.toast('✅ Sinopsis actualizada', 1800);
+                App.toast && App.toast('✅ Sinopsis actualizada (web + grupo)', 1800);
             };
         }
         if (el.synopsisTmdbBtn) {
@@ -601,6 +615,7 @@ const Detail = {
                 if (url === null) return;
                 Store.setOverride(item.id, { videoUrl: (url || '').trim() });
                 if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
+                embedToGroup(item, { video: (url || '').trim() });
                 Detail.open(item);
             };
         }
@@ -1914,7 +1929,20 @@ const CoverPicker = {
             } catch (e) { /* si falla, ya tenemos al menos el poster */ }
         }
         if (state.isAdmin) { CloudStore.saveCovers(); CloudStore.saveOverrides && CloudStore.saveOverrides(); }
-        App.toast('✅ Carátula y sinopsis actualizadas', 2000);
+        // Escribir en el grupo (carátula + datos TMDB)
+        try {
+            const dr2 = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId).catch(() => null);
+            const info2 = dr2 && dr2.details ? dr2.details : null;
+            embedToGroup(this.item, {
+                cover: posterUrl,
+                desc: (info2 && info2.overview) || undefined,
+                backdrop: (info2 && info2.backdrop) || undefined,
+                year: (info2 && info2.year) || undefined,
+                rating: (info2 && info2.rating) || undefined,
+                tmdb: tmdbId ? ((type || 'movie') + '/' + tmdbId) : undefined
+            });
+        } catch (e) { embedToGroup(this.item, { cover: posterUrl }); }
+        App.toast('✅ Carátula y sinopsis actualizadas (web + grupo)', 2000);
         this.close();
         Detail.open(this.item);
         Netflix.render();
@@ -2006,7 +2034,14 @@ const SynopsisPicker = {
                 tmdbType: info.type || type || ''
             });
             if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
-            App.toast('✅ Sinopsis actualizada', 1800);
+            embedToGroup(this.item, {
+                desc: info.overview,
+                backdrop: info.backdrop || undefined,
+                year: info.year || undefined,
+                rating: info.rating || undefined,
+                tmdb: (info.type || type || 'movie') + '/' + (info.tmdbId || tmdbId)
+            });
+            App.toast('✅ Sinopsis actualizada (web + grupo)', 1800);
             this.close();
             Detail.open(this.item);
         } catch (e) {

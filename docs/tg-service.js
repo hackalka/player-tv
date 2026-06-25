@@ -188,7 +188,13 @@
         }
 
         buildItem(message, topic) {
-            const text = message.message || '';
+            const rawText = message.message || '';
+            // Metadatos embebidos por el admin desde la web: linea "#tvplus:{...}"
+            let embed = {};
+            const emb = rawText.match(/#tvplus:(\{[\s\S]*?\})\s*$/im);
+            if (emb) { try { embed = JSON.parse(emb[1]) || {}; } catch (e) { embed = {}; } }
+            // Texto sin la linea de metadatos (para no ensuciar titulo/sinopsis)
+            const text = rawText.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').trim();
             const allLines = text.split('\n').map(s => s.trim());
             const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').replace(/tvgram:\/\/\S+/ig, '').trim();
             const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:|tvgram:\/\/)/i.test(l);
@@ -270,7 +276,7 @@
             const firstTvgram = links.find(l => l.kind === 'tvgram');
             const firstHttp = links.find(l => l.kind === 'http' || l.kind === 'tg');
 
-            return {
+            const item = {
                 id: message.id,
                 topicId: topic.id,
                 uid: doc && doc.id ? String(doc.id) : '',
@@ -289,6 +295,35 @@
                 streamUrl: isVideo ? `tgstream/${topic.id}/${message.id}` : '',
                 thumbUrl: hasThumb ? `tgthumb/${topic.id}/${message.id}` : ''
             };
+
+            // Aplicar metadatos embebidos (#tvplus) -> mandan sobre lo detectado
+            if (embed && typeof embed === 'object') {
+                if (embed.title) item.title = embed.title;
+                if (embed.desc) item.description = embed.desc;
+                if (embed.year) item.year = String(embed.year);
+                if (embed.cover) item.cover = embed.cover;       // poster (URL)
+                if (embed.backdrop) item.backdrop = embed.backdrop;
+                if (embed.logo) item.tmdbLogo = embed.logo;
+                if (embed.trailer) item.trailer = embed.trailer;
+                if (embed.rating) item.meta = Object.assign({}, item.meta, { rating: String(embed.rating) });
+                if (embed.genres) item.meta = Object.assign({}, item.meta, { genres: embed.genres });
+                if (embed.tmdb) {
+                    const tp = String(embed.tmdb).split('/');
+                    item.tmdbType = tp[0] || ''; item.tmdbId = tp[1] || tp[0] || '';
+                }
+                // Enlace de vídeo embebido "dentro de la carátula"
+                if (embed.video) {
+                    const v = String(embed.video);
+                    const k = /^tvgram:/i.test(v) ? 'tvgram' : (/^acestream:/i.test(v) ? 'ace' : 'http');
+                    const lk = Object.assign({ label: item.title, url: v, kind: k }, this._linkPlayable({ url: v, kind: k }));
+                    item.links = [lk].concat(item.links || []);
+                    if (k === 'tvgram') item.tvgramUrl = v;
+                    else if (k === 'ace') item.aceUrl = v;
+                    else { item.externalUrl = v; if (/\.(mp4|m4v|webm|mov)(\?|#|$)/i.test(v)) item.playableInBrowser = true; }
+                }
+                item.embed = embed;
+            }
+            return item;
         }
 
         _parseTme(url) {
@@ -808,6 +843,28 @@
             const entity = await this.resolveGroup();
             await this.client.editMessage(entity, { message: Number(msgId), text: String(text) });
             this._msgCache.delete(Number(msgId));
+        }
+
+        // Escribe/actualiza el bloque de metadatos "#tvplus:{...}" en el mensaje
+        // del grupo, fusionando el patch con lo que ya hubiera. Asi los cambios
+        // del admin (carátula, sinopsis, título, TMDB, enlace de vídeo) quedan
+        // guardados EN EL GRUPO ademas de en los overrides de la nube.
+        async embedMeta(msgId, patch) {
+            const id = Number(msgId);
+            const msg = await this.getMessageById(id);
+            const cur = (msg && msg.message) || '';
+            let embed = {};
+            const m = cur.match(/#tvplus:(\{[\s\S]*?\})\s*$/im);
+            if (m) { try { embed = JSON.parse(m[1]) || {}; } catch (e) { embed = {}; } }
+            for (const k of Object.keys(patch || {})) {
+                const v = patch[k];
+                if (v === null || v === undefined || v === '') delete embed[k];
+                else embed[k] = v;
+            }
+            const body = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').replace(/\s+$/, '');
+            const newText = body + (Object.keys(embed).length ? ('\n#tvplus:' + JSON.stringify(embed)) : '');
+            await this.editMessageText(id, newText);
+            return { ok: true, embed };
         }
         async deleteMessage(msgId) {
             const entity = await this.resolveGroup();
