@@ -845,10 +845,10 @@
             this._msgCache.delete(Number(msgId));
         }
 
-        // Escribe/actualiza el bloque de metadatos "#tvplus:{...}" en el mensaje
-        // del grupo, fusionando el patch con lo que ya hubiera. Asi los cambios
-        // del admin (carátula, sinopsis, título, TMDB, enlace de vídeo) quedan
-        // guardados EN EL GRUPO ademas de en los overrides de la nube.
+        // Escribe/actualiza los metadatos del admin DENTRO del mensaje del grupo
+        // pero OCULTOS (spoiler de Telegram) y SIN enlaces visibles: quita del
+        // texto visible las URLs sueltas (carátula/vídeo) y las guarda en los
+        // datos ocultos, que la app lee pero el usuario no ve.
         async embedMeta(msgId, patch) {
             const id = Number(msgId);
             const msg = await this.getMessageById(id);
@@ -861,9 +861,39 @@
                 if (v === null || v === undefined || v === '') delete embed[k];
                 else embed[k] = v;
             }
-            const body = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').replace(/\s+$/, '');
-            const newText = body + (Object.keys(embed).length ? ('\n#tvplus:' + JSON.stringify(embed)) : '');
-            await this.editMessageText(id, newText);
+            // Cuerpo visible: sin la antigua linea de metadatos
+            let body = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '');
+            // Quitar lineas que sean SOLO una URL (http/tvgram/acestream/magnet).
+            // Si no habia video en los metadatos, usamos la primera como video.
+            const urlLineRe = /^\s*(https?:\/\/|tvgram:\/\/|acestream:\/\/|magnet:)\S+\s*$/i;
+            const kept = [];
+            for (const line of body.split('\n')) {
+                const mm = line.match(urlLineRe);
+                if (mm) { if (!embed.video) embed.video = line.trim(); continue; }
+                kept.push(line);
+            }
+            body = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+
+            const metaLine = '#tvplus:' + JSON.stringify(embed);
+            const newText = (body ? body + '\n' : '') + metaLine;
+
+            // Spoiler que cubre EXACTAMENTE la linea de metadatos (queda oculta).
+            const offset = newText.length - metaLine.length;
+            let entities = [];
+            try { entities = [new Api.MessageEntitySpoiler({ offset, length: metaLine.length })]; } catch (e) { entities = []; }
+
+            const entity = await this.resolveGroup();
+            try {
+                await this.client.editMessage(entity, {
+                    message: id, text: newText,
+                    formattingEntities: entities.length ? entities : undefined,
+                    linkPreview: false
+                });
+            } catch (e) {
+                // Reintento sin entidades por si la version no las admite
+                await this.client.editMessage(entity, { message: id, text: newText, linkPreview: false });
+            }
+            this._msgCache.delete(id);
             return { ok: true, embed };
         }
         async deleteMessage(msgId) {
