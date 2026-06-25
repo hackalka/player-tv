@@ -1267,8 +1267,11 @@ const Player = {
             const mime = playable.mime || (ext ? 'video/' + ext : '');
             // MKV -> libVLC (audio AC3/DTS que ExoPlayer no decodifica); AVI/WMV/etc
             // tambien libVLC. El resto (mp4/webm/mov) -> ExoPlayer (HW, ligero).
-            const vlcExt = ['mkv', 'avi', 'wmv', 'flv', 'rmvb', 'rm', 'mpg', 'mpeg', 'vob', 'divx', 'ogm', 'asf', '3gp', 'm2ts', 'mts', 'ts'];
-            const engine = vlcExt.indexOf(ext) >= 0 ? 'vlc' : 'exo';
+            // SOLO los formatos claramente compatibles con ExoPlayer van a ExoPlayer.
+            // Todo lo demas (MKV, AVI, TS, desconocido...) va a libVLC, que SIEMPRE
+            // saca el audio (AC3/EAC3/DTS incluidos). Asi el MKV se escucha.
+            const exoExt = ['mp4', 'm4v', 'webm', 'mov'];
+            const engine = exoExt.indexOf(ext) >= 0 ? 'exo' : 'vlc';
             NativeHost.play(ref, title, mime, engine);
             return true;
         } catch (e) { return false; }

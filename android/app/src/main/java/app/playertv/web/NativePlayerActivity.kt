@@ -141,9 +141,10 @@ class NativePlayerActivity : AppCompatActivity() {
 
     private fun pickEngine(u: String, m: String?): String {
         val low = u.lowercase()
-        if (VLC_EXT.any { low.contains(it) }) return "vlc"
-        if (m != null && (m.contains("x-msvideo") || m.contains("avi") || m.contains("x-ms-wmv"))) return "vlc"
-        return "exo"
+        if (low.contains(".m3u8")) return "exo"
+        if (low.endsWith(".mp4") || low.endsWith(".m4v") || low.endsWith(".webm") || low.endsWith(".mov")) return "exo"
+        if (m != null && (m.contains("mp4") || m.contains("webm"))) return "exo"
+        return "vlc"  // todo lo demas (mkv/avi/ts/desconocido) -> libVLC (saca audio AC3/DTS)
     }
 
 
@@ -213,6 +214,7 @@ class NativePlayerActivity : AppCompatActivity() {
             media.setHWDecoderEnabled(true, false)
             mp.media = media
             media.release()
+            mp.volume = 100          // asegurar que NO sale mudo
             mp.play()
         } catch (e: Exception) {
             Toast.makeText(this, "Error libVLC: ${e.message}", Toast.LENGTH_LONG).show()
