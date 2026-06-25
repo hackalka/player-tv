@@ -99,13 +99,18 @@ class NativePlayerActivity : AppCompatActivity() {
         val close = TextView(this).apply {
             text = "✕"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            setPadding(dp(16), dp(8), dp(16), dp(8))
-            // En TV-box NO es focusable (para no robar el foco): se cierra con ATRAS.
-            // En movil/tablet se cierra tocandolo.
-            isFocusable = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+            // Focusable para el mando del TV-box (se ilumina en verde) y
+            // clickable para tactil en movil/tablet.
+            isFocusable = true
+            isFocusableInTouchMode = false
             isClickable = true
-            setBackgroundColor(Color.TRANSPARENT)
+            setBackgroundColor(Color.parseColor("#55000000"))
+            setOnFocusChangeListener { v, has ->
+                v.setBackgroundColor(if (has) Color.parseColor("#3ee65c") else Color.parseColor("#55000000"))
+                (v as TextView).setTextColor(if (has) Color.parseColor("#0a1a3a") else Color.WHITE)
+            }
             setOnClickListener { finish() }
         }
         val tv = TextView(this).apply {
@@ -120,7 +125,18 @@ class NativePlayerActivity : AppCompatActivity() {
         }
         bar.addView(close)
         bar.addView(tv)
+        bar.elevation = 100f  // por encima de los controles del player
         root.addView(bar, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+    }
+
+    // BACK siempre cierra (ExoPlayer puede "comerse" el BACK para ocultar sus
+    // controles; lo interceptamos antes para que cierre el reproductor).
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK &&
+            event.action == android.view.KeyEvent.ACTION_UP) {
+            finish(); return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun pickEngine(u: String, m: String?): String {

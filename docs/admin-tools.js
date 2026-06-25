@@ -1108,15 +1108,17 @@
         btn.addEventListener('click', open);
         navRight.insertBefore(btn, navRight.firstChild);
 
-        // Lo mostramos a CUALQUIERA que este logueado en Telegram. El owner
-        // sigue siendo solo TU para los botones admin del catalogo (carátula, enlace).
+        // Solo se muestra al ADMIN/owner y SOLO en la web (no en la APK Android),
+        // para que la app pese/cargue menos y los usuarios no accedan.
+        const inApk = !!window.NativeHost || /TvPlayer-App/i.test(navigator.userAgent || '');
+        if (inApk) return; // en la APK no aparece nunca
         for (let i = 0; i < 30; i++) {
             try {
                 const me = await api('/api/me');
                 if (me && me.loggedIn) {
                     state.owner = me;
                     loadPinned();
-                    btn.hidden = false;
+                    if (me.isOwner) btn.hidden = false; // solo el admin/owner lo ve
                     return;
                 }
             } catch { }

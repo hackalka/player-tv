@@ -1439,39 +1439,40 @@ html.tv-mode { font-size: 18px; }                   /* todo más grande en TV */
 body.tvkb-open { overflow: hidden; }
 #tvkb { position: fixed; left: 0; right: 0; bottom: 0; z-index: 99999; pointer-events: auto; }
 #tvkb .tvkb-card {
-    margin: 0 auto; max-width: 960px;
+    margin: 0 auto; max-width: 680px;
     background: rgba(10, 26, 58, 0.97);
     border-top: 2px solid #3ee65c;
+    border-radius: 12px 12px 0 0;
     box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
-    padding: 14px 18px 18px;
+    padding: 8px 12px 10px;
     backdrop-filter: blur(8px);
 }
 #tvkb .tvkb-preview {
     background: #0d1f44; color: #fff;
-    border: 1px solid #2a3d6e; border-radius: 8px;
-    padding: 10px 14px; min-height: 44px;
-    font-size: 1.4rem; margin-bottom: 12px;
+    border: 1px solid #2a3d6e; border-radius: 6px;
+    padding: 6px 12px; min-height: 30px;
+    font-size: 1rem; margin-bottom: 8px;
     text-align: center;
     font-family: monospace; word-break: break-all;
 }
 #tvkb .tvkb-preview[data-empty="1"] { color: #6c7b9a; font-style: italic; font-family: inherit; }
-#tvkb .tvkb-rows { display: flex; flex-direction: column; gap: 6px; }
-#tvkb .tvkb-row { display: flex; gap: 6px; justify-content: center; }
+#tvkb .tvkb-rows { display: flex; flex-direction: column; gap: 4px; }
+#tvkb .tvkb-row { display: flex; gap: 4px; justify-content: center; }
 #tvkb .tvkb-key {
-    flex: 1 1 0; min-width: 36px; max-width: 80px;
-    padding: 12px 8px; font-size: 1.1rem; font-weight: 600;
+    flex: 1 1 0; min-width: 28px; max-width: 56px;
+    padding: 7px 4px; font-size: 0.95rem; font-weight: 600;
     background: #1a2f5c; color: #fff;
-    border: 2px solid transparent; border-radius: 6px;
+    border: 2px solid transparent; border-radius: 5px;
     cursor: pointer; transition: transform 100ms, background 100ms, border-color 100ms;
 }
-#tvkb .tvkb-key.med { flex: 1.5 1 0; max-width: 120px; }
-#tvkb .tvkb-key.wide { flex: 4 1 0; max-width: 320px; }
+#tvkb .tvkb-key.med { flex: 1.5 1 0; max-width: 90px; }
+#tvkb .tvkb-key.wide { flex: 4 1 0; max-width: 240px; }
 #tvkb .tvkb-key:hover, #tvkb .tvkb-key:focus {
     background: #3ee65c; color: #0a1a3a;
     border-color: #fff; outline: none;
     transform: scale(1.06);
 }
-#tvkb .tvkb-foot { color: #b9c7e8; font-size: 0.78rem; text-align: center; padding-top: 10px; }
+#tvkb .tvkb-foot { color: #b9c7e8; font-size: 0.7rem; text-align: center; padding-top: 6px; }
 
 /* En TV-mode, hacemos los .focusable mas evidentes (DPad navegacion) */
 html.tv-mode .focusable:focus,
