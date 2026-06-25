@@ -205,7 +205,9 @@ class NativePlayerActivity : AppCompatActivity() {
         releaseExo()
         val args = ArrayList<String>().apply {
             add("--no-drop-late-frames"); add("--no-skip-frames")
-            add("--network-caching=1500"); add("--http-reconnect")
+            add("--network-caching=2000"); add("--http-reconnect")
+            add("--aout=opensles")        // salida de audio mas compatible en Android/TV-box
+            add("--audio-time-stretch")
         }
         val vlc = LibVLC(this, args)
         libVlc = vlc
@@ -227,7 +229,7 @@ class NativePlayerActivity : AppCompatActivity() {
                         if (!vlcSeeking && vlcLen > 0) vlcSeek?.progress = ((t.toFloat() / vlcLen) * 1000f).toInt()
                         vlcTimeTv?.text = fmtT(t) + " / " + fmtT(vlcLen)
                     }
-                    MediaPlayer.Event.Playing -> vlcPlayBtn?.text = "⏸"
+                    MediaPlayer.Event.Playing -> { vlcPlayBtn?.text = "⏸"; try { mp.volume = 100 } catch (_: Exception) {} }
                     MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> vlcPlayBtn?.text = "▶"
                     MediaPlayer.Event.EncounteredError ->
                         Toast.makeText(this, "Error reproduciendo (libVLC)", Toast.LENGTH_LONG).show()
@@ -277,12 +279,41 @@ class NativePlayerActivity : AppCompatActivity() {
         val time = TextView(this).apply {
             text = "0:00"; setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(dp(12), 0, dp(4), 0)
+            setPadding(dp(12), 0, dp(8), 0)
+        }
+        // Boton para cambiar de pista de AUDIO (arregla el "no suena" cuando el
+        // MKV trae varias pistas y libVLC coge una muda/equivocada).
+        val audioBtn = TextView(this).apply {
+            text = "🔊"; setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            isFocusable = true; isClickable = true
+            setOnClickListener { cycleAudioTrack() }
+            setOnFocusChangeListener { v, h -> (v as TextView).setTextColor(if (h) Color.parseColor("#3ee65c") else Color.WHITE) }
         }
         vlcPlayBtn = play; vlcSeek = seek; vlcTimeTv = time
-        bar.addView(play); bar.addView(seek); bar.addView(time)
+        bar.addView(play); bar.addView(seek); bar.addView(time); bar.addView(audioBtn)
         bar.elevation = 100f
         root.addView(bar, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+    }
+
+    /** Cambia a la siguiente pista de audio (y muestra cual). */
+    private fun cycleAudioTrack() {
+        val mp = vlcPlayer ?: return
+        try {
+            val tracks = mp.audioTracks ?: arrayOf()
+            // tracks puede incluir "Desactivar" (id -1); cogemos solo las reales
+            val real = tracks.filter { it.id >= 0 }
+            if (real.isEmpty()) { Toast.makeText(this, "Este vídeo no tiene pistas de audio", Toast.LENGTH_LONG).show(); return }
+            val cur = mp.audioTrack
+            var idx = real.indexOfFirst { it.id == cur }
+            idx = (idx + 1) % real.size
+            mp.audioTrack = real[idx].id
+            mp.volume = 100
+            Toast.makeText(this, "Audio: " + (real[idx].name ?: ("Pista " + (idx + 1))), Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "No se pudo cambiar el audio: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun fmtT(ms: Long): String {
