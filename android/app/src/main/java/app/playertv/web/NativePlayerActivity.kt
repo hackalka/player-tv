@@ -97,10 +97,10 @@ class NativePlayerActivity : AppCompatActivity() {
             setPadding(pad, pad, pad, pad)
         }
         val close = TextView(this).apply {
-            text = "✕"
+            text = "✕  Salir"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setPadding(dp(18), dp(8), dp(18), dp(8))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setPadding(dp(18), dp(9), dp(18), dp(9))
             // Focusable para el mando del TV-box (se ilumina en verde) y
             // clickable para tactil en movil/tablet.
             isFocusable = true

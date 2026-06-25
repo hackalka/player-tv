@@ -216,6 +216,7 @@ const el = {
     playerModal: $('#player-modal'),
     playerIframe: $('#player-iframe'),
     playerVideo: $('#player-video'),
+    playerExit: $('#player-exit'),
     playerStatus: $('#player-status'),
     detailHero: $('#detail-hero'),
     detailBackdrop: $('#detail-backdrop'),
@@ -765,6 +766,7 @@ const Detail = {
 
     resetVideo() {
         el.playerVideo.hidden = true;
+        if (el.playerExit) el.playerExit.hidden = true;
         try { el.playerVideo.pause(); } catch {}
         el.playerVideo.removeAttribute('src'); el.playerVideo.load();
         // Destruir Artplayer + hls.js si estuvieran montados
@@ -1136,6 +1138,7 @@ const Player = {
 
     _playInside(playable, parent) {
         el.detailHero.classList.add('playing');
+        if (el.playerExit) el.playerExit.hidden = false;
         el.detailBackdrop.hidden = true;
         el.playerStatus.hidden = true;
         el.playerIframe.hidden = true; el.playerIframe.src = '';
@@ -2412,6 +2415,7 @@ function wireUi() {
     $('#login-code').addEventListener('keydown', e => { if (e.key === 'Enter') Login.verifyCode(); });
     $('#login-password').addEventListener('keydown', e => { if (e.key === 'Enter') Login.verifyPassword(); });
     $('.modal-close', el.playerModal).onclick = () => Detail.close();
+    if (el.playerExit) el.playerExit.onclick = () => Detail.close();
     $('.modal-overlay', el.playerModal).onclick = () => Detail.close();
     el.searchBtn.onclick = () => App.openSearch();
     $('.search-close', el.searchOverlay).onclick = () => App.closeSearch();
