@@ -37,5 +37,23 @@ window.TVP_CONFIG = {
 
     // TMDB (v4 token recomendado o v3 key). Se usa desde el navegador.
     tmdbKey: 'cbb1fa07c88626f5c57d56e48d8ce704',
-    tmdbToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjYmIxZmEwN2M4ODYyNmY1YzU3ZDU2ZTQ4ZDhjZTcwNCIsIm5iZiI6MTc3MTc3OTI0OS43NDMsInN1YiI6IjY5OWIzNGIxMjE0MTY1ZDNmNGIyOGY1NiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.PPzm5Z0TpX6EhkaeVpi-Nhzy1tMvjpcMOKbAy16R3fc'
+    tmdbToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjYmIxZmEwN2M4ODYyNmY1YzU3ZDU2ZTQ4ZDhjZTcwNCIsIm5iZiI6MTc3MTc3OTI0OS43NDMsInN1YiI6IjY5OWIzNGIxMjE0MTY1ZDNmNGIyOGY1NiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.PPzm5Z0TpX6EhkaeVpi-Nhzy1tMvjpcMOKbAy16R3fc',
+
+    // ===== FIREBASE (sincronizacion en la nube: favoritos, "continuar viendo",
+    //        carátulas/sinopsis compartidas entre TODOS los dispositivos) =====
+    // Pega aqui la config REAL de tu proyecto Firebase. La consigues en:
+    //   https://console.firebase.google.com  ->  tu proyecto  ->  ⚙ Configuracion
+    //   del proyecto  ->  pestaña "General"  ->  "Tus apps"  ->  app Web  ->
+    //   "Configuracion del SDK" -> "Config". Copia los valores aqui.
+    // Tambien crea una base de datos "Firestore" (modo produccion) y en Reglas
+    // permite lectura/escritura (ver instrucciones que te paso).
+    // Si lo dejas en blanco, la app funciona igual pero SIN sincronizar en la nube.
+    firebase: {
+        apiKey: '',              // ej: 'AIzaSyB....'
+        authDomain: '',          // ej: 'tuproyecto.firebaseapp.com'
+        projectId: '',           // ej: 'tuproyecto'
+        storageBucket: '',       // ej: 'tuproyecto.appspot.com'
+        messagingSenderId: '',   // ej: '1234567890'
+        appId: ''                // ej: '1:1234567890:web:abc123'
+    }
 };

@@ -126,11 +126,18 @@ const CloudStore = {
     init(userId) {
         try {
             if (!window.firebase || !window.firebase.firestore) return;
+            // Usar la config REAL de tg-config.js si tiene apiKey; si no, no conecta.
+            const fb = (window.TVP_CONFIG && window.TVP_CONFIG.firebase) || {};
+            if (!fb.apiKey || !fb.projectId) {
+                console.warn('[firebase] sin claves reales en tg-config.js -> sin sincronizacion en la nube');
+                return;
+            }
             if (!firebase.apps.length) {
-                firebase.initializeApp({ apiKey: 'AIzaSyDummy', projectId: 'playertv-9449c' });
+                firebase.initializeApp(fb);
             }
             this.db = firebase.firestore();
             this.uid = String(userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '');
+            console.log('[firebase] conectado a', fb.projectId);
         } catch (e) { console.warn('Firebase init:', e.message); }
     },
     async syncFavs() {
