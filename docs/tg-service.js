@@ -194,7 +194,7 @@
             const emb = rawText.match(/#tvplus:(\{[\s\S]*?\})\s*$/im);
             if (emb) { try { embed = JSON.parse(emb[1]) || {}; } catch (e) { embed = {}; } }
             // Texto sin la linea de metadatos (para no ensuciar titulo/sinopsis)
-            const text = rawText.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').trim();
+            const text = rawText.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').replace(/📖\s?/g, '').trim();
             const allLines = text.split('\n').map(s => s.trim());
             const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').replace(/tvgram:\/\/\S+/ig, '').trim();
             const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:|tvgram:\/\/)/i.test(l);
@@ -622,6 +622,7 @@
             const date = det.release_date || det.first_air_date || '';
             return {
                 tmdbId: det.id, type,
+                title: det.title || det.name || '',
                 overview: det.overview || '',
                 year: (String(date).match(/^(\d{4})/) || [])[1] || '',
                 rating: det.vote_average ? String(Math.round(det.vote_average * 10) / 10) : '',
@@ -852,65 +853,36 @@
             this._msgCache.delete(Number(msgId));
         }
 
-        // Escribe/actualiza los metadatos del admin DENTRO del mensaje del grupo
-        // pero OCULTOS (spoiler de Telegram) y SIN enlaces visibles: quita del
-        // texto visible las URLs sueltas (carátula/vídeo) y las guarda en los
-        // datos ocultos, que la app lee pero el usuario no ve.
+        // Escribe en el mensaje del grupo, de forma VISIBLE y limpia (sin enlaces,
+        // sin nada oculto): pone el título correcto y la sinopsis como texto. Así
+        // todos los usuarios ven la sinopsis (va en el propio mensaje) y la
+        // carátula sale sola por la auto-búsqueda de TMDB con ese título.
         async embedMeta(msgId, patch) {
             const id = Number(msgId);
             const msg = await this.getMessageById(id);
             const cur = (msg && msg.message) || '';
-            let embed = {};
-            const m = cur.match(/#tvplus:(\{[\s\S]*?\})\s*$/im);
-            if (m) { try { embed = JSON.parse(m[1]) || {}; } catch (e) { embed = {}; } }
-            for (const k of Object.keys(patch || {})) {
-                const v = patch[k];
-                if (v === null || v === undefined || v === '') delete embed[k];
-                else embed[k] = v;
-            }
-            // Cuerpo visible: sin la antigua linea de metadatos
-            let body = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '');
-            // Quitar lineas que sean SOLO una URL (http/tvgram/acestream/magnet).
-            // Si no habia video en los metadatos, usamos la primera como video.
+            patch = patch || {};
+            // Limpiar: metadatos antiguos (#tvplus) y bloque de sinopsis previo (📖)
+            let lines = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').split('\n');
+            const synIdx = lines.findIndex(l => /^\s*📖/.test(l));
+            if (synIdx >= 0) lines = lines.slice(0, synIdx);
+            // Quitar líneas que sean solo una URL (no queremos enlaces visibles)
             const urlLineRe = /^\s*(https?:\/\/|tvgram:\/\/|acestream:\/\/|magnet:)\S+\s*$/i;
-            const kept = [];
-            for (const line of body.split('\n')) {
-                const mm = line.match(urlLineRe);
-                if (mm) { if (!embed.video) embed.video = line.trim(); continue; }
-                kept.push(line);
+            lines = lines.filter(l => !urlLineRe.test(l));
+            // Cambiar el título (primera línea con texto) si se indica
+            if (patch.title) {
+                const i = lines.findIndex(l => l.trim() !== '');
+                if (i >= 0) lines[i] = patch.title; else lines = [String(patch.title)];
             }
-            body = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
-
-            // "El vídeo dentro de la carátula": si este mensaje ES un vídeo y no
-            // hay un enlace de vídeo explícito, guardamos su PROPIO enlace t.me
-            // (el "copiar enlace del vídeo" de Telegram): https://t.me/c/<gid>/<msgId>
-            const hasMedia = !!(msg && (msg.media || msg.video || msg.document));
-            if (hasMedia && !embed.video) {
-                const gid = String(this.cfg.groupId).replace(/^-100/, '').replace(/^-/, '');
-                if (gid) embed.video = 'https://t.me/c/' + gid + '/' + id;
-            }
-
-            const metaLine = '#tvplus:' + JSON.stringify(embed);
-            const newText = (body ? body + '\n' : '') + metaLine;
-
-            // Spoiler que cubre EXACTAMENTE la linea de metadatos (queda oculta).
-            const offset = newText.length - metaLine.length;
-            let entities = [];
-            try { entities = [new Api.MessageEntitySpoiler({ offset, length: metaLine.length })]; } catch (e) { entities = []; }
-
+            let body = lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+            const desc = (patch.desc || '').trim();
+            let newText = body;
+            if (desc) newText = (body ? body + '\n\n' : '') + '📖 ' + desc;
+            if (!newText.trim()) return { ok: true, skipped: true };
             const entity = await this.resolveGroup();
-            try {
-                await this.client.editMessage(entity, {
-                    message: id, text: newText,
-                    formattingEntities: entities.length ? entities : undefined,
-                    linkPreview: false
-                });
-            } catch (e) {
-                // Reintento sin entidades por si la version no las admite
-                await this.client.editMessage(entity, { message: id, text: newText, linkPreview: false });
-            }
+            await this.client.editMessage(entity, { message: id, text: newText, linkPreview: false });
             this._msgCache.delete(id);
-            return { ok: true, embed };
+            return { ok: true };
         }
         async deleteMessage(msgId) {
             const entity = await this.resolveGroup();

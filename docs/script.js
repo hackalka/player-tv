@@ -1906,43 +1906,32 @@ const CoverPicker = {
     async pick(posterUrl, type, tmdbId) {
         if (!this.item) return;
         if (!posterUrl) { App.toast('Esa ficha no tiene carátula', 2500, true); return; }
-        // Guarda como override de cover
+        // Guarda como override de cover (para verlo al instante en tu navegador)
         Store.setCover(this.item.id, posterUrl);
-        // Si tenemos tmdbId, traer también la sinopsis y metadatos
+        let info = null;
         if (tmdbId) {
             try {
                 const dr = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId);
-                const info = dr && dr.details ? dr.details : null;
+                info = dr && dr.details ? dr.details : null;
                 if (info) {
                     Store.setOverride(this.item.id, {
-                        desc: info.overview || '',
-                        backdrop: info.backdrop || '',
-                        trailer: info.trailerKey || '',
-                        logo: info.logo || '',
-                        rating: info.rating || '',
-                        year: info.year || '',
-                        runtime: info.runtime || '',
-                        tmdbId: info.tmdbId || tmdbId,
-                        tmdbType: info.type || type || ''
+                        desc: info.overview || '', backdrop: info.backdrop || '', trailer: info.trailerKey || '',
+                        logo: info.logo || '', rating: info.rating || '', year: info.year || '',
+                        runtime: info.runtime || '', tmdbId: info.tmdbId || tmdbId, tmdbType: info.type || type || ''
                     });
                 }
-            } catch (e) { /* si falla, ya tenemos al menos el poster */ }
+            } catch (e) { /* al menos tenemos el poster */ }
         }
         if (state.isAdmin) { CloudStore.saveCovers(); CloudStore.saveOverrides && CloudStore.saveOverrides(); }
-        // Escribir en el grupo (carátula + datos TMDB)
-        try {
-            const dr2 = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId).catch(() => null);
-            const info2 = dr2 && dr2.details ? dr2.details : null;
-            embedToGroup(this.item, {
-                cover: posterUrl,
-                desc: (info2 && info2.overview) || undefined,
-                backdrop: (info2 && info2.backdrop) || undefined,
-                year: (info2 && info2.year) || undefined,
-                rating: (info2 && info2.rating) || undefined,
-                tmdb: tmdbId ? ((type || 'movie') + '/' + tmdbId) : undefined
-            });
-        } catch (e) { embedToGroup(this.item, { cover: posterUrl }); }
-        App.toast('✅ Carátula y sinopsis actualizadas (web + grupo)', 2000);
+        // Escribir en el GRUPO de forma VISIBLE (sin enlaces, nada oculto):
+        // - el título correcto de TMDB -> hace que la CARÁTULA salga sola para
+        //   todos (el catálogo auto-busca en TMDB por el título).
+        // - la SINOPSIS como texto -> la ven todos en el propio mensaje.
+        embedToGroup(this.item, {
+            title: (info && info.title) || undefined,
+            desc: (info && info.overview) || undefined
+        });
+        App.toast('✅ Carátula y sinopsis puestas (web + grupo)', 2000);
         this.close();
         Detail.open(this.item);
         Netflix.render();
@@ -2035,11 +2024,8 @@ const SynopsisPicker = {
             });
             if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
             embedToGroup(this.item, {
-                desc: info.overview,
-                backdrop: info.backdrop || undefined,
-                year: info.year || undefined,
-                rating: info.rating || undefined,
-                tmdb: (info.type || type || 'movie') + '/' + (info.tmdbId || tmdbId)
+                title: info.title || undefined,
+                desc: info.overview || undefined
             });
             App.toast('✅ Sinopsis actualizada (web + grupo)', 1800);
             this.close();
