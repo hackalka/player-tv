@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -47,6 +48,12 @@ class NativePlayerActivity : AppCompatActivity() {
     private var libVlc: LibVLC? = null
     private var vlcPlayer: MediaPlayer? = null
     private var vlcLayout: VLCVideoLayout? = null
+    // Controles propios para libVLC (no trae UI nativa)
+    private var vlcPlayBtn: TextView? = null
+    private var vlcSeek: SeekBar? = null
+    private var vlcTimeTv: TextView? = null
+    private var vlcLen: Long = 0
+    private var vlcSeeking = false
 
     private lateinit var root: FrameLayout
     private var url: String = ""
@@ -209,6 +216,24 @@ class NativePlayerActivity : AppCompatActivity() {
         val mp = MediaPlayer(vlc)
         vlcPlayer = mp
         mp.attachViews(layout, null, false, false)
+        buildVlcControls()
+        mp.setEventListener { ev ->
+            try {
+                when (ev.type) {
+                    MediaPlayer.Event.LengthChanged -> { vlcLen = mp.length }
+                    MediaPlayer.Event.TimeChanged -> {
+                        if (vlcLen <= 0) vlcLen = mp.length
+                        val t = mp.time
+                        if (!vlcSeeking && vlcLen > 0) vlcSeek?.progress = ((t.toFloat() / vlcLen) * 1000f).toInt()
+                        vlcTimeTv?.text = fmtT(t) + " / " + fmtT(vlcLen)
+                    }
+                    MediaPlayer.Event.Playing -> vlcPlayBtn?.text = "⏸"
+                    MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> vlcPlayBtn?.text = "▶"
+                    MediaPlayer.Event.EncounteredError ->
+                        Toast.makeText(this, "Error reproduciendo (libVLC)", Toast.LENGTH_LONG).show()
+                }
+            } catch (_: Exception) {}
+        }
         try {
             val media = Media(vlc, Uri.parse(url))
             media.setHWDecoderEnabled(true, false)
@@ -219,6 +244,51 @@ class NativePlayerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Error libVLC: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /** Barra de controles inferior para libVLC (play/pausa, barra de tiempo). */
+    private fun buildVlcControls() {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#99000000"))
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+        }
+        val play = TextView(this).apply {
+            text = "⏸"; setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setPadding(dp(8), dp(4), dp(16), dp(4))
+            isFocusable = true; isClickable = true
+            setOnClickListener { togglePlay() }
+            setOnFocusChangeListener { v, h -> (v as TextView).setTextColor(if (h) Color.parseColor("#3ee65c") else Color.WHITE) }
+        }
+        val seek = SeekBar(this).apply {
+            max = 1000
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {}
+                override fun onStartTrackingTouch(s: SeekBar?) { vlcSeeking = true }
+                override fun onStopTrackingTouch(s: SeekBar?) {
+                    vlcSeeking = false
+                    if (vlcLen > 0) vlcPlayer?.time = ((s?.progress ?: 0) / 1000f * vlcLen).toLong()
+                }
+            })
+        }
+        val time = TextView(this).apply {
+            text = "0:00"; setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(12), 0, dp(4), 0)
+        }
+        vlcPlayBtn = play; vlcSeek = seek; vlcTimeTv = time
+        bar.addView(play); bar.addView(seek); bar.addView(time)
+        bar.elevation = 100f
+        root.addView(bar, FrameLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+    }
+
+    private fun fmtT(ms: Long): String {
+        if (ms <= 0) return "0:00"
+        val s = ms / 1000; val h = s / 3600; val m = (s % 3600) / 60; val ss = s % 60
+        return if (h > 0) String.format("%d:%02d:%02d", h, m, ss) else String.format("%d:%02d", m, ss)
     }
 
     private fun releaseExo() {
@@ -236,6 +306,7 @@ class NativePlayerActivity : AppCompatActivity() {
         try { libVlc?.release() } catch (_: Exception) {}
         libVlc = null
         vlcLayout = null
+        vlcPlayBtn = null; vlcSeek = null; vlcTimeTv = null; vlcLen = 0
     }
 
 

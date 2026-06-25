@@ -153,7 +153,10 @@ class LocalStreamServer(
             ?: return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "no data")
 
         val status = if (partial) Response.Status.PARTIAL_CONTENT else Response.Status.OK
-        val res: Response = newFixedLengthResponse(status, mime, ByteArrayInputStream(data), data.size.toLong())
+        // Content-Type neutro: dejamos que el reproductor (libVLC/ExoPlayer)
+        // detecte el formato por el contenido. Un mime erroneo (p.ej. video/mkv)
+        // hacia que libVLC demuxease mal y se perdiera el AUDIO.
+        val res: Response = newFixedLengthResponse(status, "application/octet-stream", ByteArrayInputStream(data), data.size.toLong())
         res.addHeader("Accept-Ranges", "bytes")
         if (partial) res.addHeader("Content-Range", "bytes $start-$end/$size")
         return res
