@@ -314,12 +314,19 @@
                 // Enlace de vídeo embebido "dentro de la carátula"
                 if (embed.video) {
                     const v = String(embed.video);
-                    const k = /^tvgram:/i.test(v) ? 'tvgram' : (/^acestream:/i.test(v) ? 'ace' : 'http');
-                    const lk = Object.assign({ label: item.title, url: v, kind: k }, this._linkPlayable({ url: v, kind: k }));
-                    item.links = [lk].concat(item.links || []);
-                    if (k === 'tvgram') item.tvgramUrl = v;
-                    else if (k === 'ace') item.aceUrl = v;
-                    else { item.externalUrl = v; if (/\.(mp4|m4v|webm|mov)(\?|#|$)/i.test(v)) item.playableInBrowser = true; }
+                    const gid = String(this.cfg.groupId).replace(/^-100/, '').replace(/^-/, '');
+                    // ¿Es el enlace del PROPIO mensaje (copiar enlace)? Entonces NO
+                    // añadimos un Play duplicado: la ficha ya reproduce su vídeo.
+                    const isSelf = new RegExp('/c/' + gid + '/(\\d+/)?' + message.id + '/?$').test(v);
+                    item.copyLink = v;
+                    if (!isSelf) {
+                        const k = /^tvgram:/i.test(v) ? 'tvgram' : (/^acestream:/i.test(v) ? 'ace' : 'http');
+                        const lk = Object.assign({ label: item.title, url: v, kind: k }, this._linkPlayable({ url: v, kind: k }));
+                        item.links = [lk].concat(item.links || []);
+                        if (k === 'tvgram') item.tvgramUrl = v;
+                        else if (k === 'ace') item.aceUrl = v;
+                        else { item.externalUrl = v; if (/\.(mp4|m4v|webm|mov)(\?|#|$)/i.test(v)) item.playableInBrowser = true; }
+                    }
                 }
                 item.embed = embed;
             }
@@ -873,6 +880,15 @@
                 kept.push(line);
             }
             body = kept.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+
+            // "El vídeo dentro de la carátula": si este mensaje ES un vídeo y no
+            // hay un enlace de vídeo explícito, guardamos su PROPIO enlace t.me
+            // (el "copiar enlace del vídeo" de Telegram): https://t.me/c/<gid>/<msgId>
+            const hasMedia = !!(msg && (msg.media || msg.video || msg.document));
+            if (hasMedia && !embed.video) {
+                const gid = String(this.cfg.groupId).replace(/^-100/, '').replace(/^-/, '');
+                if (gid) embed.video = 'https://t.me/c/' + gid + '/' + id;
+            }
 
             const metaLine = '#tvplus:' + JSON.stringify(embed);
             const newText = (body ? body + '\n' : '') + metaLine;
