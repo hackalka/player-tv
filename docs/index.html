@@ -3,44 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Tv Player — tu catálogo de cine, series y deportes">
     <meta name="theme-color" content="#0a1a3a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tv Player">
     <title>Tv Player</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo192.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23E50914' width='100' height='100' rx='18'/><text x='50' y='70' font-size='52' font-weight='bold' text-anchor='middle' fill='%23fff'>TV</text></svg>">
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar">
-        <div class="navbar-left"><a href="#" class="logo"><span id="brand-name">TV+</span></a><ul class="nav-links" id="nav-links"></ul></div>
+        <div class="navbar-left">
+            <a href="#" class="logo">
+                <img class="brand-logo" src="logo192.png" alt="TV+" onerror="this.style.display='none'">
+                <span class="logo-text" id="brand-name">TV+</span>
+            </a>
+            <ul class="nav-links" id="nav-links"></ul>
+        </div>
+        <div class="navbar-center view-switch" hidden>
+            <button id="nav-netflix" class="view-btn active" type="button">Cine</button>
+            <button id="nav-telegram" class="view-btn" type="button">Chat</button>
+        </div>
         <div class="navbar-right">
-            <button class="icon-btn" id="admin-panel-btn" hidden>⚙</button>
+            <button class="icon-btn" id="admin-panel-btn" hidden>⚙️</button>
             <button class="icon-btn" id="admin-refresh" hidden>↻</button>
             <button class="icon-btn" id="admin-lock">🔒</button>
             <button class="search-btn">🔍</button>
         </div>
     </nav>
-    <div id="netflix-view"><section class="hero" id="hero"><div class="hero-content"><h1 id="hero-title"></h1><p id="hero-description"></p><div class="hero-buttons"><button class="btn btn-play" id="hero-play">Reproducir</button></div></div></section><main class="main-content"><div class="rows-container" id="rows-container"></div></main></div>
-    <div class="modal" id="player-modal" hidden><div class="modal-content detail-modal">
-        <div class="detail-hero" id="detail-hero">
-            <div id="artplayer-mount"></div>
-            <div class="admin-fab" id="admin-fab" hidden>
-                <button id="admin-fab-toggle">✏️</button>
-                <div class="admin-fab-menu" id="admin-fab-menu" hidden>
-                    <button id="title-btn">Título</button>
-                    <button id="video-link-btn">Enlace</button>
-                    <button id="add-episode-btn">＋ Capítulo</button>
-                    <button id="edit-episodes-btn">📋 Gestionar</button>
+
+    <div id="netflix-view">
+        <section class="hero" id="hero">
+            <div class="hero-background"><img src="" class="hero-image" id="hero-image"><div class="hero-gradient"></div></div>
+            <div class="hero-content">
+                <h1 class="hero-title" id="hero-title"></h1>
+                <p class="hero-description" id="hero-description"></p>
+                <div class="hero-buttons">
+                    <button class="btn btn-play" id="hero-play">▶ Reproducir</button>
                 </div>
             </div>
+        </section>
+        <main class="main-content"><div class="rows-container" id="rows-container"></div></main>
+    </div>
+
+    <div class="modal" id="player-modal" hidden>
+        <div class="modal-overlay"></div>
+        <div class="modal-content detail-modal">
+            <button class="modal-close">✕</button>
+            <div class="detail-hero" id="detail-hero">
+                <div id="artplayer-mount"></div>
+                <img id="detail-backdrop" class="detail-backdrop">
+                <div class="detail-hero-content">
+                    <h2 class="detail-title" id="modal-title"></h2>
+                    <div class="detail-actions">
+                        <button class="btn btn-play" id="detail-play">▶ Reproducir</button>
+                        <button class="btn btn-fav" id="fav-btn"><span class="fav-ico">★</span></button>
+                    </div>
+                </div>
+                <!-- Menú Admin con Capítulos -->
+                <div class="admin-fab" id="admin-fab" hidden>
+                    <button class="admin-fab-btn" id="admin-fab-toggle">✏️</button>
+                    <div class="admin-fab-menu" id="admin-fab-menu" hidden>
+                        <button class="admin-fab-item" id="title-btn">✏ Título</button>
+                        <button class="admin-fab-item" id="video-link-btn">🔗 Enlace</button>
+                        <button class="admin-fab-item" id="add-episode-btn">➕ Añadir Capítulo</button>
+                        <button class="admin-fab-item" id="edit-episodes-btn">📋 Gestionar Capítulos</button>
+                        <button class="admin-fab-item" id="cover-tmdb-btn">🔍 Buscar en TMDB</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-details">
+                <p id="modal-description"></p>
+                <div id="episode-list" hidden><h3>Episodios</h3><div id="episodes-track"></div></div>
+            </div>
         </div>
-        <div class="modal-details"><h2 id="modal-title"></h2><p id="modal-description"></p><div id="episodes-track"></div></div>
-    </div></div>
-    <!-- Scripts Motores -->
+    </div>
+
+    <!-- Modales de login, búsqueda y admin panel se mantienen igual en tu CSS -->
+    <div id="loading-screen" class="loading-screen"><div class="loader"></div></div>
+
+    <!-- MOTORES DE VIDEO (Orden correcto) -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@artplayer/plugin-cast/dist/artplayer-plugin-cast.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/artplayer@5.3.0/dist/artplayer.js"></script>
-    <script src="tg-config.js"></script><script src="tg-service.js"></script><script src="tg-app.js"></script>
-    <script src="script.js"></script><script src="artplayer-bridge.js"></script>
+    
+    <!-- LÓGICA APP -->
+    <script src="tg-config.js"></script>
+    <script src="tg-service.js"></script>
+    <script src="tg-app.js"></script>
+    <script src="script.js"></script>
+    <script src="artplayer-bridge.js"></script>
 </body>
 </html>
