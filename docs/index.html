@@ -12,12 +12,8 @@
 <body>
     <nav class="navbar">
         <div class="navbar-left">
-            <a href="#" class="logo"><span id="brand-name">TV+</span></a>
+            <a href="#" class="logo"><img src="logo192.png" style="height:32px;margin-right:10px" onerror="this.style.display='none'"><span id="brand-name">TV+</span></a>
             <ul class="nav-links" id="nav-links"></ul>
-        </div>
-        <div class="navbar-center view-switch" hidden>
-            <button id="nav-netflix" class="view-btn active">Cine</button>
-            <button id="nav-telegram" class="view-btn">Chat</button>
         </div>
         <div class="navbar-right">
             <button class="icon-btn" id="admin-panel-btn" hidden>⚙️</button>
@@ -44,10 +40,7 @@
         <div class="modal-content detail-modal">
             <button class="modal-close">✕</button>
             <div class="detail-hero" id="detail-hero">
-                <!-- Shaka Player montado sobre un video estándar -->
-                <div class="video-container" style="background:#000; width:100%; height:100%; position:relative;">
-                    <video id="player-video" controls playsinline style="width:100%; height:100%;"></video>
-                </div>
+                <video id="player-video" controls playsinline style="width:100%; height:100%; background:#000;"></video>
                 <div class="admin-fab" id="admin-fab" hidden>
                     <button class="admin-fab-btn" id="admin-fab-toggle">✏️</button>
                     <div class="admin-fab-menu" id="admin-fab-menu" hidden>
@@ -55,6 +48,7 @@
                         <button class="admin-fab-item" id="video-link-btn">🔗 Enlace</button>
                         <button class="admin-fab-item" id="add-episode-btn">➕ Capítulo</button>
                         <button class="admin-fab-item" id="edit-episodes-btn">📋 Gestionar</button>
+                        <button class="admin-fab-item" id="cover-tmdb-btn">🔍 TMDB</button>
                     </div>
                 </div>
             </div>
@@ -66,14 +60,12 @@
         </div>
     </div>
 
-    <!-- Modales adicionales (Login, Búsqueda) se manejan por script.js -->
-    <div id="loading-screen" class="loading-screen"><div class="loader"></div></div>
+    <div id="loading-screen" class="loading-screen"><div class="loader"></div><p>Cargando TV+...</p></div>
 
     <!-- Motores -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
-    
     <script src="tg-config.js"></script>
     <script src="tg-service.js"></script>
     <script src="tg-app.js"></script>
