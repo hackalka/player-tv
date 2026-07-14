@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Tv Player</title>
+    <meta name="theme-color" content="#0a1a3a">
+    <title>TV+ Player</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        .vjs-theme-tvplus .vjs-control-bar { background-color: rgba(10, 26, 58, 0.9); }
+        .vjs-theme-tvplus .vjs-play-progress { background-color: #3ee65c; }
+    </style>
 </head>
-<body>
+<body class="vjs-theme-tvplus">
     <nav class="navbar">
         <div class="navbar-left">
-            <a href="#" class="logo"><img src="logo192.png" style="height:32px;margin-right:10px" onerror="this.style.display='none'"><span id="brand-name">TV+</span></a>
+            <a href="#" class="logo">
+                <img class="brand-logo" src="logo192.png" alt="TV+">
+                <span class="logo-text" id="brand-name">TV+</span>
+            </a>
             <ul class="nav-links" id="nav-links"></ul>
         </div>
         <div class="navbar-right">
@@ -27,8 +35,8 @@
         <section class="hero" id="hero">
             <div class="hero-background"><img src="" class="hero-image" id="hero-image"><div class="hero-gradient"></div></div>
             <div class="hero-content">
-                <h1 id="hero-title"></h1>
-                <p id="hero-description"></p>
+                <h1 class="hero-title" id="hero-title"></h1>
+                <p class="hero-description" id="hero-description"></p>
                 <div class="hero-buttons"><button class="btn btn-play" id="hero-play">▶ Reproducir</button></div>
             </div>
         </section>
@@ -40,32 +48,30 @@
         <div class="modal-content detail-modal">
             <button class="modal-close">✕</button>
             <div class="detail-hero" id="detail-hero">
-                <video id="player-video" controls playsinline style="width:100%; height:100%; background:#000;"></video>
+                <!-- Video.js Player -->
+                <video id="player-video" class="video-js vjs-big-play-centered" controls preload="auto" playsinline style="width:100%; height:100%;"></video>
                 <div class="admin-fab" id="admin-fab" hidden>
                     <button class="admin-fab-btn" id="admin-fab-toggle">✏️</button>
                     <div class="admin-fab-menu" id="admin-fab-menu" hidden>
-                        <button class="admin-fab-item" id="title-btn">✏ Título</button>
-                        <button class="admin-fab-item" id="video-link-btn">🔗 Enlace</button>
-                        <button class="admin-fab-item" id="add-episode-btn">➕ Capítulo</button>
-                        <button class="admin-fab-item" id="edit-episodes-btn">📋 Gestionar</button>
-                        <button class="admin-fab-item" id="cover-tmdb-btn">🔍 TMDB</button>
+                        <button class="admin-fab-item" id="add-episode-btn">➕ Añadir Capítulo</button>
+                        <button class="admin-fab-item" id="edit-episodes-btn">📋 Gestionar Capítulos</button>
+                        <button class="admin-fab-item" id="video-link-btn">🔗 Cambiar Enlace</button>
                     </div>
                 </div>
             </div>
             <div class="modal-details">
                 <h2 id="modal-title"></h2>
-                <p id="modal-description"></p>
-                <div id="episode-list" hidden><h3>Episodios</h3><div id="episodes-track"></div></div>
+                <div id="episode-list" hidden><h3>Capítulos</h3><div id="episodes-track"></div></div>
+                <div id="player-options" class="opt-box"></div>
             </div>
         </div>
     </div>
 
-    <div id="loading-screen" class="loading-screen"><div class="loader"></div><p>Cargando TV+...</p></div>
+    <div id="loading-screen" class="loading-screen"><div class="loader"></div></div>
 
-    <!-- Motores -->
+    <!-- Scripts -->
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <script src="tg-config.js"></script>
     <script src="tg-service.js"></script>
     <script src="tg-app.js"></script>
