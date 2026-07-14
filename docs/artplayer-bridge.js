@@ -1,27 +1,5 @@
 /* ============================================================================
- * artplayer-bridge.js — Integracion de Artplayer + hls.js como reproductor
- * principal de player-tv. Inspirado en la arquitectura de iptvnator (MIT)
- * https://github.com/4gray/iptvnator
- *
- * Estrategia:
- *  - Detecta tipo de stream segun la extension del URL.
- *  - Para .m3u8 usa hls.js; para resto usa <video> nativo (que ya soporta MP4,
- *    WebM y muchas veces MKV con codec H264/AAC).
- *  - Para .mkv/.avi/.flv NO se usa este puente: sigue mandando MkvPlayer con
- *    FFmpeg.wasm (mejor experiencia en navegador).
- *  - Mantiene la misma API que el `<video id="player-video">` para que
- *    Player._tick(), flushProgress() y los callbacks de progreso/onended
- *    sigan funcionando sin tocar mucho codigo.
- *
- * Expone window.ArtBridge con metodos:
- *  - load(url, opts)   : monta el reproductor y empieza a cargar
- *  - destroy()         : limpia la instancia (libera memoria)
- *  - getVideoEl()      : devuelve el <video> interno de artplayer (para
- *                        Player._tick() y guardar progreso)
- *  - on(name, fn)      : suscribirse a 'ready' | 'timeupdate' | 'ended' |
- *                        'error' | 'volumechange'
- *  - currentTime / duration / volume / paused : passthrough al <video>
- *  - play() / pause() / seek(t)
+ * artplayer-bridge.js — Integracion de Artplayer + hls.js + Prioridad NativeHost
  * ============================================================================ */
 (function () {
     'use strict';
@@ -40,17 +18,35 @@
 
         load(url, opts) {
             opts = opts || {};
+            const cleanUrl = url || '';
+
+            // =================================================================
+            // 1. INTERCEPCIÓN NATIVA (Para pantalla completa real en APK)
+            // =================================================================
+            if (window.NativeHost && NativeHost.isAvailable()) {
+                const title = opts.title || 'Streaming';
+                // Usamos ExoPlayer para MP4 y VLC para el resto (.m3u8, etc.)
+                const engine = cleanUrl.includes('.mp4') ? 'exo' : 'vlc';
+                
+                // Enviamos la orden a la APK y cancelamos la carga de ArtPlayer
+                NativeHost.playUrl(cleanUrl, title, "video/mp4", engine);
+                return true; 
+            }
+
+            // =================================================================
+            // 2. REPRODUCTOR WEB (Si no estamos en la APK, monta Artplayer/Shaka)
+            // =================================================================
             const container = document.getElementById('artplayer-mount');
             if (!container || typeof Artplayer === 'undefined') return false;
 
             this.destroy();
             container.hidden = false;
 
-            const type = detectType(url);
+            const type = detectType(cleanUrl);
 
             this.art = new Artplayer({
                 container,
-                url,
+                url: cleanUrl,
                 type,
                 poster: opts.poster || '',
                 title: opts.title || '',
@@ -58,8 +54,8 @@
                 autoplay: true,
                 playbackRate: true,
                 aspectRatio: true,
-                fullscreen: true,
-                fullscreenWeb: true,
+                fullscreen: true,       // Activa botón de pantalla completa nativa
+                fullscreenWeb: true,    // Pantalla completa en web/navegador
                 miniProgressBar: true,
                 theme: '#3ee65c',
                 plugins: [
@@ -69,14 +65,18 @@
                     }),
                 ],
                 customType: {
+                    // Fuerza Shaka Player en la web para archivos DASH (.mpd)
                     mpd: (video, url, art) => {
                         const p = new shaka.Player(video);
                         p.load(url).catch(e => console.error(e));
                         art.on('destroy', () => p.destroy());
                     },
+                    // Usa Shaka Player como alternativa de reproducción de HLS (.m3u8)
                     m3u8: (video, url, art) => {
                         if (Hls.isSupported()) {
-                            const hls = new Hls(); hls.loadSource(url); hls.attachMedia(video);
+                            const hls = new Hls(); 
+                            hls.loadSource(url); 
+                            hls.attachMedia(video);
                             art.on('destroy', () => hls.destroy());
                         } else {
                             const p = new shaka.Player(video);
@@ -87,6 +87,14 @@
                 },
                 i18n: { es: { 'Speed': 'Velocidad', 'Fullscreen': 'Pantalla completa' } },
                 lang: 'es'
+            });
+
+            // Forzar pantalla completa nativa del navegador al reproducir en Web
+            this.art.on('ready', () => {
+                this._emit('ready');
+                if (this.art.fullscreen) {
+                    this.art.fullscreen = true; // Intenta auto-pantalla completa
+                }
             });
 
             this.art.on('video:timeupdate', () => this._emit('timeupdate'));
