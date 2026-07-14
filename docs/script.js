@@ -1,5 +1,5 @@
 /* =====================================================================
- * script.js — Versión Final: Shaka Player + Prioridad ExoPlayer
+ * script.js — Versión Final: Shaka Player + Prioridad ExoPlayer (Blindado)
  * ===================================================================== */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -41,29 +41,58 @@ const Player = {
     shaka: null,
     async play(playable, parent) {
         if (!playable) return;
-        // Corrección 1: Aseguramos que url sea siempre un string (evita crash en .includes)
         const url = playable.streamUrl || playable.externalUrl || '';
 
-        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK)
+        // BLINDAJE: Si ArtPlayer creó contenedores o capas encima del video, los eliminamos
+        const container = $('[data-shaka-player-container]');
+        if (container) {
+            // Eliminamos elementos extraños que no sean el tag <video> (ej. divs creados por ArtPlayer)
+            Array.from(container.children).forEach(child => {
+                if (child.tagName !== 'VIDEO') child.remove();
+            });
+        }
+
+        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK - ExoPlayer / VLC)
         if (window.NativeHost && NativeHost.isAvailable()) {
             const title = (parent && parent.title) || playable.title || '';
-            // Usamos ExoPlayer para MP4/WebM y VLC para el resto
             const engine = url.includes('.mp4') ? 'exo' : 'vlc';
             NativeHost.playUrl(url, title, "video/mp4", engine);
             return;
         }
 
-        // 2. WEB: SHAKA PLAYER
+        // 2. WEB: SHAKA PLAYER (Con pantalla completa HTML5 nativa)
         const video = el.playerVideo;
-        if (!this.shaka) this.shaka = new shaka.Player(video);
+        if (video) {
+            video.style.display = 'block'; // Asegurar que el video sea visible
+        }
+
+        if (!this.shaka && video) {
+            this.shaka = new shaka.Player(video);
+            // Configuración para forzar controles nativos y pantalla completa nativa en móviles
+            this.shaka.configure({
+                streaming: {
+                    lowLatencyMode: true
+                }
+            });
+        }
         
         el.detailHero.classList.add('playing');
         try {
             await this.shaka.load(url);
             video.play();
+            
+            // Forzar pantalla completa en navegadores móviles/web si no es APK
+            if (video.requestFullscreen) {
+                video.requestFullscreen();
+            } else if (video.webkitRequestFullscreen) {
+                video.webkitRequestFullscreen(); // Safari / iOS
+            }
         } catch (e) {
-            video.src = url; 
-            video.play();
+            // Fallback si falla Shaka
+            if (video) {
+                video.src = url; 
+                video.play();
+            }
         }
     }
 };
@@ -77,19 +106,29 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
-        // Mostrar u ocultar el panel de admin según permisos
         if (state.isAdmin && el.adminFab) {
             el.adminFab.hidden = false;
         } else if (el.adminFab) {
             el.adminFab.hidden = true;
         }
         
-        $('#detail-play').onclick = () => Player.play(item.episodes ? item.episodes[0] : item, item);
+        // Asignación directa con prioridad alta para el botón de reproducir
+        const playBtn = $('#detail-play');
+        if (playBtn) {
+            playBtn.onclick = (e) => {
+                // Evitamos que tg-app.js u otros scripts intercepten el clic para meter ArtPlayer
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                Player.play(item.episodes ? item.episodes[0] : item, item);
+            };
+        }
     },
     close() { 
         el.playerModal.hidden = true; 
-        el.playerVideo.pause(); 
-        el.playerVideo.removeAttribute('src');
+        if (el.playerVideo) {
+            el.playerVideo.pause(); 
+            el.playerVideo.removeAttribute('src');
+        }
         el.detailHero.classList.remove('playing');
     }
 };
@@ -106,7 +145,11 @@ const Netflix = {
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.innerHTML = `<img src="${it.thumbUrl}"><div class="card-title">${it.title}</div>`;
-                card.onclick = () => Detail.open(it);
+                card.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    Detail.open(it);
+                };
                 track.appendChild(card);
             });
             el.rowsContainer.appendChild(row);
@@ -116,14 +159,12 @@ const Netflix = {
 
 async function boot() {
     try {
-        // Corrección 2: Control de errores en llamadas críticas de API para evitar pantalla de carga infinita
         const me = await api('/api/me');
         state.isAdmin = me.isAdmin;
         state.catalog = await api('/api/catalog');
         Netflix.render();
     } catch (error) {
-        console.error("Error durante el arranque de la app:", error);
-        alert("No se pudo cargar el catálogo. Por favor, recarga la página.");
+        console.error("Error durante el arranque:", error);
     } finally {
         const loader = $('#loading-screen');
         if (loader) loader.hidden = true;
@@ -135,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
     $('.modal-close').onclick = () => Detail.close();
     $('#admin-fab-toggle').onclick = () => el.adminFabMenu.hidden = !el.adminFabMenu.hidden;
 
-    // Corrección 3: Evento del Administrador delegado fuera del ciclo de apertura
     const addEpBtn = $('#add-episode-btn');
     if (addEpBtn) {
         addEpBtn.onclick = () => {
