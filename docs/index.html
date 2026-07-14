@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0a1a3a">
     <title>TV+ Player</title>
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="style.css">
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
     <style>
-        .vjs-theme-tvplus .vjs-control-bar { background-color: rgba(10, 26, 58, 0.9); }
-        .vjs-theme-tvplus .vjs-play-progress { background-color: #3ee65c; }
+        /* Ajustes de integración para el contenedor de Shaka Player */
+        .shaka-video-container { max-width: 100%; height: 100%; }
     </style>
 </head>
-<body class="vjs-theme-tvplus">
+<body>
     <nav class="navbar">
         <div class="navbar-left">
             <a href="#" class="logo">
@@ -33,23 +33,33 @@
 
     <div id="netflix-view">
         <section class="hero" id="hero">
-            <div class="hero-background"><img src="" class="hero-image" id="hero-image"><div class="hero-gradient"></div></div>
+            <div class="hero-background">
+                <img src="" class="hero-image" id="hero-image">
+                <div class="hero-gradient"></div>
+            </div>
             <div class="hero-content">
                 <h1 class="hero-title" id="hero-title"></h1>
                 <p class="hero-description" id="hero-description"></p>
-                <div class="hero-buttons"><button class="btn btn-play" id="hero-play">▶ Reproducir</button></div>
+                <div class="hero-buttons">
+                    <button class="btn btn-play" id="hero-play">▶ Reproducir</button>
+                </div>
             </div>
         </section>
-        <main class="main-content"><div class="rows-container" id="rows-container"></div></main>
+        <main class="main-content">
+            <div class="rows-container" id="rows-container"></div>
+        </main>
     </div>
 
     <div class="modal" id="player-modal" hidden>
         <div class="modal-overlay"></div>
         <div class="modal-content detail-modal">
             <button class="modal-close">✕</button>
+            
             <div class="detail-hero" id="detail-hero">
-                <!-- Video.js Player -->
-                <video id="player-video" class="video-js vjs-big-play-centered" controls preload="auto" playsinline style="width:100%; height:100%;"></video>
+                <div data-shaka-player-container style="width:100%; height:100%;">
+                    <video id="player-video" autoplay playsinline style="width:100%; height:100%;"></video>
+                </div>
+                
                 <div class="admin-fab" id="admin-fab" hidden>
                     <button class="admin-fab-btn" id="admin-fab-toggle">✏️</button>
                     <div class="admin-fab-menu" id="admin-fab-menu" hidden>
@@ -59,19 +69,30 @@
                     </div>
                 </div>
             </div>
+            
             <div class="modal-details">
                 <h2 id="modal-title"></h2>
-                <div id="episode-list" hidden><h3>Capítulos</h3><div id="episodes-track"></div></div>
+                
+                <button class="btn btn-play" id="detail-play" style="margin-bottom: 15px;">▶ Ver Ahora</button>
+                
+                <p id="modal-description" class="modal-description"></p>
+                
+                <div id="episode-list" hidden>
+                    <h3>Capítulos</h3>
+                    <div id="episodes-track"></div>
+                </div>
                 <div id="player-options" class="opt-box"></div>
             </div>
         </div>
     </div>
 
-    <div id="loading-screen" class="loading-screen"><div class="loader"></div></div>
+    <div id="loading-screen" class="loading-screen">
+        <div class="loader"></div>
+    </div>
 
-    <!-- Scripts -->
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
+    
     <script src="tg-config.js"></script>
     <script src="tg-service.js"></script>
     <script src="tg-app.js"></script>
