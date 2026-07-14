@@ -36,30 +36,36 @@ const el = {
 
 const Player = {
     shaka: null,
-    async play(playable, parent) {
+    async  play(playable, parent) {
         if (!playable) return;
+        this.current = { playable, parent };
         const url = playable.streamUrl || playable.externalUrl;
 
-        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK)
-        if (window.NativeHost && NativeHost.isAvailable()) {
-            const title = (parent && parent.title) || playable.title || '';
-            // Usamos ExoPlayer para MP4/WebM y VLC para el resto
-            const engine = url.includes('.mp4') ? 'exo' : 'vlc';
-            NativeHost.playUrl(url, title, "video/mp4", engine);
-            return;
+        // 1. PRIORIDAD APK: Si detecta la APK, abre el Reproductor Nativo (ExoPlayer/VLC)
+        // Esto garantiza PANTALLA COMPLETA real con el botón de Escala.
+        if (this._hasNative() && playable.streamUrl) {
+            if (this._playNative(playable, parent)) return;
         }
 
-        // 2. WEB: SHAKA PLAYER
-        const video = el.playerVideo;
-        if (!this.shaka) this.shaka = new shaka.Player(video);
-        
-        el.detailHero.classList.add('playing');
-        try {
-            await this.shaka.load(url);
-            video.play();
-        } catch (e) {
-            video.src = url; video.play();
+        // 2. BOTÓN TVGRAM: Ofrece abrir en TVGram Player si es un link de Telegram
+        if (url.includes('tgstream')) {
+            const tvgramBtn = document.createElement('button');
+            tvgramBtn.className = 'opt-btn tvgram focusable';
+            tvgramBtn.innerHTML = '📺 Abrir en TVGram Player (Mejor Calidad)';
+            tvgramBtn.onclick = () => {
+                const tme = ExternalPlayers.tmeLink(playable);
+                window.location.href = 'tvgram://play?url=' + encodeURIComponent(tme);
+            };
+            $('#player-options').innerHTML = '';
+            $('#player-options').appendChild(tvgramBtn);
         }
+
+        // 3. WEB: Inicializar Video.js
+        el.detailHero.classList.add('playing');
+        const player = videojs('player-video');
+        player.src({ src: url, type: url.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
+        player.play();
+    }
     }
 };
 
