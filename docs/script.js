@@ -6,7 +6,10 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
 async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers);
-    try { const t = localStorage.getItem('tvp_token'); if (t) headers['x-auth-token'] = t; } catch {}
+    try { 
+        const t = localStorage.getItem('tvp_token'); 
+        if (t) headers['x-auth-token'] = t; 
+    } catch {}
     let r = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
     return await r.json();
 }
@@ -36,40 +39,37 @@ const el = {
 
 const Player = {
     shaka: null,
-    async  play(playable, parent) {
+    async play(playable, parent) {
         if (!playable) return;
-        this.current = { playable, parent };
-        const url = playable.streamUrl || playable.externalUrl;
+        // Corrección 1: Aseguramos que url sea siempre un string (evita crash en .includes)
+        const url = playable.streamUrl || playable.externalUrl || '';
 
-        // 1. PRIORIDAD APK: Si detecta la APK, abre el Reproductor Nativo (ExoPlayer/VLC)
-        // Esto garantiza PANTALLA COMPLETA real con el botón de Escala.
-        if (this._hasNative() && playable.streamUrl) {
-            if (this._playNative(playable, parent)) return;
+        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK)
+        if (window.NativeHost && NativeHost.isAvailable()) {
+            const title = (parent && parent.title) || playable.title || '';
+            // Usamos ExoPlayer para MP4/WebM y VLC para el resto
+            const engine = url.includes('.mp4') ? 'exo' : 'vlc';
+            NativeHost.playUrl(url, title, "video/mp4", engine);
+            return;
         }
 
-        // 2. BOTÓN TVGRAM: Ofrece abrir en TVGram Player si es un link de Telegram
-        if (url.includes('tgstream')) {
-            const tvgramBtn = document.createElement('button');
-            tvgramBtn.className = 'opt-btn tvgram focusable';
-            tvgramBtn.innerHTML = '📺 Abrir en TVGram Player (Mejor Calidad)';
-            tvgramBtn.onclick = () => {
-                const tme = ExternalPlayers.tmeLink(playable);
-                window.location.href = 'tvgram://play?url=' + encodeURIComponent(tme);
-            };
-            $('#player-options').innerHTML = '';
-            $('#player-options').appendChild(tvgramBtn);
-        }
-
-        // 3. WEB: Inicializar Video.js
+        // 2. WEB: SHAKA PLAYER
+        const video = el.playerVideo;
+        if (!this.shaka) this.shaka = new shaka.Player(video);
+        
         el.detailHero.classList.add('playing');
-        const player = videojs('player-video');
-        player.src({ src: url, type: url.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
-        player.play();
-    }
+        try {
+            await this.shaka.load(url);
+            video.play();
+        } catch (e) {
+            video.src = url; 
+            video.play();
+        }
     }
 };
 
 const Detail = {
+    current: null,
     open(item) {
         this.current = item;
         const ov = Store.overrides[item.id] || {};
@@ -77,18 +77,13 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
-        if (state.isAdmin) {
+        // Mostrar u ocultar el panel de admin según permisos
+        if (state.isAdmin && el.adminFab) {
             el.adminFab.hidden = false;
-            $('#add-episode-btn').onclick = () => {
-                const u = prompt('Enlace del capítulo:');
-                if (u) { 
-                    const eps = item.episodes || [];
-                    eps.push({title: 'Capítulo ' + (eps.length + 1), streamUrl: u});
-                    Store.setOverride(item.id, { episodes: eps });
-                    this.open(item);
-                }
-            };
+        } else if (el.adminFab) {
+            el.adminFab.hidden = true;
         }
+        
         $('#detail-play').onclick = () => Player.play(item.episodes ? item.episodes[0] : item, item);
     },
     close() { 
@@ -120,15 +115,39 @@ const Netflix = {
 };
 
 async function boot() {
-    const me = await api('/api/me');
-    state.isAdmin = me.isAdmin;
-    state.catalog = await api('/api/catalog');
-    Netflix.render();
-    $('#loading-screen').hidden = true;
+    try {
+        // Corrección 2: Control de errores en llamadas críticas de API para evitar pantalla de carga infinita
+        const me = await api('/api/me');
+        state.isAdmin = me.isAdmin;
+        state.catalog = await api('/api/catalog');
+        Netflix.render();
+    } catch (error) {
+        console.error("Error durante el arranque de la app:", error);
+        alert("No se pudo cargar el catálogo. Por favor, recarga la página.");
+    } finally {
+        const loader = $('#loading-screen');
+        if (loader) loader.hidden = true;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     boot();
     $('.modal-close').onclick = () => Detail.close();
     $('#admin-fab-toggle').onclick = () => el.adminFabMenu.hidden = !el.adminFabMenu.hidden;
+
+    // Corrección 3: Evento del Administrador delegado fuera del ciclo de apertura
+    const addEpBtn = $('#add-episode-btn');
+    if (addEpBtn) {
+        addEpBtn.onclick = () => {
+            if (Detail.current && state.isAdmin) {
+                const u = prompt('Enlace del capítulo:');
+                if (u) { 
+                    const eps = Detail.current.episodes || [];
+                    eps.push({ title: 'Capítulo ' + (eps.length + 1), streamUrl: u });
+                    Store.setOverride(Detail.current.id, { episodes: eps });
+                    Detail.open(Detail.current);
+                }
+            }
+        };
+    }
 });
