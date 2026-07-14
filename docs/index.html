@@ -12,6 +12,11 @@
     <style>
         /* Ajustes de integración para el contenedor de Shaka Player */
         .shaka-video-container { max-width: 100%; height: 100%; }
+        
+        /* Asegura que el contenedor de Shaka no oculte elementos necesarios */
+        .shaka-controls-container {
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
@@ -56,11 +61,11 @@
             <button class="modal-close">✕</button>
             
             <div class="detail-hero" id="detail-hero">
-                <div data-shaka-player-container style="width:100%; height:100%;">
+                <div id="shaka-container" data-shaka-player-container style="width:100%; height:100%; position:relative;">
                     <video id="player-video" autoplay playsinline style="width:100%; height:100%;"></video>
                 </div>
                 
-                <div class="admin-fab" id="admin-fab" hidden>
+                <div class="admin-fab" id="admin-fab" hidden style="z-index: 99;">
                     <button class="admin-fab-btn" id="admin-fab-toggle">✏️</button>
                     <div class="admin-fab-menu" id="admin-fab-menu" hidden>
                         <button class="admin-fab-item" id="add-episode-btn">➕ Añadir Capítulo</button>
@@ -90,7 +95,7 @@
         <div class="loader"></div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     
     <script src="tg-config.js"></script>
