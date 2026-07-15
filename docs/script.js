@@ -46,7 +46,6 @@ const Player = {
         // BLINDAJE: Si ArtPlayer creó contenedores o capas encima del video, los eliminamos
         const container = $('[data-shaka-player-container]');
         if (container) {
-            // Eliminamos elementos extraños que no sean el tag <video> (ej. divs creados por ArtPlayer)
             Array.from(container.children).forEach(child => {
                 if (child.tagName !== 'VIDEO') child.remove();
             });
@@ -63,12 +62,17 @@ const Player = {
         // 2. WEB: SHAKA PLAYER (Con pantalla completa HTML5 nativa)
         const video = el.playerVideo;
         if (video) {
-            video.style.display = 'block'; // Asegurar que el video sea visible
+            // SOLUCIÓN AL BUG DEL PÓSTER:
+            // Eliminamos el atributo poster y fondos inline del video para que no tape los botones
+            video.removeAttribute('poster');
+            video.style.backgroundImage = 'none';
+            video.style.backgroundColor = '#000';
+            video.style.display = 'block';
+            video.style.zIndex = '10'; // Lo empujamos al frente
         }
 
         if (!this.shaka && video) {
             this.shaka = new shaka.Player(video);
-            // Configuración para forzar controles nativos y pantalla completa nativa en móviles
             this.shaka.configure({
                 streaming: {
                     lowLatencyMode: true
@@ -76,7 +80,9 @@ const Player = {
             });
         }
         
+        // Marcamos el estado de reproducción en la interfaz
         el.detailHero.classList.add('playing');
+        
         try {
             await this.shaka.load(url);
             video.play();
@@ -106,17 +112,24 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
+        // Resetear visualización del vídeo en el modal de detalles al abrir
+        if (el.playerVideo) {
+            el.playerVideo.style.zIndex = '';
+            // Si quieres asignarle una miniatura temporal antes de darle al Play:
+            if (item.thumbUrl) {
+                el.playerVideo.setAttribute('poster', item.thumbUrl);
+            }
+        }
+
         if (state.isAdmin && el.adminFab) {
             el.adminFab.hidden = false;
         } else if (el.adminFab) {
             el.adminFab.hidden = true;
         }
         
-        // Asignación directa con prioridad alta para el botón de reproducir
         const playBtn = $('#detail-play');
         if (playBtn) {
             playBtn.onclick = (e) => {
-                // Evitamos que tg-app.js u otros scripts intercepten el clic para meter ArtPlayer
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 Player.play(item.episodes ? item.episodes[0] : item, item);
@@ -128,6 +141,8 @@ const Detail = {
         if (el.playerVideo) {
             el.playerVideo.pause(); 
             el.playerVideo.removeAttribute('src');
+            el.playerVideo.removeAttribute('poster'); // Limpieza absoluta
+            el.playerVideo.style.backgroundImage = 'none';
         }
         el.detailHero.classList.remove('playing');
     }
@@ -189,5 +204,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         };
+    }
+
+    // ⚡ INTEGRACIÓN: Enlace de apertura para tu Telegram Web Personal
+    const tgBtn = $('#tg-personal-btn');
+    if (tgBtn) {
+        tgBtn.addEventListener('click', () => {
+            if (window.TelegramWebPersonal) {
+                window.TelegramWebPersonal.open();
+            } else {
+                console.error("El script 'tg-personal-admin.js' no está cargado o no se encuentra en el index.html");
+            }
+        });
     }
 });
