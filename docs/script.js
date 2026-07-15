@@ -50,21 +50,35 @@ const Player = {
             return;
         }
 
-        // 2. INTEGRACIÓN COMPATIBLE CON ARTPLAYER (Evitamos conflictos)
-        // Si ArtPlayer está inicializado en la ventana o a través de tg-app.js:
+        // 2. BLINDAJE CSS ABSOLUTO (Evita que la imagen del poster tape los controles)
+        // Forzamos a que, al reproducir, cualquier imagen de fondo o capa extraña en el hero se oculte
+        if (el.detailHero) {
+            el.detailHero.style.backgroundImage = 'none';
+            el.detailHero.style.setProperty('background-image', 'none', 'important');
+            el.detailHero.classList.add('playing');
+        }
+
+        // 3. INTEGRACIÓN COMPATIBLE CON ARTPLAYER
         if (window.art) {
             try {
                 // Cambiamos el stream directamente en la instancia activa de ArtPlayer
                 window.art.switchUrl(url);
                 window.art.play();
-                el.detailHero.classList.add('playing');
+                
+                // Forzar que el contenedor físico de ArtPlayer esté al frente absoluto de interacción
+                const artEl = $('.artplayer-app') || $('.art-video-player') || window.art.container;
+                if (artEl) {
+                    artEl.style.setProperty('z-index', '99999', 'important');
+                    artEl.style.setProperty('position', 'relative', 'important');
+                    artEl.style.setProperty('pointer-events', 'auto', 'important');
+                }
                 return;
             } catch (e) {
                 console.log("No se pudo reusar la instancia global de ArtPlayer, aplicando fallback...", e);
             }
         }
 
-        // 3. FALLBACK DE REPRODUCCIÓN ESTÁNDAR
+        // 4. FALLBACK DE REPRODUCCIÓN ESTÁNDAR
         const video = el.playerVideo;
         if (video) {
             video.removeAttribute('poster');
@@ -73,7 +87,6 @@ const Player = {
             video.style.display = 'block';
             video.src = url;
             
-            el.detailHero.classList.add('playing');
             try {
                 await video.play();
                 if (video.requestFullscreen) video.requestFullscreen();
@@ -93,7 +106,7 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
-        // Limpiar el video y preparar la vista
+        // Resetear visualización al abrir la ficha de detalles (antes de darle al play)
         if (el.playerVideo) {
             el.playerVideo.style.zIndex = '';
             if (item.thumbUrl) {
@@ -101,10 +114,13 @@ const Detail = {
             }
         }
         
-        // Evitamos que los elementos de texto floten encima del reproductor principal
+        // Al abrir detalles el hero muestra su fondo con normalidad
         if (el.detailHero) {
             el.detailHero.style.zIndex = '5'; 
             el.detailHero.style.position = 'relative';
+            if (item.thumbUrl) {
+                el.detailHero.style.backgroundImage = `url(${item.thumbUrl})`;
+            }
         }
 
         if (state.isAdmin && el.adminFab) {
@@ -139,6 +155,7 @@ const Detail = {
         if (el.detailHero) {
             el.detailHero.classList.remove('playing');
             el.detailHero.style.zIndex = '';
+            el.detailHero.style.backgroundImage = 'none';
         }
     }
 };
