@@ -1,5 +1,5 @@
 /* =====================================================================
- * script.js — Versión Final: Shaka Player + Prioridad ExoPlayer (Blindado)
+ * script.js — Versión Final Adaptada para ArtPlayer + Prioridad ExoPlayer
  * ===================================================================== */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -38,28 +38,11 @@ const el = {
 };
 
 const Player = {
-    shaka: null,
     async play(playable, parent) {
         if (!playable) return;
         const url = playable.streamUrl || playable.externalUrl || '';
 
-        // 1. BLINDAJE ANTI-TEXTO CORRUPTO Y SVG ROTOs:
-        // Buscamos y eliminamos cualquier nodo de texto plano con código SVG corrupto dentro del contenedor
-        const container = $('[data-shaka-player-container]');
-        if (container) {
-            Array.from(container.childNodes).forEach(node => {
-                // Eliminamos nodos de texto huérfanos que tengan trozos de código urlencodeado (como %22, %3C, rect, etc.)
-                if (node.nodeType === Node.TEXT_NODE && (node.textContent.includes('%') || node.textContent.includes('<'))) {
-                    node.remove();
-                }
-                // Limpieza de capas que no sean el video propiamente dicho o la interfaz de Shaka
-                if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('shaka-controls-container') && node.tagName !== 'VIDEO') {
-                    node.remove();
-                }
-            });
-        }
-
-        // 2. PRIORIDAD NATIVA (Para pantalla completa real en APK - ExoPlayer / VLC)
+        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK - ExoPlayer / VLC)
         if (window.NativeHost && NativeHost.isAvailable()) {
             const title = (parent && parent.title) || playable.title || '';
             const engine = url.includes('.mp4') ? 'exo' : 'vlc';
@@ -67,47 +50,35 @@ const Player = {
             return;
         }
 
-        // 3. WEB: SHAKA PLAYER (Con aislamiento y z-index corregido para que no se metan los textos)
+        // 2. INTEGRACIÓN COMPATIBLE CON ARTPLAYER (Evitamos conflictos)
+        // Si ArtPlayer está inicializado en la ventana o a través de tg-app.js:
+        if (window.art) {
+            try {
+                // Cambiamos el stream directamente en la instancia activa de ArtPlayer
+                window.art.switchUrl(url);
+                window.art.play();
+                el.detailHero.classList.add('playing');
+                return;
+            } catch (e) {
+                console.log("No se pudo reusar la instancia global de ArtPlayer, aplicando fallback...", e);
+            }
+        }
+
+        // 3. FALLBACK DE REPRODUCCIÓN ESTÁNDAR
         const video = el.playerVideo;
         if (video) {
             video.removeAttribute('poster');
             video.style.backgroundImage = 'none';
             video.style.backgroundColor = '#000';
             video.style.display = 'block';
-        }
-
-        // Forzar aislamiento visual en el contenedor del reproductor para evitar superposición
-        if (el.detailHero) {
-            el.detailHero.style.position = 'relative';
-            el.detailHero.style.zIndex = '9999'; // Lo mandamos al frente absoluto por encima de los textos del modal
-        }
-
-        if (!this.shaka && video) {
-            this.shaka = new shaka.Player(video);
-            this.shaka.configure({
-                streaming: {
-                    lowLatencyMode: true
-                }
-            });
-        }
-        
-        // Marcamos la clase playing en el contenedor
-        el.detailHero.classList.add('playing');
-        
-        try {
-            await this.shaka.load(url);
-            video.play();
+            video.src = url;
             
-            // Forzar pantalla completa en móviles
-            if (video.requestFullscreen) {
-                video.requestFullscreen();
-            } else if (video.webkitRequestFullscreen) {
-                video.webkitRequestFullscreen(); 
-            }
-        } catch (e) {
-            if (video) {
-                video.src = url; 
-                video.play();
+            el.detailHero.classList.add('playing');
+            try {
+                await video.play();
+                if (video.requestFullscreen) video.requestFullscreen();
+            } catch (err) {
+                console.error("Error en reproducción fallback:", err);
             }
         }
     }
@@ -122,16 +93,18 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
-        // Resetear visualización al abrir la ficha de detalles
+        // Limpiar el video y preparar la vista
         if (el.playerVideo) {
+            el.playerVideo.style.zIndex = '';
             if (item.thumbUrl) {
                 el.playerVideo.setAttribute('poster', item.thumbUrl);
             }
         }
         
-        // Devolvemos el contenedor a su orden normal de z-index al abrir detalles sin reproducir
+        // Evitamos que los elementos de texto floten encima del reproductor principal
         if (el.detailHero) {
-            el.detailHero.style.zIndex = '';
+            el.detailHero.style.zIndex = '5'; 
+            el.detailHero.style.position = 'relative';
         }
 
         if (state.isAdmin && el.adminFab) {
@@ -151,6 +124,12 @@ const Detail = {
     },
     close() { 
         el.playerModal.hidden = true; 
+        
+        // Detener ArtPlayer de forma segura si está corriendo en la ventana
+        if (window.art && typeof window.art.pause === 'function') {
+            try { window.art.pause(); } catch {}
+        }
+
         if (el.playerVideo) {
             el.playerVideo.pause(); 
             el.playerVideo.removeAttribute('src');
@@ -159,7 +138,7 @@ const Detail = {
         }
         if (el.detailHero) {
             el.detailHero.classList.remove('playing');
-            el.detailHero.style.zIndex = ''; // Restaurar capa
+            el.detailHero.style.zIndex = '';
         }
     }
 };
@@ -222,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Integración del botón de Telegram Web Personal Admin
+    // Botón de tu panel Telegram Web Pro
     const tgBtn = $('#tg-personal-btn');
     if (tgBtn) {
         tgBtn.addEventListener('click', () => {
