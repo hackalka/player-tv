@@ -43,15 +43,23 @@ const Player = {
         if (!playable) return;
         const url = playable.streamUrl || playable.externalUrl || '';
 
-        // BLINDAJE: Si ArtPlayer creó contenedores o capas encima del video, los eliminamos
+        // 1. BLINDAJE ANTI-TEXTO CORRUPTO Y SVG ROTOs:
+        // Buscamos y eliminamos cualquier nodo de texto plano con código SVG corrupto dentro del contenedor
         const container = $('[data-shaka-player-container]');
         if (container) {
-            Array.from(container.children).forEach(child => {
-                if (child.tagName !== 'VIDEO') child.remove();
+            Array.from(container.childNodes).forEach(node => {
+                // Eliminamos nodos de texto huérfanos que tengan trozos de código urlencodeado (como %22, %3C, rect, etc.)
+                if (node.nodeType === Node.TEXT_NODE && (node.textContent.includes('%') || node.textContent.includes('<'))) {
+                    node.remove();
+                }
+                // Limpieza de capas que no sean el video propiamente dicho o la interfaz de Shaka
+                if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('shaka-controls-container') && node.tagName !== 'VIDEO') {
+                    node.remove();
+                }
             });
         }
 
-        // 1. PRIORIDAD NATIVA (Para pantalla completa real en APK - ExoPlayer / VLC)
+        // 2. PRIORIDAD NATIVA (Para pantalla completa real en APK - ExoPlayer / VLC)
         if (window.NativeHost && NativeHost.isAvailable()) {
             const title = (parent && parent.title) || playable.title || '';
             const engine = url.includes('.mp4') ? 'exo' : 'vlc';
@@ -59,16 +67,19 @@ const Player = {
             return;
         }
 
-        // 2. WEB: SHAKA PLAYER (Con pantalla completa HTML5 nativa)
+        // 3. WEB: SHAKA PLAYER (Con aislamiento y z-index corregido para que no se metan los textos)
         const video = el.playerVideo;
         if (video) {
-            // SOLUCIÓN AL BUG DEL PÓSTER:
-            // Eliminamos el atributo poster y fondos inline del video para que no tape los botones
             video.removeAttribute('poster');
             video.style.backgroundImage = 'none';
             video.style.backgroundColor = '#000';
             video.style.display = 'block';
-            video.style.zIndex = '10'; // Lo empujamos al frente
+        }
+
+        // Forzar aislamiento visual en el contenedor del reproductor para evitar superposición
+        if (el.detailHero) {
+            el.detailHero.style.position = 'relative';
+            el.detailHero.style.zIndex = '9999'; // Lo mandamos al frente absoluto por encima de los textos del modal
         }
 
         if (!this.shaka && video) {
@@ -80,21 +91,20 @@ const Player = {
             });
         }
         
-        // Marcamos el estado de reproducción en la interfaz
+        // Marcamos la clase playing en el contenedor
         el.detailHero.classList.add('playing');
         
         try {
             await this.shaka.load(url);
             video.play();
             
-            // Forzar pantalla completa en navegadores móviles/web si no es APK
+            // Forzar pantalla completa en móviles
             if (video.requestFullscreen) {
                 video.requestFullscreen();
             } else if (video.webkitRequestFullscreen) {
-                video.webkitRequestFullscreen(); // Safari / iOS
+                video.webkitRequestFullscreen(); 
             }
         } catch (e) {
-            // Fallback si falla Shaka
             if (video) {
                 video.src = url; 
                 video.play();
@@ -112,13 +122,16 @@ const Detail = {
         $('#modal-description').innerText = ov.desc || item.description || '';
         el.playerModal.hidden = false;
 
-        // Resetear visualización del vídeo en el modal de detalles al abrir
+        // Resetear visualización al abrir la ficha de detalles
         if (el.playerVideo) {
-            el.playerVideo.style.zIndex = '';
-            // Si quieres asignarle una miniatura temporal antes de darle al Play:
             if (item.thumbUrl) {
                 el.playerVideo.setAttribute('poster', item.thumbUrl);
             }
+        }
+        
+        // Devolvemos el contenedor a su orden normal de z-index al abrir detalles sin reproducir
+        if (el.detailHero) {
+            el.detailHero.style.zIndex = '';
         }
 
         if (state.isAdmin && el.adminFab) {
@@ -141,10 +154,13 @@ const Detail = {
         if (el.playerVideo) {
             el.playerVideo.pause(); 
             el.playerVideo.removeAttribute('src');
-            el.playerVideo.removeAttribute('poster'); // Limpieza absoluta
+            el.playerVideo.removeAttribute('poster');
             el.playerVideo.style.backgroundImage = 'none';
         }
-        el.detailHero.classList.remove('playing');
+        if (el.detailHero) {
+            el.detailHero.classList.remove('playing');
+            el.detailHero.style.zIndex = ''; // Restaurar capa
+        }
     }
 };
 
@@ -206,14 +222,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // ⚡ INTEGRACIÓN: Enlace de apertura para tu Telegram Web Personal
+    // Integración del botón de Telegram Web Personal Admin
     const tgBtn = $('#tg-personal-btn');
     if (tgBtn) {
         tgBtn.addEventListener('click', () => {
             if (window.TelegramWebPersonal) {
                 window.TelegramWebPersonal.open();
             } else {
-                console.error("El script 'tg-personal-admin.js' no está cargado o no se encuentra en el index.html");
+                console.error("El script 'tg-personal-admin.js' no está cargado correctamente.");
             }
         });
     }
