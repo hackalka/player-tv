@@ -17,6 +17,13 @@
         .shaka-controls-container {
             z-index: 1;
         }
+
+        /* Regla CSS para ocultar por completo el botón "Chat" del menú dinámico izquierdo */
+        #nav-links li:has(a[href*="chat"]),
+        #nav-links a[href*="chat"],
+        #nav-links a[id*="chat"] {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -26,10 +33,12 @@
                 <img class="brand-logo" src="logo192.png" alt="TV+">
                 <span class="logo-text" id="brand-name">TV+</span>
             </a>
+            <!-- Aquí se generan dinámicamente "Cine" y el resto de pestañas -->
             <ul class="nav-links" id="nav-links"></ul>
         </div>
         <div class="navbar-right">
-            <button class="icon-btn" id="tg-personal-btn" title="Telegram Personal" style="font-size: 1.25rem; background: transparent; border: none; cursor: pointer; padding: 4px 8px;">💬</button>
+            <!-- Botón con el avión de papel (✈) para abrir Telegram Personal Pro -->
+            <button class="icon-btn" id="tg-personal-btn" title="Telegram Personal" style="font-size: 1.25rem; background: transparent; border: none; cursor: pointer; padding: 4px 8px; color: white;">✈</button>
             
             <button class="icon-btn" id="admin-panel-btn" hidden>⚙️</button>
             <button class="icon-btn" id="admin-refresh" hidden>↻</button>
@@ -97,15 +106,19 @@
         <div class="loader"></div>
     </div>
 
+    <!-- Scripts y dependencias externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
     
+    <!-- Configuración e Integración Base -->
     <script src="tg-config.js"></script>
     <script src="tg-service.js"></script>
     <script src="tg-app.js"></script>
     
+    <!-- Módulo Telegram Personal Pro (ADMIN MAX EDITION) -->
     <script src="tg-personal-admin.js"></script>
     
+    <!-- Lógica principal de tu Frontend -->
     <script src="script.js"></script>
 </body>
 </html>
