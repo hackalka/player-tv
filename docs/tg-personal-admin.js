@@ -58,7 +58,8 @@
         messages: [],
         cat: 'all',
         pinned: new Set(),
-        theme: localStorage.getItem('tg_pref_theme') || 'telegram',
+        // Forzamos que por defecto use el tema acestream si no hay ninguno guardado
+        theme: localStorage.getItem('tg_pref_theme') || 'acestream',
         forwardCache: null
     };
 
@@ -126,6 +127,11 @@
     }
 
     function buildModal() {
+        if (!document.body) {
+            // Protección por si el body no existe aún al intentar construir
+            setTimeout(buildModal, 50);
+            return;
+        }
         if ($('#tg-personal')) return;
         injectStyles();
         
@@ -142,9 +148,9 @@
                         <header class="tg-side-head" style="padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--tg-border);">
                             <strong style="font-size:1.1rem;">Telegram Web Admin</strong>
                             <select class="tg-theme-selector" id="tg-theme-select">
-                                <option value="telegram">Telegram Blue</option>
-                                <option value="dark">Modo Oscuro</option>
                                 <option value="acestream">Tema AceStream</option>
+                                <option value="dark">Modo Oscuro</option>
+                                <option value="telegram">Telegram Blue</option>
                             </select>
                         </header>
                         <div class="tg-search-wrap"><input id="tg-search" class="tg-search" type="search" placeholder="Buscar canales o grupos..."></div>
@@ -192,7 +198,9 @@
     }
 
     function renderCats() {
-        $('#tg-cats').innerHTML = Object.entries(CATS).map(([k, v]) => `
+        const catsEl = $('#tg-cats');
+        if (!catsEl) return;
+        catsEl.innerHTML = Object.entries(CATS).map(([k, v]) => `
             <button class="tg-cat${state.cat === k ? ' active' : ''}" data-cat="${k}">${v.icon} ${v.label}</button>`).join('');
         $$('#tg-cats .tg-cat').forEach(b => b.addEventListener('click', () => { state.cat = b.dataset.cat; renderCats(); renderList(); }));
     }
@@ -206,7 +214,10 @@
 
     async function open() { 
         buildModal(); 
-        $('#tg-personal').hidden = false; 
+        const modal = $('#tg-personal');
+        if (modal) {
+            modal.hidden = false; 
+        }
         await loadChats(); 
     }
 
@@ -228,7 +239,9 @@
             if (state.cat !== 'all' && state.cat !== 'sources' && state.cat !== 'admin' && c.category !== state.cat) return false;
             return !q || c.title.toLowerCase().includes(q);
         });
-        $('#tg-list').innerHTML = items.map(c => `
+        const listEl = $('#tg-list');
+        if (!listEl) return;
+        listEl.innerHTML = items.map(c => `
             <div class="tg-item${state.currentPeer === c.peerId ? ' active' : ''}" data-peer="${c.peerId}" data-title="${c.title}">
                 <div class="tg-avatar" style="background:${colorFor(c.title)}">${initials(c.title)}</div>
                 <div class="tg-item-body">
@@ -236,7 +249,7 @@
                     <div class="tg-item-sub">${esc(c.username ? '@' + c.username : 'ID: ' + c.peerId.slice(0,8))}</div>
                 </div>
             </div>`).join('');
-        $$('.tg-item', $('#tg-list')).forEach(el => el.addEventListener('click', () => selectChat(el.dataset.peer, el.dataset.title)));
+        $$('.tg-item', listEl).forEach(el => el.addEventListener('click', () => selectChat(el.dataset.peer, el.dataset.title)));
     }
 
     async function selectChat(peer, title) {
@@ -343,6 +356,7 @@
 
     function renderMessages() {
         const body = $('#tg-main-body');
+        if (!body) return;
         const sorted = state.messages.slice().sort((a, b) => a.id - b.id);
         body.innerHTML = sorted.map(m => {
             let html = esc(m.text || '');
@@ -391,7 +405,7 @@
     // Exportación e inicialización segura
     window.TelegramWebPersonal = { open };
 
-    // Si el DOM ya está listo creamos el modal en diferido, de lo contrario esperamos al evento.
+    // Ejecución segura de construcción del modal
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', buildModal);
     } else {
