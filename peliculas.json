@@ -1,0 +1,2837 @@
+[
+  {
+    "titulo": "Yo Tonya ",
+    "portada": "https://image.tmdb.org/t/p/w500/aVWX0t95Igd8kKC3ejmtHCy1vX6.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6168"
+  },
+  {
+    "titulo": "DAZN 3",
+    "portada": "https://i.ibb.co/FVzKq1y/dazn1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://e1ccce973c71547a8acda770885cb1c30a9cf3e1"
+  },
+  {
+    "titulo": "Eurosport 1",
+    "portada": "https://i.ibb.co/r2Yd7xD/euro1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://0db68ab752b50e6bb257eef22d102c1d29cd92ea"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion",
+    "portada": "https://i.ibb.co/CBdGc9f/hypermotion1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://1f75d92098580443857caa95a719103cb83781b0"
+  },
+  {
+    "titulo": "DAZN LaLiga 2",
+    "portada": "https://i.imgur.com/NcieUZO.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a231b2fa1f7754433efeb8bb8d69d7b9096dcba8"
+  },
+  {
+    "titulo": "SKY Sports LaLiga",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKBCa6SydXxbOh3qbRLTAWW6FOnRo5nXa9kw&s",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://e9975d38aaa4475ac0b1fa0faa541bbadd85a662"
+  },
+  {
+    "titulo": "SKY Sports LaLiga SD",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKBCa6SydXxbOh3qbRLTAWW6FOnRo5nXa9kw&s",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a9bddffdff085cdc18b34218d5dc1093b88e3c0a"
+  },
+  {
+    "titulo": "MOVISTAR PLUS",
+    "portada": "https://i.ibb.co/hFYPWbpJ/plus.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://1ab443f5b4beb6d586f19e8b25b9f9646cf2ab78"
+  },
+  {
+    "titulo": "M+ Deportes",
+    "portada": "https://i.ibb.co/CV4CLjz/deportes.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://c6a824a81b36f6c3529826477caf2ad94b45776d"
+  },
+  {
+    "titulo": "M+ Deportes 2",
+    "portada": "https://i.ibb.co/q95fBKV/deportes2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://3774d8feab016ca766b35ea8488e7514ca30e0ee"
+  },
+  {
+    "titulo": "M+ Deportes 3",
+    "portada": "https://i.ibb.co/jDg5qWD/deportes3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://f4d9011721fad5098febbe4d7c078a582e176a01"
+  },
+  {
+    "titulo": "M+ Deportes 7",
+    "portada": "https://www.movistarplus.es/recorte/n/caratula5/M2114916V1621463",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://9b38816906198580dbeb35b68673e1d060668e05"
+  },
+  {
+    "titulo": "M+ Deportes 8",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/deportes-8-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://abe6834b6e2509d2ff5b5b04f7ecb1db6e81083a"
+  },
+  {
+    "titulo": "M+ Golf 2",
+    "portada": "https://r2.thesportsdb.com/images/media/channel/logo/irjqp71744196637.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://882074140fca664e119a43294afa2fb4a64917ef"
+  },
+  {
+    "titulo": "M+ Vamos",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ad5ca6e24f87f47a9c3c5bc10c7e8e5af46767fc"
+  },
+  {
+    "titulo": "RFEF TV",
+    "portada": "https://static.wikia.nocookie.net/logopedia/images/d/df/Logo_Primera_RFEF_2021.png/revision/latest?cb=20230620215900&path-prefix=es",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://7b742628b9f7e82902bdbc1ff92eba1988875cfc"
+  },
+  {
+    "titulo": "La 1 TVE",
+    "portada": "https://i.ibb.co/Vf2GT70/la1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://02622fa2fab63847d88dc14fd9fa5c2fc35de8a8"
+  },
+  {
+    "titulo": "Teledeporte",
+    "portada": "https://img2.rtve.es/n/15966755",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://3b50a1dca0977e3761d016edd79314ab797f74f6"
+  },
+  {
+    "titulo": "Las ratas",
+    "portada": "https://images.justwatch.com/poster/338151550/s166/las-ratas-una-historia-de-the-witcher.avif",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6200"
+  },
+  {
+    "titulo": "DAZN 2",
+    "portada": "https://i.ibb.co/Kz0GXSX/dazn2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://d60b8c154828cb990b7bb1570764b215bd979e74"
+  },
+  {
+    "titulo": "M+ LaLiga",
+    "portada": "https://i.ibb.co/yfV1Q8n/liga.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://14b6cd8769cd485f2cffdca64be9698d9bfeac58"
+  },
+  {
+    "titulo": "M+ LaLiga 3",
+    "portada": "https://i.ibb.co/BZF0xG9/liga3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://7ad14386deef2f45ffe17d30a631dbf79b6a1a87"
+  },
+  {
+    "titulo": "M+ Liga de Campeones",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://97df5b7824948972d041d8ca2a4d29c90b641bc9"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 2",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%202.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://8156912ae14f6174a19c8a4efcf36a06e847f632"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 3",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%203.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://320bee0fbdf2a168d47810236985a7c40b4f85c9"
+  },
+  {
+    "titulo": "Dazn MotoGP",
+    "portada": "https://i.imgur.com/tHhFsZk.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://342ca6975a4884d81f9fec5c4085a47060bd2028"
+  },
+  {
+    "titulo": "ACB EVENTO 01",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://23bee556c002d0726c1f0cac98a1901cff0a9239"
+  },
+  {
+    "titulo": "ACB EVENTO 01",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://53962d7fb865aff73b34a3afb2905cd492f60d75"
+  },
+  {
+    "titulo": "ACB EVENTO 02",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://d7e6b6bb1666740a21099fe6ceb0178a14f58e0c"
+  },
+  {
+    "titulo": "ACB EVENTO 02",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://22b702984a0db43fd371c30e2df150b2336551cd"
+  },
+  {
+    "titulo": "ACB EVENTO 03",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://119087e842ea8857124b9405b10bb6cfffd2900c"
+  },
+  {
+    "titulo": "ACB EVENTO 03",
+    "portada": "https://www.acb.com/docs/descarga/logos/liga_endesa/JPG/ligaendesa_vertical_positivo.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://02ec118ee4586d96df9115ffc486be9a499d00d9"
+  },
+  {
+    "titulo": "DAZN 1",
+    "portada": "https://i.ibb.co/FVzKq1y/dazn1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a116ce3ff95c41c60e987e2b1aa247007f707884"
+  },
+  {
+    "titulo": "DAZN 1",
+    "portada": "https://i.ibb.co/FVzKq1y/dazn1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream:/9afc89481b721ce6c326c85e47148676077b8e62"
+  },
+  {
+    "titulo": "DAZN 1",
+    "portada": "https://i.ibb.co/FVzKq1y/dazn1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://7ba1f321f4d0791b7ebd42f41a07c1cd1479e784"
+  },
+  {
+    "titulo": "DAZN 3",
+    "portada": "https://i.ibb.co/FVzKq1y/dazn1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://908bc5e7ae52afc06e40793b6db749dba11a1780"
+  },
+  {
+    "titulo": "DAZN 4",
+    "portada": "https://cdn.sincroguia.tv/uploads/channels/xlogo-dazn-4-1169.jpg.pagespeed.ic.6tKessrDtb.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://d669c6cee7173a1c8994075f7050a6526655b1dc"
+  },
+  {
+    "titulo": "DAZN 4",
+    "portada": "https://images.seeklogo.com/logo-png/49/2/dazn-laliga-logo-png_seeklogo-490009.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://9ced16b2055c99bf89c26e678e315e1b01d3734c"
+  },
+  {
+    "titulo": "Eurosport 1",
+    "portada": "https://i.ibb.co/r2Yd7xD/euro1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://48a589dbeab3544662fafd79888aada7d834cfe9"
+  },
+  {
+    "titulo": "Eurosport 2",
+    "portada": "https://i.ibb.co/M6h4Qyd/euro2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://24f940fef7e270b6b3ae5d9dc713a80c8345cfba"
+  },
+  {
+    "titulo": "Eurosport 2",
+    "portada": "https://i.ibb.co/M6h4Qyd/euro2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://f5908690485ae2facecf3074446ba4315f07a193"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion",
+    "portada": "https://i.ibb.co/CBdGc9f/hypermotion1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a4f072c9b614323ac1258a175f868a909ea3c8cd"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion",
+    "portada": "https://i.ibb.co/CBdGc9f/hypermotion1.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://87bb542f974b6b9e89d0f2e20ed6dc93426f4be0"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion 2",
+    "portada": "https://i.ibb.co/8K0VrQV/hypermotion2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://3a21e651c0bffe810cfc8537065cb81f5ed68a55"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion 2",
+    "portada": "https://i.ibb.co/8K0VrQV/hypermotion2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://709075831bf5c41ed0a20dfbd640aab6c28971f8"
+  },
+  {
+    "titulo": "LaLiga TV Hypermotion 3",
+    "portada": "https://i.ibb.co/826y2Yv/Hypermotion3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://1fdb405a6942da0941266f24cdd1c71b11552f1f"
+  },
+  {
+    "titulo": "DAZN LaLiga",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/dazn-laliga-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://4e6d9cf7d177366045d33cd8311d8b1d7f4bed1f"
+  },
+  {
+    "titulo": "DAZN LaLiga",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/dazn-laliga-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://4955867fad3bc92e5b4c36045699fc277800fb18"
+  },
+  {
+    "titulo": "DAZN LaLiga 2",
+    "portada": "https://i.imgur.com/NcieUZO.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a231b2fa1f7754433efeb8bb8d69d7b9096dcba8"
+  },
+  {
+    "titulo": "DAZN LaLiga 2",
+    "portada": "https://i.imgur.com/NcieUZO.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://a231b2fa1f7754433efeb8bb8d69d7b9096dcba8"
+  },
+  {
+    "titulo": "DAZN LaLiga",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/dazn-laliga-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://9c75f1d190c518cfe0f236415b8dccc1f676ef3b"
+  },
+  {
+    "titulo": "M+ LaLiga",
+    "portada": "https://i.ibb.co/yfV1Q8n/liga.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://f863873de9f7b2996dde19a0657dd89835af3007"
+  },
+  {
+    "titulo": "M+ LaLiga",
+    "portada": "https://i.ibb.co/yfV1Q8n/liga.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://c9321006921967d6258df6945f1d598a5c0cbf1e"
+  },
+  {
+    "titulo": "M+ LaLiga 2",
+    "portada": "https://i.ibb.co/Tc97zSb/liga2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ad42faa399df66dcd62a1cbc9d1c99ed4512d3b8"
+  },
+  {
+    "titulo": "M+ LaLiga 2",
+    "portada": "https://i.ibb.co/Tc97zSb/liga2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://51b363b1c4d42724e05240ad068ad219df8042ec"
+  },
+  {
+    "titulo": "M+ LaLiga 3",
+    "portada": "https://i.ibb.co/BZF0xG9/liga3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://382b14499e3d76e557d449d2e5bbc4e4bd63bd39"
+  },
+  {
+    "titulo": "M+ LaLiga 4",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/laliga-tv-4-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://1bcee22d5476f2eae9dc2cb24e3685152cf285cb"
+  },
+  {
+    "titulo": "M+ LaLiga 4",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/laliga-tv-4-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://2a6b1fd8a24b23747db1ea534a51457708523602"
+  },
+  {
+    "titulo": "SKY Sports LaLiga",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKBCa6SydXxbOh3qbRLTAWW6FOnRo5nXa9kw&s",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://d58f619d860d29cd47720055b9bb842199971da1"
+  },
+  {
+    "titulo": "M+ Liga de Campeones",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://43249349740032bee068b5bbff7b078f642812db"
+  },
+  {
+    "titulo": "M+ Liga de Campeones",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://9db029dff6a9c637d1f670e78dbc1a479b9b406e"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 2",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%202.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://38f7b2044e549df2039ff26cefa6f9a60c854d5e"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 2",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%202.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://bb26037a253866d341778181eff5c8637240d615"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 3",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%203.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://cfc371890bfb502737a26de5215e50929c52d0f9"
+  },
+  {
+    "titulo": "M+ Liga de Campeones 3",
+    "portada": "https://raw.githubusercontent.com/davidmuma/picons_dobleM/master/icon/M%2B%20Liga%20de%20Campeones%203.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://4416843c96b7f7a1bc55c476091a60fff0922bc7"
+  },
+  {
+    "titulo": "MOVISTAR PLUS",
+    "portada": "https://i.ibb.co/hFYPWbpJ/plus.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://d23497596720b47b096ec0f850d6d26a19d1a336"
+  },
+  {
+    "titulo": "MOVISTAR PLUS",
+    "portada": "https://i.ibb.co/hFYPWbpJ/plus.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ed74406ccdb3c21941b919db6bffca7f1de015bb"
+  },
+  {
+    "titulo": "M+ Deportes",
+    "portada": "https://i.ibb.co/CV4CLjz/deportes.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://6e031aed136bf97d8667fcd5fc49c73256928281"
+  },
+  {
+    "titulo": "M+ Deportes",
+    "portada": "https://i.ibb.co/CV4CLjz/deportes.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ebca4a63ce3bfda7b272964a1acc5227218184a4"
+  },
+  {
+    "titulo": "M+ Deportes 2",
+    "portada": "https://i.ibb.co/q95fBKV/deportes2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://bfa01c11c5c6b7a616a516de4f2c769a89d26b25"
+  },
+  {
+    "titulo": "M+ Deportes 2",
+    "portada": "https://i.ibb.co/q95fBKV/deportes2.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://f0ee7a2b43c1df5ea9e4fac5bf876d5bef4372b0"
+  },
+  {
+    "titulo": "M+ Deportes 3",
+    "portada": "https://i.ibb.co/jDg5qWD/deportes3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://2fd410c5d89e7a627cd3785685b7915b8e4bd534"
+  },
+  {
+    "titulo": "M+ Deportes 3",
+    "portada": "https://i.ibb.co/jDg5qWD/deportes3.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://799c6b5ee1cf41af077d14e3f9c45a32697eb903"
+  },
+  {
+    "titulo": "M+ Deportes 4",
+    "portada": "https://i.ibb.co/WDN9NN9/deportes4.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://2a5d90651e212106434edea5bfbba1a843b7b97c"
+  },
+  {
+    "titulo": "M+ Deportes 4",
+    "portada": "https://i.ibb.co/WDN9NN9/deportes4.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://4abe06c5cce7cb3c6bef2c3bccaafefd3299794f"
+  },
+  {
+    "titulo": "M+ Deportes 4",
+    "portada": "https://i.ibb.co/WDN9NN9/deportes4.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://590a1f4546e3a0d5d419b62b8177b44d6ce0339f"
+  },
+  {
+    "titulo": "M+ Deportes 5",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/deportes-5-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://646a1ed4ece843de1979f7888cbdd4d937506a28"
+  },
+  {
+    "titulo": "M+ Deportes 5",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/deportes-5-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://7b361369a40046ad3011086f9d4ae2982fb4d5aa"
+  },
+  {
+    "titulo": "M+ Deportes 6",
+    "portada": "https://i.imgur.com/bVrPNnB.jpeg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://e6cd9205e26b3b6680f607030c702e911272524a"
+  },
+  {
+    "titulo": "M+ Deportes 7",
+    "portada": "https://www.movistarplus.es/recorte/n/caratula5/M2114916V1621463",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://2d549bbcd898b09c4b736e6e3e83e8e8c19fcbda"
+  },
+  {
+    "titulo": "M+ Golf",
+    "portada": "https://www.vhv.rs/dpng/d/424-4244985_file-movistar-golf-svg-logo-movistar-golf-hd.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://f60535a458b3c114283e2f433379144345beddd6"
+  },
+  {
+    "titulo": "M+ Golf",
+    "portada": "https://www.vhv.rs/dpng/d/424-4244985_file-movistar-golf-svg-logo-movistar-golf-hd.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://8121478d3d3e563ad6b98018bc1c0aeb2f6166eb"
+  },
+  {
+    "titulo": "M+ Vamos",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://0e5d8c9724fa9163f49096b70484e315251eb785"
+  },
+  {
+    "titulo": "M+ Vamos",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://476b6f6583517bd75c15c4663bf45fab7c8da9cf"
+  },
+  {
+    "titulo": "M+ VAMOS 2",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://5e310dbffed8c941d20ad819cb8ef43c34b07884"
+  },
+  {
+    "titulo": "M+ VAMOS 3",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://837883625d40e1eb5566eefaf74811046491f53a"
+  },
+  {
+    "titulo": "M+ VAMOS 3",
+    "portada": "https://i.ibb.co/gWMRpFB/vamos.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://b7b1c1eeb4be09c63fbc2f319c9760851c274455"
+  },
+  {
+    "titulo": "RFEF TV",
+    "portada": "https://rfef.es/themes/custom/rfef/img/rfef-share.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://3fbc1b7dc316f19b77e7f7cfc775a0af67adcc7f"
+  },
+  {
+    "titulo": "Esport3",
+    "portada": "https://img.3cat.cat/multimedia/jpg/1/5/1697802708951.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ed6524f8f73c30cf102fde66f2cb520f4b5842e3"
+  },
+  {
+    "titulo": "Esport3",
+    "portada": "https://img.3cat.cat/multimedia/jpg/1/5/1697802708951.jpg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://8f59ce96e4c902ba2f5193af07546d7ff17fc3bc"
+  },
+  {
+    "titulo": "Teledeporte",
+    "portada": "https://img2.rtve.es/n/15966755",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://b0d1489c9f3239349665ad5ab423363f2b02e5ae"
+  },
+  {
+    "titulo": "Teledeporte",
+    "portada": "https://img2.rtve.es/n/15966755",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://77cf022557c56cdf8d8115f50e61f846ad72ee05"
+  },
+  {
+    "titulo": "Dazn MotoGP",
+    "portada": "https://i.imgur.com/tHhFsZk.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://342ca6975a4884d81f9fec5c4085a47060bd2028"
+  },
+  {
+    "titulo": "Dazn MotoGP",
+    "portada": "https://i.imgur.com/tHhFsZk.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://342ca6975a4884d81f9fec5c4085a47060bd2028"
+  },
+  {
+    "titulo": "Eternidad",
+    "portada": "https://pics.filmaffinity.com/Eternity-961050540-large.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6216"
+  },
+  {
+    "titulo": "La asistenta acestream",
+    "portada": "https://es.web.img2.acsta.net/img/71/83/7183a7a55e47f98332d9ef93b5518384.jpg",
+    "categoria": "#peliculas",
+    "anio": "",
+    "link": "http://127.0.0.1:6878/ace/getstream?infohash=1a63b5bb10108557f500ce620d3382ca33a8b98c"
+  },
+  {
+    "titulo": "Scream 7",
+    "portada": "https://image.tmdb.org/t/p/w500/hflipaW7mtfKZM9WFEyzUdFsgSk.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6227"
+  },
+  {
+    "titulo": "La sociedad de la nieve",
+    "portada": "https://image.tmdb.org/t/p/w500/9tkJPQb4X4VoU3S5nqLDohZijPj.jpg",
+    "categoria": "#peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6274"
+  },
+  {
+    "titulo": "Jules",
+    "portada": "https://image.tmdb.org/t/p/w500/qMHXapZUmk2sB6XWF82loZD3FIK.jpg",
+    "categoria": "#peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6278"
+  },
+  {
+    "titulo": "Subsuelo",
+    "portada": "https://image.tmdb.org/t/p/w500/ctW0xFUhjNJfKypBwXKczENr84h.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6280"
+  },
+  {
+    "titulo": "Géminis",
+    "portada": "https://image.tmdb.org/t/p/w500/vyX8rxk5ozdlrl8kgWvLWwswimZ.jpg",
+    "categoria": "#peliculas",
+    "anio": "2020",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6332"
+  },
+  {
+    "titulo": "Los mundos de Coraline",
+    "portada": "https://image.tmdb.org/t/p/w500/xz1HjxeqpIACyPtJMqv33Z2RjRP.jpg",
+    "categoria": "#peliculas",
+    "anio": "2009",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6336"
+  },
+  {
+    "titulo": "El Pianista",
+    "portada": "https://image.tmdb.org/t/p/w500/3ZLo0rib2nM6a68twn5IafhqUQU.jpg",
+    "categoria": "#peliculas",
+    "anio": "1998",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6338"
+  },
+  {
+    "titulo": "Greenland 2",
+    "portada": "https://image.tmdb.org/t/p/w500/q7aijAKE98Fcp6dgR6oWiUkFO2g.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6340"
+  },
+  {
+    "titulo": "Mongol 2007",
+    "portada": "https://image.tmdb.org/t/p/w500/z7zHTW4g4ZFoA4WMWrYZlP4cYYV.jpg",
+    "categoria": "#peliculas",
+    "anio": "2007",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6342"
+  },
+  {
+    "titulo": "Los Dinosaurios Documntales",
+    "portada": "https://pics.filmaffinity.com/the_dinosaurs-190468530-mmed.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 1",
+    "link": "http://localhost:42955/resolve?chat_id=-1003837341885&msg_id=27262976"
+  },
+  {
+    "titulo": "Los Dinosaurios Documntales",
+    "portada": "https://pics.filmaffinity.com/the_dinosaurs-190468530-mmed.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 2",
+    "link": "http://127.0.0.1:42955/resolve?chat_id=-1003837341885&msg_id=28311552"
+  },
+  {
+    "titulo": "Los Dinosaurios Documntales",
+    "portada": "https://pics.filmaffinity.com/the_dinosaurs-190468530-mmed.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 3",
+    "link": "http://127.0.0.1:42955/resolve?chat_id=-1003837341885&msg_id=29360128"
+  },
+  {
+    "titulo": "Los Dinosaurios Documntales",
+    "portada": "https://pics.filmaffinity.com/the_dinosaurs-190468530-mmed.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 4",
+    "link": "http://127.0.0.1:42955/resolve?chat_id=-1003837341885&msg_id=30408704"
+  },
+  {
+    "titulo": "Sultan of swing",
+    "portada": "https://m.media-amazon.com/images/I/81NXACShjnL._UF894,1000_QL80_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6441"
+  },
+  {
+    "titulo": "Capitán América: Civil War",
+    "portada": "https://image.tmdb.org/t/p/w500/jPPy7tCfglppQo6J9nGwU6UmJ8X.jpg",
+    "categoria": "#peliculas",
+    "anio": "2016",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6536"
+  },
+  {
+    "titulo": "La Maquina del Tiempo",
+    "portada": "https://image.tmdb.org/t/p/w500/q3Th3QEXNBJdZfU8S2XKp7TJDri.jpg",
+    "categoria": "#peliculas",
+    "anio": "1975",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6538"
+  },
+  {
+    "titulo": "Torrente, el brazo tonto de la ley",
+    "portada": "https://image.tmdb.org/t/p/w500/bYAqKRiDVL0f38AoUKpDI32oY5r.jpg",
+    "categoria": "#peliculas",
+    "anio": "1998",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6557"
+  },
+  {
+    "titulo": "Torrente 2: Misión en Marbella",
+    "portada": "https://image.tmdb.org/t/p/w500/pAXIn7wFa6140zi6LzYMD6Rt8CD.jpg",
+    "categoria": "#peliculas",
+    "anio": "2001",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6559"
+  },
+  {
+    "titulo": "Torrente 3: El protector",
+    "portada": "https://image.tmdb.org/t/p/w500/wDPujLAIQTfUCkrS21l8FXGXb5E.jpg",
+    "categoria": "#peliculas",
+    "anio": "2005",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6561"
+  },
+  {
+    "titulo": "Torrente 4: Lethal crisis",
+    "portada": "https://image.tmdb.org/t/p/w500/ye6vXu1Ts4lo8gPlKUBRESvdgic.jpg",
+    "categoria": "#peliculas",
+    "anio": "2011",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6563"
+  },
+  {
+    "titulo": "Torrente 5: Operación Eurovegas",
+    "portada": "https://image.tmdb.org/t/p/w500/xfdrLVB61b0ALAjxFwtbmlv1GT4.jpg",
+    "categoria": "#peliculas",
+    "anio": "2014",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6565"
+  },
+  {
+    "titulo": "El ministro de propaganda",
+    "portada": "https://image.tmdb.org/t/p/w500/x3fYOR0wFn2ibEx6pG2XqlrjA3j.jpg",
+    "categoria": "#peliculas",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6570"
+  },
+  {
+    "titulo": "AAA Alianzas Noviembre 2025",
+    "portada": "https://image.tmdb.org/t/p/w500/kRXGV6xRmeflKsYzdoSnBUn5InX.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6586"
+  },
+  {
+    "titulo": "Anora",
+    "portada": "https://image.tmdb.org/t/p/w500/n5wEFSLkm2fCtN0FVAuphrCAjf8.jpg",
+    "categoria": "#peliculas",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6597"
+  },
+  {
+    "titulo": "Airbourne:  Live at Rockpalast 2010",
+    "portada": "https://image.tmdb.org/t/p/w500/mHkGS4ok1rh9dFbCp7wfZonJssp.jpg",
+    "categoria": "#peliculas",
+    "anio": "2010",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6591"
+  },
+  {
+    "titulo": "Un lugar tranquilo 2",
+    "portada": "https://image.tmdb.org/t/p/w500/6uRb5axnwAd17h4ak4ENHcJqHVr.jpg",
+    "categoria": "#peliculas",
+    "anio": "2021",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6599"
+  },
+  {
+    "titulo": "Siempre es invierno",
+    "portada": "https://image.tmdb.org/t/p/w500/k3mUdZf2T58bMgGLaIgrJrLMxC3.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6605"
+  },
+  {
+    "titulo": "Anora",
+    "portada": "https://image.tmdb.org/t/p/w500/n5wEFSLkm2fCtN0FVAuphrCAjf8.jpg",
+    "categoria": "#peliculas",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6607"
+  },
+  {
+    "titulo": "DAZN F1 FHD ",
+    "portada": "https://i.imgur.com/NDU8jqT.jpeg",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://6422e8bc34282871634c81947be093c04ad1bb29"
+  },
+  {
+    "titulo": "Los domingos",
+    "portada": "https://image.tmdb.org/t/p/w500/kwpDm6qtON8pLCSY0C8MltMofEE.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6636"
+  },
+  {
+    "titulo": "La zona de interés",
+    "portada": "https://image.tmdb.org/t/p/w500/jjBgrAsz0vFerjesnM3NnyU3Bm5.jpg",
+    "categoria": "#peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6678"
+  },
+  {
+    "titulo": "La Caja De Música",
+    "portada": "https://image.tmdb.org/t/p/w500/wfvsuNn6Y0jV5ETnf80Ir4PP8ht.jpg",
+    "categoria": "#peliculas",
+    "anio": "1989",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6700"
+  },
+  {
+    "titulo": "Furiosa: De la saga Mad Max",
+    "portada": "https://image.tmdb.org/t/p/w500/tGHUlykWn9V2IIQ4ZaATIAq9VLB.jpg",
+    "categoria": "#peliculas",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6815"
+  },
+  {
+    "titulo": "SEND HELP (Enviad ayuda)",
+    "portada": "https://image.tmdb.org/t/p/w500/qXZZtyzuTX3KMfSLssCR6J0mODd.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6708"
+  },
+  {
+    "titulo": "M+ Deportes 5",
+    "portada": "https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/spain/deportes-5-por-movistar-plus-es.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://7b361369a40046ad3011086f9d4ae2982fb4d5aa"
+  },
+  {
+    "titulo": "Un lugar tranquilo 2",
+    "portada": "https://image.tmdb.org/t/p/w500/6uRb5axnwAd17h4ak4ENHcJqHVr.jpg",
+    "categoria": "#peliculas",
+    "anio": "2021",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6599"
+  },
+  {
+    "titulo": "Los domingos",
+    "portada": "https://image.tmdb.org/t/p/w500/kwpDm6qtON8pLCSY0C8MltMofEE.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6636"
+  },
+  {
+    "titulo": "Anora",
+    "portada": "https://image.tmdb.org/t/p/w500/n5wEFSLkm2fCtN0FVAuphrCAjf8.jpg",
+    "categoria": "#peliculas",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6607"
+  },
+  {
+    "titulo": "M+ Deportes 6",
+    "portada": "https://www.movistarplus.es/recorte/n/caratula5/M2114916V1621463",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://e6cd9205e26b3b6680f607030c702e911272524a"
+  },
+  {
+    "titulo": "M+ Deportes",
+    "portada": "https://i.ibb.co/CV4CLjz/deportes.png",
+    "categoria": "#directos",
+    "anio": "2026",
+    "link": "acestream://ebca4a63ce3bfda7b272964a1acc5227218184a4"
+  },
+  {
+    "titulo": "Buscando a Nemo",
+    "portada": "https://static.cegal.es/imagenes/marcadas/9788416/978841654853.gif",
+    "categoria": "#peliculas",
+    "anio": "",
+    "link": "tvgram://play?url=https://t.me/c/2111145906/7148/474988"
+  },
+  {
+    "titulo": "La sociedad de la nieve",
+    "portada": "https://image.tmdb.org/t/p/w500/9tkJPQb4X4VoU3S5nqLDohZijPj.jpg",
+    "categoria": "#peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/c/3749684388/6274"
+  },
+  {
+    "titulo": "AÑO MARIANO",
+    "portada": "https://m.media-amazon.com/images/M/MV5BMTYzOTU3MTk2NF5BMl5BanBnXkFtZTcwNzM3MjY1Mg@@._V1_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2000",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/6882"
+  },
+  {
+    "titulo": "Jamon jamon",
+    "portada": "https://m.media-amazon.com/images/I/512B0TK90YL._AC_UF894,1000_QL80_.jpg",
+    "categoria": "#peliculas",
+    "anio": "1992",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/6886"
+  },
+  {
+    "titulo": "secaderos",
+    "portada": "https://beginagainfilms.es/wp-content/uploads/2023/05/Cartel_SECADEROS_BAF_PromocionCines_web.jpg",
+    "categoria": "#peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/6123"
+  },
+  {
+    "titulo": "URCHIN",
+    "portada": "https://image.tmdb.org/t/p/w500/38Fcb3lgBYITJ3j6hjrFiKoCIqi.jpg",
+    "categoria": "#peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/6894"
+  },
+  {
+    "titulo": "53 domingos",
+    "portada": "https://vmanager.iseic.net/media/ver/port/wide/mobile/v4/2026/03/4bb35ae5-d415-4762-ad9e-fa0f7a9f0abb.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/7487"
+  },
+  {
+    "titulo": "londres salvaje",
+    "portada": "https://image.tmdb.org/t/p/w500/qxoCZcvdDEhZ2v7zCIvhGISnyP2.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/7489"
+  },
+  {
+    "titulo": "Cumbres borrascosas",
+    "portada": "https://image.tmdb.org/t/p/w500/afGUJcMBJloAUp9uC27MQiqkD7X.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/7993"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 1",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7971"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 2",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7972"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 3",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7973"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 4",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7974"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 5",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7975"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 6",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7976"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 7",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7977"
+  },
+  {
+    "titulo": "21 Thunder ",
+    "portada": "https://m.media-amazon.com/images/M/MV5BZTM1Njg1NGYtNzBlMC00NjdkLWIwMjEtNGUwMDBiNTJjMTQ0XkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "Episodio 8",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/7978"
+  },
+  {
+    "titulo": "Aún Estoy Aquí",
+    "portada": "https://www.aceprensa.com/wp-content/uploads/2025/02/aun-estoy-aqui-716x1024.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1/8097"
+  },
+  {
+    "titulo": "El maestro que prometió el mar",
+    "portada": "https://cineszocomajadahonda.org/wp-content/uploads/53587789263_48a02544db_o-scaled.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/8149"
+  },
+  {
+    "titulo": "Hermano oso",
+    "portada": "https://image.tmdb.org/t/p/w500/1XwOQNSby3HZfKMZcY7rtZw4KR.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2111145906/7148/474978"
+  },
+  {
+    "titulo": "Revelación",
+    "portada": "https://www.commonsensemedia.org/sites/default/files/styles/ratio_2_3_xlarge/public/product-images/csm-movie/revelations.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/7477"
+  },
+  {
+    "titulo": "Siempre es invierno",
+    "portada": "https://image.tmdb.org/t/p/w500/vWdQtOjqwwcO8mwm3ArcDiOiHqr.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/7471"
+  },
+  {
+    "titulo": "Romería (2025)",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNjMyNWE4MTAtODhhMC00MTI4LWIwZTQtNjA5ZGNiNmZmZDI1XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://pixeldrain.net/u/SpJxLATa"
+  },
+  {
+    "titulo": "Valor sentimental (2025)",
+    "portada": "https://es.web.img3.acsta.net/img/35/66/35661f40931132d1af3e82b56fed553f.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://pixeldrain.net/u/j6Zs1X3M"
+  },
+  {
+    "titulo": "Escuadrón letal (2025)",
+    "portada": "https://m.media-amazon.com/images/S/pv-target-images/c70c2bee6dfe4dbcf46d0ec3e177d1d86b1319cc210150bacf75b0da08b06e2d.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://pixeldrain.net/u/4W4w4D9i"
+  },
+  {
+    "titulo": "Golpes",
+    "portada": "https://multicinestenerife.com/wp-content/uploads/2025/12/unnamed-2-204x350_c.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5877"
+  },
+  {
+    "titulo": "Entre Tierras",
+    "portada": "https://es.web.img2.acsta.net/img/a7/3e/a73e03ded95e0bf2b288d13d6faaa9dc.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5889"
+  },
+  {
+    "titulo": "Entre Tierras",
+    "portada": "https://es.web.img2.acsta.net/img/a7/3e/a73e03ded95e0bf2b288d13d6faaa9dc.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5891"
+  },
+  {
+    "titulo": "Entre Tierras",
+    "portada": "https://es.web.img2.acsta.net/img/a7/3e/a73e03ded95e0bf2b288d13d6faaa9dc.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5893"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1074"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1075"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1076"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1077"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1078"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1079"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1080"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1081"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1082"
+  },
+  {
+    "titulo": "Hermanos de Sangre",
+    "portada": "https://pics.filmaffinity.com/Hermanos_de_sangre_Miniserie_de_TV-541225951-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1083"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1047"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1048"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1049"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1050"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1051"
+  },
+  {
+    "titulo": "El caballero de los siete reinos",
+    "portada": "https://pics.filmaffinity.com/a_knight_of_the_seven_kingdoms-848827233-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1052"
+  },
+  {
+    "titulo": "La Orden del Fénix",
+    "portada": "https://image.tmdb.org/t/p/w500/xxXiM2Ij7plbzibKWW9BfDk23aI.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1579652292/686/4835"
+  },
+  {
+    "titulo": "Drácula",
+    "portada": "https://image.tmdb.org/t/p/w500/ff7fyDdtXM2wu9jsm9gOMYtpvOl.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1918569531/152839/337892"
+  },
+  {
+    "titulo": "del reves",
+    "portada": "https://image.tmdb.org/t/p/w500/lE3DCRI7bQgHSiIuEPcFiXpiuGV.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/lacasadeldragon_ck/203"
+  },
+  {
+    "titulo": "sin piedad",
+    "portada": "https://image.tmdb.org/t/p/w500/9zBNg8koM3fjUTPT7QeJHuGG2r9.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/lacasadeldragon_ck/201"
+  },
+  {
+    "titulo": "sueños en oslo",
+    "portada": "https://image.tmdb.org/t/p/w500/5BRlnpdZTzt2JDujAizDwDYQCNs.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/lacasadeldragon_ck/198"
+  },
+  {
+    "titulo": "Love Me, Love Me",
+    "portada": "https://image.tmdb.org/t/p/w500/jfwHKRHRE2X4NTexdzblaioHH51.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/lacasadeldragon_ck/196"
+  },
+  {
+    "titulo": "ahora me vez 3",
+    "portada": "https://pics.filmaffinity.com/Ahora_me_ves_3-640070231-large.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "https://t.me/lacasadeldragon_ck/194"
+  },
+  {
+    "titulo": "Una carta a mí Juventud",
+    "portada": "https://image.tmdb.org/t/p/w500/lQAEYXhRyOD6OQK0tKt9FAj3Kkx.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/lacasadeldragon_ck/188"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5905"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5907"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5909"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5911"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5913"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5915"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5917"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5919"
+  },
+  {
+    "titulo": "Yellowstone",
+    "portada": "https://pics.filmaffinity.com/yellowstone-884945491-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1553890390/5921"
+  },
+  {
+    "titulo": "The Pitt",
+    "portada": "https://image.tmdb.org/t/p/w500/kvFSpESyBZMjaeOJDx7RS3P1jey.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=/help"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194266"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194267"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194268"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194269"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194270"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194271"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194272"
+  },
+  {
+    "titulo": "El largo río de las almas (2025)",
+    "portada": "https://pics.filmaffinity.com/El_largo_raio_de_las_almas_Serie_de_TV-204563225-large.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Videoclubserieselretorno/102880/194273"
+  },
+  {
+    "titulo": "El Último Gigante",
+    "portada": "https://es.web.img3.acsta.net/img/bc/06/bc068f07e1731016a68fc734afde4d9f.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/1788352447/501136/874588"
+  },
+  {
+    "titulo": "Harry Potter y las Reliquias de la Muerte 2",
+    "portada": "https://m.media-amazon.com/images/I/71Qw7SC8IDL._AC_UF894,1000_QL80_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2168987560/89754/150869"
+  },
+  {
+    "titulo": "ROMERIA",
+    "portada": "https://es.web.img2.acsta.net/img/af/68/af68d85f1f115be98178bfd97e9cc957.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/28956"
+  },
+  {
+    "titulo": "BABYLON",
+    "portada": "https://www.cinemamalda.com/wp-content/uploads/2023/04/babylon.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1133"
+  },
+  {
+    "titulo": "LA VIUDA NEGRA",
+    "portada": "https://pics.filmaffinity.com/La_viuda_negra-896924809-large.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1134"
+  },
+  {
+    "titulo": "Harry Potter y el misterio del Principe",
+    "portada": "https://image.tmdb.org/t/p/w500/tO0UGkNuQoxyXve0mvwtXP49NAO.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/16"
+  },
+  {
+    "titulo": "EL BOTIN",
+    "portada": "https://images.justwatch.com/poster/340952481/s718/rip-0.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/8/29508"
+  },
+  {
+    "titulo": "Harry potter y la piedra filosofal",
+    "portada": "https://image.tmdb.org/t/p/w500/3MKK7vAJLtSkBTABMTjxf6TOCo3.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/2"
+  },
+  {
+    "titulo": "Harry Potter y la cámara secreta",
+    "portada": "https://image.tmdb.org/t/p/w500/bhCfAzeMMg7GyLDT11yVM2i1NPh.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/3"
+  },
+  {
+    "titulo": "Harry Potter",
+    "portada": "https://image.tmdb.org/t/p/w500/5hrrncgY7GfRHz6JmnhPlvJUONe.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/5"
+  },
+  {
+    "titulo": "Harry Potter",
+    "portada": "https://image.tmdb.org/t/p/w500/xxXiM2Ij7plbzibKWW9BfDk23aI.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/6"
+  },
+  {
+    "titulo": "LA ASISTENTA",
+    "portada": "https://lh3.googleusercontent.com/pw/AP1GczNftFGmpqwN68Wk3zPSEbePjeUaRcmPZJhRtZwNFGKxax30rEhhYLKDS05zoYXHn2Hs5hexoaPSM5par2JqcP313kKYXAHyoUarqya3UFbrTHUqfX1H=w2400",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1138"
+  },
+  {
+    "titulo": "SINISTER",
+    "portada": "https://pics.filmaffinity.com/sinister-331009764-large.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/8/9106"
+  },
+  {
+    "titulo": "LA ASISTENTA",
+    "portada": "https://www.bizcochito.es/img/tt27543632-es-pos.webp",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/8/32573"
+  },
+  {
+    "titulo": "Reversión",
+    "portada": "https://image.tmdb.org/t/p/w500/8N5ZJObdKQynrNZjabVMEiKFEFZ.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/33"
+  },
+  {
+    "titulo": "Deathstalker",
+    "portada": "https://image.tmdb.org/t/p/w500/v0m1HewJ9eqSRbldIDzqRlYm16d.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/37"
+  },
+  {
+    "titulo": "Arlempdes",
+    "portada": "https://image.tmdb.org/t/p/w500/doz7atgFLWogKj0dPXuZCQnJHKv.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/40"
+  },
+  {
+    "titulo": "El accidente de piano",
+    "portada": "https://image.tmdb.org/t/p/w500/tTxiiSFFocayJX16Yxs2HB8RVZR.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/45"
+  },
+  {
+    "titulo": "RUTA DE ESCAPE",
+    "portada": "https://www.sonypictures.es/statics/medium_1080_X1920_40dfe80f70.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/8/36072"
+  },
+  {
+    "titulo": "Keeper",
+    "portada": "https://image.tmdb.org/t/p/w500/2sr2n0mZ8cG4VeXG4EHoPBz9QuF.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/87"
+  },
+  {
+    "titulo": "El Rey de Reyes",
+    "portada": "https://image.tmdb.org/t/p/w500/oukn96XolAQBXykWTVT6h0HNgY7.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/85"
+  },
+  {
+    "titulo": "Mike y Nick y Nick y Alice",
+    "portada": "https://image.tmdb.org/t/p/w500/k6PSvLUs84QJsWLt0Zlkoa8ih6V.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/81"
+  },
+  {
+    "titulo": "Pretty Lethal",
+    "portada": "https://image.tmdb.org/t/p/w500/cmZqxJQ9MdNQEoD49HYghOXsiwH.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/77"
+  },
+  {
+    "titulo": "EL MEDICO II",
+    "portada": "https://www.deaplaneta.com/uploads/20251127/El_Medico_2_Poster_290.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "https://pixeldrain.net/api/file/RtZNoRfx"
+  },
+  {
+    "titulo": "EL MEDICO II",
+    "portada": "https://www.deaplaneta.com/uploads/20251127/El_Medico_2_Poster_290.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2440450209/8/36010"
+  },
+  {
+    "titulo": "Mientras Dure la Guerra",
+    "portada": "https://www.premiosgoya.com/wp-content/uploads/2019/11/system/uploads/feature_film/poster/1346/AAFF_MDLG_RGB_REF_26_07-320x457.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/3723557656/2/2536"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7285"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7286"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7287"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7288"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7289"
+  },
+  {
+    "titulo": "DUNE La Profecía",
+    "portada": "https://playmax.xyz/img/c/400/195/1731917986/97148.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2198503265/3182/7290"
+  },
+  {
+    "titulo": "CLIKA Vive tus sueños",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNzEyYjAyNWMtY2Y3Yy00YjRmLTllNDYtMThkMDFlNWI3YTkwXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/95"
+  },
+  {
+    "titulo": "Escuadrón letal",
+    "portada": "https://image.tmdb.org/t/p/w500/ftBCLqEhDvgKRcux0fk5TriVhMD.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/91"
+  },
+  {
+    "titulo": "el descendiente",
+    "portada": "https://image.tmdb.org/t/p/w500/3tO8SSlRxrZrJStbX2nPr5u7dCQ.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/96"
+  },
+  {
+    "titulo": "Sinister",
+    "portada": "https://m.media-amazon.com/images/I/51Vttk-H1RL._AC_UF894,1000_QL80_.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/8586"
+  },
+  {
+    "titulo": "La ley del asfalto",
+    "portada": "https://image.tmdb.org/t/p/w500/huPpcGEVt8GFJI9Xj4nf6cPMFqM.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "https://pixeldrain.net/u/jFYBY49y"
+  },
+  {
+    "titulo": "Babylon",
+    "portada": "https://image.tmdb.org/t/p/w500/9bHTq4XfYpAZcgzTLoPAElMytMj.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/101"
+  },
+  {
+    "titulo": "Gladiator 2",
+    "portada": "https://image.tmdb.org/t/p/w500/ckTXrwlr4cRVxpBFEZcEmDzrmea.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/102"
+  },
+  {
+    "titulo": "El último gigante",
+    "portada": "https://image.tmdb.org/t/p/w500/a8CuWZZ91SWajXLpZHN0ttfVtk2.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/104"
+  },
+  {
+    "titulo": "Noche de bodas",
+    "portada": "https://image.tmdb.org/t/p/w500/47BlTRVQ43NyzgMWPLOkKYYnHez.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/117"
+  },
+  {
+    "titulo": "CIUDAD SIN SUEÑO",
+    "portada": "https://bteampictures.es/wp-content/uploads/2024/10/Copy-CSS_online_baja.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1162"
+  },
+  {
+    "titulo": "Ready or Not",
+    "portada": "https://image.tmdb.org/t/p/w500/47BlTRVQ43NyzgMWPLOkKYYnHez.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/117"
+  },
+  {
+    "titulo": "UN SIMPLE ACCIDENTE",
+    "portada": "https://es.web.img3.acsta.net/img/1d/8d/1d8d9b04eea852815c88ef0a8917881f.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "https://pixeldrain.net/u/7Tf9VCLL"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK",
+    "portada": "https://m.media-amazon.com/images/M/MV5BMGY1NGJkOTAtM2RmNC00NWI3LWJkY2EtYjU1YmY5OGFjN2RjXkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1175"
+  },
+  {
+    "titulo": "LA PROMESA DE IRENE",
+    "portada": "https://pics.filmaffinity.com/La_promesa_de_Irene-972793869-large.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1183"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK (SIGUIENTE)",
+    "portada": "https://m.media-amazon.com/images/M/MV5BMGY1NGJkOTAtM2RmNC00NWI3LWJkY2EtYjU1YmY5OGFjN2RjXkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK (SIGUIENTE) (SIGUIENTE)",
+    "portada": "https://m.media-amazon.com/images/M/MV5BMGY1NGJkOTAtM2RmNC00NWI3LWJkY2EtYjU1YmY5OGFjN2RjXkEyXkFqcGc@._V1_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1176"
+  },
+  {
+    "titulo": "CLANES",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1054"
+  },
+  {
+    "titulo": "CLANES (SIGUIENTE)",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1055"
+  },
+  {
+    "titulo": "STRANGER THINGS 1X01",
+    "portada": "https://pics.filmaffinity.com/entre_tierras-308500748-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "Stranger Things"
+  },
+  {
+    "titulo": "CLANES",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1054"
+  },
+  {
+    "titulo": "CLANES 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1055"
+  },
+  {
+    "titulo": "CLANES 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1056"
+  },
+  {
+    "titulo": "CLANES 2 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1057"
+  },
+  {
+    "titulo": "CLANES 2 2 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1058"
+  },
+  {
+    "titulo": "CLANES 2 2 2 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1059"
+  },
+  {
+    "titulo": "CLANES 2 2 2 2 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1060"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X01",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1175"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X02",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1176"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X03",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1177"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X04",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1178"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X05",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1179"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X06",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1180"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X07",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1181"
+  },
+  {
+    "titulo": "YOUNG SHERLOCK 1X08",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBCy9nqsYg6LjEQZY3gPAZbSXfSlXjghR0FputQB77_DKHBLGukX0Y04Qd&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1182"
+  },
+  {
+    "titulo": "ENTRE TIERRAS 2X1",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPUtO35nLPxaTN5OmOZtoyCaM_cijtEdmf_OJD_shRIA_fNYJCxx0ItIcl&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1085"
+  },
+  {
+    "titulo": "ENTRE TIERRAS 2X02",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPUtO35nLPxaTN5OmOZtoyCaM_cijtEdmf_OJD_shRIA_fNYJCxx0ItIcl&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1086"
+  },
+  {
+    "titulo": "ENTRE TIERRAS 2X03",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPUtO35nLPxaTN5OmOZtoyCaM_cijtEdmf_OJD_shRIA_fNYJCxx0ItIcl&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1119"
+  },
+  {
+    "titulo": "ENTRE TIERRAS 2X04",
+    "portada": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPUtO35nLPxaTN5OmOZtoyCaM_cijtEdmf_OJD_shRIA_fNYJCxx0ItIcl&s=10",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1173"
+  },
+  {
+    "titulo": "CLANES",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_.jpg\nCLANES",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8724"
+  },
+  {
+    "titulo": "CLANES 1X01",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1054"
+  },
+  {
+    "titulo": "CLANES 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_.jpg\nCLANES",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8725"
+  },
+  {
+    "titulo": "CLANES 1X02",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1055"
+  },
+  {
+    "titulo": "CLANES 2 2",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_.jpg\nCLANES",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8726"
+  },
+  {
+    "titulo": "CLANES 1X03",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1056"
+  },
+  {
+    "titulo": "CLANES 1X04",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1057"
+  },
+  {
+    "titulo": "CLANES 1X05",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1058"
+  },
+  {
+    "titulo": "CLANES 1X06",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1059"
+  },
+  {
+    "titulo": "CLANES 1X07",
+    "portada": "https://m.media-amazon.com/images/M/MV5BNDIxNzdhMjItMGFkMS00OGZjLWIyMjAtNTJjMzM4MzkzYmM5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1060"
+  },
+  {
+    "titulo": "CLANES 2X01",
+    "portada": "https://lh3.googleusercontent.com/pw/AP1GczMJ3IrisfsUKI7oykG-Wye5ISQmo6R6ASunnzn2bPD9-yAeoMEtiENPDbQGBafjrkZol0QRTyCgOT3tbFCwGVLvoTKETHJ4h8vvcGITvPwmjZjtvbLh=w2400",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1200"
+  },
+  {
+    "titulo": "CLANES 2X02",
+    "portada": "https://lh3.googleusercontent.com/pw/AP1GczMJ3IrisfsUKI7oykG-Wye5ISQmo6R6ASunnzn2bPD9-yAeoMEtiENPDbQGBafjrkZol0QRTyCgOT3tbFCwGVLvoTKETHJ4h8vvcGITvPwmjZjtvbLh=w2400",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1201"
+  },
+  {
+    "titulo": "ZETA",
+    "portada": "https://image.tmdb.org/t/p/w500/tEFMZGcmxBDCodbLAqmrjdjCTwm.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/146"
+  },
+  {
+    "titulo": "SÚPER MARIO GALAXI",
+    "portada": "https://image.tmdb.org/t/p/w500/79EVB4qhyfrdlMgT8GIRAikdzsQ.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/147"
+  },
+  {
+    "titulo": "MATAR VENGAR REPETIR",
+    "portada": "https://image.tmdb.org/t/p/w500/xzuvCZNKF2jnZ6amc0SP5AjclNK.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/149"
+  },
+  {
+    "titulo": "RUTA DE ESCAPE 2",
+    "portada": "https://www.sonypictures.es/statics/medium_1080_X1920_40dfe80f70.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/153"
+  },
+  {
+    "titulo": "EL MÉDICO",
+    "portada": "https://image.tmdb.org/t/p/w500/QHzDzBdXQinLn1Az63aYaohUgV.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/155"
+  },
+  {
+    "titulo": "EL MÉDICO 2",
+    "portada": "https://image.tmdb.org/t/p/w500/QHzDzBdXQinLn1Az63aYaohUgV.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/157"
+  },
+  {
+    "titulo": "CLANES 2X01",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1209"
+  },
+  {
+    "titulo": "CLANES 2X02",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1210"
+  },
+  {
+    "titulo": "CLANES 2X03",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1211"
+  },
+  {
+    "titulo": "CLANES 2X04",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1212"
+  },
+  {
+    "titulo": "CLANES 2X05",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1213"
+  },
+  {
+    "titulo": "CLANES 2X06",
+    "portada": "https://pics.filmaffinity.com/clanes-938671091-mmed.jpg",
+    "categoria": "#series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1040/1214"
+  },
+  {
+    "titulo": "EL SONIDO DE LA MUERTE",
+    "portada": "https://t.me/Y_Y_y7o/151",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/151"
+  },
+  {
+    "titulo": "LA NOVIA",
+    "portada": "https://image.tmdb.org/t/p/w500/4xC5IfnCekweHkTFjqQsMOC1gca.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/158"
+  },
+  {
+    "titulo": "SOBRAN LAS PALABRAS",
+    "portada": "https://image.tmdb.org/t/p/w500/tQd773a9flb3utTxwYWzsThU6j9.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/161"
+  },
+  {
+    "titulo": "ETERNITY",
+    "portada": "https://image.tmdb.org/t/p/w500/5zCTIGICQ9ykuBXDmS4rL1kEK9l.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/165"
+  },
+  {
+    "titulo": "LAS CRÓNICAS DE NARNIA",
+    "portada": "https://image.tmdb.org/t/p/w500/2Lv2wKf2YocOcRfzmvQYOUGRhFg.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/168"
+  },
+  {
+    "titulo": "LAS CRÓNICAS DE NARNIA",
+    "portada": "https://image.tmdb.org/t/p/w500/ccXSnN0bMBYc7Pno5chkpy7UYcq.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/169"
+  },
+  {
+    "titulo": "LAS CRÓNICAS DE NARNIA",
+    "portada": "https://image.tmdb.org/t/p/w500/i1VNVBUkai81eRQTS16zXllnN52.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/170"
+  },
+  {
+    "titulo": "RETURN TO SILENT HILL",
+    "portada": "https://image.tmdb.org/t/p/w500/5Y2TeCVEnwPbd4FDShGbkKYw6GE.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/177"
+  },
+  {
+    "titulo": "EL ENGAÑO",
+    "portada": "https://image.tmdb.org/t/p/w500/y8ADH1i7Ti1A0WLWjMCTEN6s4F8.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/175"
+  },
+  {
+    "titulo": "ESPÍRITU GITANO",
+    "portada": "https://image.tmdb.org/t/p/w500/hRBApDtFapC5i4HNLO85hZne2U0.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/209"
+  },
+  {
+    "titulo": "ARTISTA EN GUERRA",
+    "portada": "https://image.tmdb.org/t/p/w500/4tGIJZwAaOlyBNFKDor7VCLdlTS.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/215"
+  },
+  {
+    "titulo": "LA VOZ DE HIND",
+    "portada": "https://image.tmdb.org/t/p/w500/g6Mq2ymivGJoB7Y6XO7fNU9IJqR.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/217"
+  },
+  {
+    "titulo": "EL TEMPLO DE LOS HUESOS",
+    "portada": "https://image.tmdb.org/t/p/w500/2DTPapravB7kVBWjm6RsqEWyNqn.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/cinemaMX/3322"
+  },
+  {
+    "titulo": "OPERACIÓN CASTOR",
+    "portada": "https://image.tmdb.org/t/p/w500/4Z0E1W7YvQ0aVtgj7KKtktb9ukd.jpg",
+    "categoria": "#peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/223"
+  },
+  {
+    "titulo": "TRECE DÍAS",
+    "portada": "https://image.tmdb.org/t/p/w500/6Jm3Uh12E37sfrxYCiH25hL2S7G.jpg",
+    "categoria": "peliculas",
+    "anio": "2000",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/229"
+  },
+  {
+    "titulo": "EL AVIADOR",
+    "portada": "https://image.tmdb.org/t/p/w500/sZNc61SsUdKWl8yNhKjqesYStre.jpg",
+    "categoria": "peliculas",
+    "anio": "2004",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/231"
+  },
+  {
+    "titulo": "PERROS Y DIABLOS",
+    "portada": "https://image.tmdb.org/t/p/w500/7ateP8tehPJOk7kdvIuH4co99Ls.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/233"
+  },
+  {
+    "titulo": "UNA BATALLA TRAS OTRA",
+    "portada": "https://image.tmdb.org/t/p/w500/iZ1499F6hYxDxiqioy8oSUaxipG.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/234"
+  },
+  {
+    "titulo": "GOLPES",
+    "portada": "https://image.tmdb.org/t/p/w500/jDKla4N5XzjLVDl449E684YWx0g.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/236"
+  },
+  {
+    "titulo": "ECOS Y OTROS RELATOS ASOMBROSOS",
+    "portada": "https://image.tmdb.org/t/p/w500/4ApkaxocGRhYry7IWyuHJrPXhHC.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/242"
+  },
+  {
+    "titulo": "EL GRAN DILUVIO",
+    "portada": "https://image.tmdb.org/t/p/w500/qIzSyT2AmDxkcQ0zOAeTbtZR9EQ.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/244"
+  },
+  {
+    "titulo": "तू या मैं",
+    "portada": "https://image.tmdb.org/t/p/w500/8oX64BrJsndCn1f8bXcvyf5Sc4P.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/225"
+  },
+  {
+    "titulo": "MISIÓN: IMPOSIBLE - SENTENCIA FINAL",
+    "portada": "https://image.tmdb.org/t/p/w500/haOjJGUV00dKlZaJWgjM1UD1cJV.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/246"
+  },
+  {
+    "titulo": "SAW X",
+    "portada": "https://image.tmdb.org/t/p/w500/nzVkXj1IX0BNoYzpTVogtkcCStf.jpg",
+    "categoria": "peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/250"
+  },
+  {
+    "titulo": "PERROS Y DIABLOS",
+    "portada": "https://image.tmdb.org/t/p/w500/7ateP8tehPJOk7kdvIuH4co99Ls.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/251"
+  },
+  {
+    "titulo": "NOCHE DE JUEGOS",
+    "portada": "https://image.tmdb.org/t/p/w500/cSrbnS7SItBFenF6jrKGhgFAiaq.jpg",
+    "categoria": "peliculas",
+    "anio": "2018",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/8826"
+  },
+  {
+    "titulo": "VADHAM",
+    "portada": "https://image.tmdb.org/t/p/w500/fAgMAERZeRY15zilAazPWKzkeVJ.jpg",
+    "categoria": "peliculas",
+    "anio": "2021",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/253"
+  },
+  {
+    "titulo": "LAS VUELTAS QUE DA LA VIDA",
+    "portada": "https://image.tmdb.org/t/p/w500/d01wOgBAf8zigMfJWBu4whjJVyS.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/255"
+  },
+  {
+    "titulo": "COMPAÑERAS DE CUARTO",
+    "portada": "https://image.tmdb.org/t/p/w500/hHOBxFzUK2CHmQ5djuOneyHkptS.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/266"
+  },
+  {
+    "titulo": 180,
+    "portada": "https://image.tmdb.org/t/p/w500/9ISjrhA38HpSSGtfiCk8lpziC3K.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/268"
+  },
+  {
+    "titulo": "ÍDOLOS",
+    "portada": "https://image.tmdb.org/t/p/w500/ugwbVoO67N6nZn5A8LTPsn0pkuN.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/270"
+  },
+  {
+    "titulo": "LA TOSTADORA",
+    "portada": "https://image.tmdb.org/t/p/w500/cbYyWHc1dL1bfwEJbaMYDYKgWG2.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "La tostadora"
+  },
+  {
+    "titulo": "MISDIRECTION",
+    "portada": "https://image.tmdb.org/t/p/w500/z7padnoIDHbmxPdqEHryhqlaVqc.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/274"
+  },
+  {
+    "titulo": "FATHER MOTHER SISTER BROTHER",
+    "portada": "https://image.tmdb.org/t/p/w500/iLwZuafLq8WmM9xJjS2T9YXZvc.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/276"
+  },
+  {
+    "titulo": "VIDA PRIVADA",
+    "portada": "https://image.tmdb.org/t/p/w500/xKU9M7rmOqYOvcNZUGyyESEwRde.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/272"
+  },
+  {
+    "titulo": "EL ENGAÑO",
+    "portada": "https://image.tmdb.org/t/p/w500/y8ADH1i7Ti1A0WLWjMCTEN6s4F8.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/278"
+  },
+  {
+    "titulo": "EL PODER DE LA ESPERANZA",
+    "portada": "https://image.tmdb.org/t/p/w500/ms31qMSUaLr5njJ2Mqsh2Y22uJn.jpg",
+    "categoria": "peliculas",
+    "anio": "2014",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/280"
+  },
+  {
+    "titulo": "EL HOMBRE MENGUANTE",
+    "portada": "https://image.tmdb.org/t/p/w500/1hRdOzLWpXdNawaNhktTnRoM0w1.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/282"
+  },
+  {
+    "titulo": "EL SENDERO AZUL",
+    "portada": "https://image.tmdb.org/t/p/w500/sY7dcqyvUKbVKwaNFOPaPgljyj0.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/284"
+  },
+  {
+    "titulo": "FRANZ KAFKA",
+    "portada": "https://image.tmdb.org/t/p/w500/4bzQ0ka5ru65dEVS6MF3kKWKWvV.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/286"
+  },
+  {
+    "titulo": "HOOLIGANS",
+    "portada": "https://image.tmdb.org/t/p/w500/oTxHFRSbFcCWdfJB4ozA41Yq57c.jpg",
+    "categoria": "peliculas",
+    "anio": "2005",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/287"
+  },
+  {
+    "titulo": "THE MADISON",
+    "portada": "https://image.tmdb.org/t/p/w500/nZVRyqVbDqfLSOrLcsGGTUHccZ8.jpg",
+    "categoria": "series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/8870"
+  },
+  {
+    "titulo": "THE MADISON",
+    "portada": "https://image.tmdb.org/t/p/w500/nZVRyqVbDqfLSOrLcsGGTUHccZ8.jpg",
+    "categoria": "series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/c/2111145906/6/486775"
+  },
+  {
+    "titulo": "THE MADISON",
+    "portada": "https://image.tmdb.org/t/p/w500/nZVRyqVbDqfLSOrLcsGGTUHccZ8.jpg",
+    "categoria": "series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8872"
+  },
+  {
+    "titulo": "THE MADISON",
+    "portada": "https://image.tmdb.org/t/p/w500/nZVRyqVbDqfLSOrLcsGGTUHccZ8.jpg",
+    "categoria": "series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8873"
+  },
+  {
+    "titulo": "THE MADISON",
+    "portada": "https://image.tmdb.org/t/p/w500/nZVRyqVbDqfLSOrLcsGGTUHccZ8.jpg",
+    "categoria": "series",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/1663/8874"
+  },
+  {
+    "titulo": "GREEN STREET HOOLIGANS: UNDERGROUND",
+    "portada": "https://image.tmdb.org/t/p/w500/jtlDK3r8G282Vi0cGMxLVJJkhke.jpg",
+    "categoria": "peliculas",
+    "anio": "2013",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/289"
+  },
+  {
+    "titulo": "GREEN STREET HOOLIGANS: UNDERGROUND",
+    "portada": "https://image.tmdb.org/t/p/w500/jtlDK3r8G282Vi0cGMxLVJJkhke.jpg",
+    "categoria": "peliculas",
+    "anio": "2013",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/291"
+  },
+  {
+    "titulo": "BALLS UP: CON UN PAR",
+    "portada": "https://image.tmdb.org/t/p/w500/50V1E3NE3UDFmq0fhMpByx1b4Ka.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/294"
+  },
+  {
+    "titulo": "ARIEL",
+    "portada": "https://image.tmdb.org/t/p/w500/34lmCGzMsWJBT4ueSKx1lUTyGSm.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/368"
+  },
+  {
+    "titulo": "WOLVES",
+    "portada": "https://image.tmdb.org/t/p/w500/sVSS6PnzsU7USbDc2zbehY4x4XU.jpg",
+    "categoria": "peliculas",
+    "anio": "2022",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/364"
+  },
+  {
+    "titulo": "ARIEL",
+    "portada": "https://image.tmdb.org/t/p/w500/34lmCGzMsWJBT4ueSKx1lUTyGSm.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/368"
+  },
+  {
+    "titulo": "OXÍGENO",
+    "portada": "https://image.tmdb.org/t/p/w500/roG7MoLiHMsmeWgRtMSXH9HB57h.jpg",
+    "categoria": "peliculas",
+    "anio": "2021",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/404"
+  },
+  {
+    "titulo": "PRINCESA EN LA NIEVE",
+    "portada": "https://image.tmdb.org/t/p/w500/srLvqEJIr2uaV0eIhZkZwZxsZH8.jpg",
+    "categoria": "peliculas",
+    "anio": "2019",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/430"
+  },
+  {
+    "titulo": "HARRY POTTER Y LA PIEDRA FILOSOFAL",
+    "portada": "https://image.tmdb.org/t/p/w500/3MKK7vAJLtSkBTABMTjxf6TOCo3.jpg",
+    "categoria": "peliculas",
+    "anio": "2001",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/412"
+  },
+  {
+    "titulo": "HARRY POTTER Y LA CÁMARA SECRETA",
+    "portada": "https://image.tmdb.org/t/p/w500/bhCfAzeMMg7GyLDT11yVM2i1NPh.jpg",
+    "categoria": "peliculas",
+    "anio": "2002",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/414"
+  },
+  {
+    "titulo": "HARRY POTTER Y EL PRISIONERO DE AZKABAN",
+    "portada": "https://image.tmdb.org/t/p/w500/wF9aoo4YZmpKP4bZPSy4Zwwek6G.jpg",
+    "categoria": "peliculas",
+    "anio": "2004",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/416"
+  },
+  {
+    "titulo": "HARRY POTTER Y EL CÁLIZ DE FUEGO",
+    "portada": "https://image.tmdb.org/t/p/w500/5hrrncgY7GfRHz6JmnhPlvJUONe.jpg",
+    "categoria": "peliculas",
+    "anio": "2005",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/418"
+  },
+  {
+    "titulo": "HARRY POTTER Y LA ORDEN DEL FÉNIX",
+    "portada": "https://image.tmdb.org/t/p/w500/xxXiM2Ij7plbzibKWW9BfDk23aI.jpg",
+    "categoria": "peliculas",
+    "anio": "2007",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/420"
+  },
+  {
+    "titulo": "HARRY POTTER Y EL MISTERIO DEL PRÍNCIPE",
+    "portada": "https://image.tmdb.org/t/p/w500/tO0UGkNuQoxyXve0mvwtXP49NAO.jpg",
+    "categoria": "peliculas",
+    "anio": "2009",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/422"
+  },
+  {
+    "titulo": "HARRY POTTER Y LAS RELIQUIAS DE LA MUERTE - PARTE 1",
+    "portada": "https://image.tmdb.org/t/p/w500/w6wsYKdXERaXRdByPsI2O9rn20b.jpg",
+    "categoria": "peliculas",
+    "anio": "2010",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/424"
+  },
+  {
+    "titulo": "HARRY POTTER Y LAS RELIQUIAS DE LA MUERTE - PARTE 2",
+    "portada": "https://image.tmdb.org/t/p/w500/aM1TuUiPtV8OAZyu61CTdy9Ymtk.jpg",
+    "categoria": "peliculas",
+    "anio": "2011",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/426"
+  },
+  {
+    "titulo": "HARRY POTTER, 20º ANIVERSARIO: REGRESO A HOGWARTS",
+    "portada": "https://image.tmdb.org/t/p/w500/jAwbyTKDbw7iqYptPMSlPfFsbPU.jpg",
+    "categoria": "peliculas",
+    "anio": "2022",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/428"
+  },
+  {
+    "titulo": "LOS JUEGOS DEL HAMBRE",
+    "portada": "https://image.tmdb.org/t/p/w500/qSEn7KsGchT7qB08HlviyeTPrEr.jpg",
+    "categoria": "peliculas",
+    "anio": "2012",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/432"
+  },
+  {
+    "titulo": "LOS JUEGOS DEL HAMBRE: EN LLAMAS",
+    "portada": "https://image.tmdb.org/t/p/w500/oxnKI1qiHz7xC0mNthC7dSqTcot.jpg",
+    "categoria": "peliculas",
+    "anio": "2013",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/434"
+  },
+  {
+    "titulo": "LOS JUEGOS DEL HAMBRE: SINSAJO - PARTE 1",
+    "portada": "https://image.tmdb.org/t/p/w500/wfLsciidZamFPeOb4FD8ywk1Q9c.jpg",
+    "categoria": "peliculas",
+    "anio": "2014",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/436"
+  },
+  {
+    "titulo": "LOS JUEGOS DEL HAMBRE: SINSAJO - PARTE 2",
+    "portada": "https://image.tmdb.org/t/p/w500/3qQPBc7JVGXJGo0Av5jrqndcdTm.jpg",
+    "categoria": "peliculas",
+    "anio": "2015",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/438"
+  },
+  {
+    "titulo": "LOS JUEGOS DEL HAMBRE: BALADA DE PÁJAROS CANTORES Y SERPIENTES",
+    "portada": "https://image.tmdb.org/t/p/w500/2vIK81ikjvdewSLmrwIg7AMoJIv.jpg",
+    "categoria": "peliculas",
+    "anio": "2023",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/440"
+  },
+  {
+    "titulo": "COMPAÑERAS DE CUARTO",
+    "portada": "https://image.tmdb.org/t/p/w500/hHOBxFzUK2CHmQ5djuOneyHkptS.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/442"
+  },
+  {
+    "titulo": "ELOY DE LA IGLESIA, ADICTO AL CINE",
+    "portada": "https://image.tmdb.org/t/p/w500/r3Fdy3NZHuPUMoXSt3R5eehMIdE.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/444"
+  },
+  {
+    "titulo": "EMMA.",
+    "portada": "https://image.tmdb.org/t/p/w500/hd5YQjsIPuLmZuvWfdv36apz8tE.jpg",
+    "categoria": "peliculas",
+    "anio": "2020",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/447"
+  },
+  {
+    "titulo": "¿QUIERES SER MI NOVIA?",
+    "portada": "https://image.tmdb.org/t/p/w500/oscW8xV8EhRYj7iAhyVlBohKqxo.jpg",
+    "categoria": "Comedia, Romance",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/449"
+  },
+  {
+    "titulo": "ALICIA EN EL PAÍS DE LAS MARAVILLAS",
+    "portada": "https://image.tmdb.org/t/p/w500/sqOyCSgzLglxcR2y1boewr5Qufn.jpg",
+    "categoria": "Familia, Fantasía, Aventura",
+    "anio": "2010",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/451"
+  },
+  {
+    "titulo": "EL NIÑO CON EL PIJAMA DE RAYAS",
+    "portada": "https://image.tmdb.org/t/p/w500/dZeiD0WVM1IHzRAOSldsY0jh1CR.jpg",
+    "categoria": "Drama, Bélica, Historia",
+    "anio": "2008",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/453"
+  },
+  {
+    "titulo": "EL ÚLTIMO CAZADOR DE BRUJAS",
+    "portada": "https://image.tmdb.org/t/p/w500/7fwK5selQxZ7XVNBAPdewDjCfCp.jpg",
+    "categoria": "Acción, Aventura, Fantasía",
+    "anio": "2015",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/463"
+  },
+  {
+    "titulo": "BAILANDO (STEP UP)",
+    "portada": "https://image.tmdb.org/t/p/w500/6yLy7EFXU3CKULLDWzR0L6XmmSi.jpg",
+    "categoria": "Música, Drama, Romance, Crimen",
+    "anio": "2006",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/455"
+  },
+  {
+    "titulo": "STREET DANCE (STEP UP 2)",
+    "portada": "https://image.tmdb.org/t/p/w500/emRJx4qxG2DMtrEPH1vWDvee9Mm.jpg",
+    "categoria": "Música, Drama, Romance",
+    "anio": "2008",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/456"
+  },
+  {
+    "titulo": "STEP UP 3 - 3D",
+    "portada": "https://image.tmdb.org/t/p/w500/rPcqa5TZ7S63RNmCuY45ZizFBen.jpg",
+    "categoria": "Drama, Romance",
+    "anio": "2010",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/457"
+  },
+  {
+    "titulo": "STEP UP 4 REVOLUTION",
+    "portada": "https://image.tmdb.org/t/p/w500/jMpwxmk3r7Aq36GcqMbCuP9DJYQ.jpg",
+    "categoria": "Música, Drama, Romance",
+    "anio": "2012",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/458"
+  },
+  {
+    "titulo": "STEP UP 5 - ALL IN",
+    "portada": "https://image.tmdb.org/t/p/w500/6LhkFp3YGZoZtbwkEhmtGqwYEC1.jpg",
+    "categoria": "Romance, Drama, Música",
+    "anio": "2014",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/459"
+  },
+  {
+    "titulo": "LA CASA DEL DRAGÓN",
+    "portada": "https://image.tmdb.org/t/p/w500/8MaxftF69sEAAD5673vTjIl8yT3.jpg",
+    "categoria": "Sci-Fi & Fantasy, Drama, Action & Adventure",
+    "anio": "2022",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/459"
+  },
+  {
+    "titulo": "LA CASA DEL DRAGÓN",
+    "portada": "https://image.tmdb.org/t/p/w500/8MaxftF69sEAAD5673vTjIl8yT3.jpg",
+    "categoria": "Sci-Fi & Fantasy, Drama, Action & Adventure",
+    "anio": "2022",
+    "link": "tvgram://play?url=1X6 https://t.me/Y_Y_y7o/470"
+  },
+  {
+    "titulo": "LA OTRA VÍCTIMA",
+    "portada": "https://image.tmdb.org/t/p/w500/cgimNO0z3u5QtJ9Uec33GFKyP6I.jpg",
+    "categoria": "Drama",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/478"
+  },
+  {
+    "titulo": "GATOR LAKE",
+    "portada": "https://image.tmdb.org/t/p/w500/xL0MYWgZjjCpsoA2vNBgg2bbNfm.jpg",
+    "categoria": "Terror, Comedia, Aventura",
+    "anio": "2024",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/476"
+  },
+  {
+    "titulo": "VALOR SENTIMENTAL",
+    "portada": "https://image.tmdb.org/t/p/w500/s4a3hpTmws0mNLEn0BNBRiX5q3g.jpg",
+    "categoria": "Drama",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/c/2331060595/663798/874166"
+  },
+  {
+    "titulo": "JUGADA MAESTRA",
+    "portada": "https://image.tmdb.org/t/p/w500/wpAt80FtHAQySEC8SwsDGhFp8MF.jpg",
+    "categoria": "Comedia, Suspense",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/482"
+  },
+  {
+    "titulo": "LA TRINCHERA INFINITA",
+    "portada": "https://image.tmdb.org/t/p/w500/4l28g28lT2yv1eIX0XNqNP4osPw.jpg",
+    "categoria": "Drama, Historia, Suspense",
+    "anio": "2019",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1272"
+  },
+  {
+    "titulo": "LAND OF MINE (BAJO LA ARENA)",
+    "portada": "https://image.tmdb.org/t/p/w500/2SlbP9s3ctfbSv2bnx3mIL2ghEC.jpg",
+    "categoria": "Bélica, Drama, Historia",
+    "anio": "2015",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1258"
+  },
+  {
+    "titulo": "DEPREDADOR DOMINANTE",
+    "portada": "https://image.tmdb.org/t/p/w500/mV7uFS1U8iP0p4CcXZp4znBVpch.jpg",
+    "categoria": "Suspense, Acción",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/500"
+  },
+  {
+    "titulo": "LOS EXTRAÑOS",
+    "portada": "https://image.tmdb.org/t/p/w500/n14pclgMhk1ZnuioVgN64Nralfb.jpg",
+    "categoria": "Terror, Suspense",
+    "anio": "2008",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/521"
+  },
+  {
+    "titulo": "EL MÉDICO II",
+    "portada": "https://image.tmdb.org/t/p/w500/kZv9zMB70lqXNZ7CsD5gzadzPZt.jpg",
+    "categoria": "Misterio, Drama",
+    "anio": "2025",
+    "link": "tvgram://play?url=https://t.me/AprendiendoBoxTv/1038/1282?single"
+  },
+  {
+    "titulo": "EL MÉDICO DE VIENA",
+    "portada": "https://image.tmdb.org/t/p/w500/wX5PCehyiwfhLXp7WJwTQyWMgpr.jpg",
+    "categoria": "Historia, Drama",
+    "anio": "2023",
+    "link": "https://pixeldrain.net/u/EUADUkkE"
+  },
+  {
+    "titulo": "EL MINISTERIO DE LA GUERRA SUCIA",
+    "portada": "https://image.tmdb.org/t/p/w500/zhvyWzZii2SWpsrcUvLZJNaJyoG.jpg",
+    "categoria": "Acción, Comedia, Bélica",
+    "anio": "2024",
+    "link": "https://pixeldrain.net/u/hNbrs2UV"
+  },
+  {
+    "titulo": "EL ENGAÑO",
+    "portada": "https://image.tmdb.org/t/p/w500/y8ADH1i7Ti1A0WLWjMCTEN6s4F8.jpg",
+    "categoria": "Drama, Acción, Suspense",
+    "anio": "2026",
+    "link": "https://pixeldrain.net/u/fPRBnA1H"
+  },
+  {
+    "titulo": "EL CONSENTIMIENTO",
+    "portada": "https://image.tmdb.org/t/p/w500/pXkjvDW9w7fKs29cMmWGV1Exnta.jpg",
+    "categoria": "Historia, Drama",
+    "anio": "2023",
+    "link": "https://pixeldrain.net/u/eXXQ5cdP"
+  },
+  {
+    "titulo": "TORRENTE PRESIDENTE",
+    "portada": "https://image.tmdb.org/t/p/w500/a0Fn0PiGGiU74jIUelpce6z70i9.jpg",
+    "categoria": "Comedia",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/523"
+  },
+  {
+    "titulo": "NO TE OLVIDARÉ",
+    "portada": "https://image.tmdb.org/t/p/w500/iPJ4V6o5PttdBmHoehdOtWqQ6gx.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/525"
+  },
+  {
+    "titulo": "EL DIABLO VISTE A LA MODA 2",
+    "portada": "https://image.tmdb.org/t/p/w500/sz687EF7yJMS4VNEdHKT9ebkhA9.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/gran_player/3185/9417"
+  },
+  {
+    "titulo": "LOS EXTRAÑOS",
+    "portada": "https://image.tmdb.org/t/p/w500/n14pclgMhk1ZnuioVgN64Nralfb.jpg",
+    "categoria": "peliculas",
+    "anio": "2008",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/521"
+  },
+  {
+    "titulo": "MICHAEL",
+    "portada": "https://image.tmdb.org/t/p/w500/2uK36ujoDXOfNiJ5Yp3raVprB51.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/529"
+  },
+  {
+    "titulo": "TE VAN A MATAR",
+    "portada": "https://image.tmdb.org/t/p/w500/9dEn8a12dqkQw48zxQhPcpQ7D5W.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "tvgram://play?url=https://t.me/Y_Y_y7o/533"
+  },
+  {
+    "titulo": "EL INSTINTO",
+    "portada": "https://image.tmdb.org/t/p/w500/eaFfVOektvXQqwKScwZqWthZpcj.jpg",
+    "categoria": "peliculas",
+    "anio": "2025",
+    "link": "https://t.me/gran_player/3185/9994"
+  },
+  {
+    "titulo": "DESDE LA CELDA: CRIMEN EN LEÓN",
+    "portada": "https://image.tmdb.org/t/p/w500/qtcYhqnuAWQ4WnKPCuzDlwDCWES.jpg",
+    "categoria": "peliculas",
+    "anio": "2026",
+    "link": "https://t.me/c/2097332917/2/364293"
+  },
+  {
+    "titulo": "JACKASS: LO MEJOR PARA EL FINAL",
+    "portada": "https://image.tmdb.org/t/p/w500/8sVomxZ7OBnjaHA0C8lAvSq1fr.jpg",
+    "categoria": "agenda",
+    "anio": "2026",
+    "link": "https://t.me/c/2097332917/2/383172"
+  }
+]
