@@ -5,7 +5,17 @@ const state = {
     currentChannel: null,
     isLoading: true,
     searchQuery: '',
-    tgClient: null
+    tgClient: null,
+    engine: null,      // referencia al TelegramEngine activo
+    me: null,          // usuario logueado (getMe)
+    isOwner: false     // true solo si el usuario logueado es el propietario
+};
+
+// ===== STORAGE KEYS =====
+const STORAGE = {
+    sources: 'source_groups',     // grupos fuente seleccionados por el propietario
+    target: 'target_group',       // grupo destino de los reenvios
+    forwarded: 'forwarded_log'     // ids ya reenviados (dedupe)
 };
 
 // ===== DOM ELEMENTS =====
@@ -35,7 +45,17 @@ const elements = {
     loginModal: $('#login-modal'),
     qrCode: $('#qr-code'),
     qrLoading: $('#qr-loading'),
-    bootStatus: $('#boot-status')
+    bootStatus: $('#boot-status'),
+    // Panel admin
+    adminBtn: $('#admin-btn'),
+    adminModal: $('#admin-modal'),
+    adminClose: $('#admin-close'),
+    adminWhoami: $('#admin-whoami'),
+    adminGroupList: $('#admin-group-list'),
+    adminTarget: $('#admin-target'),
+    adminReload: $('#admin-reload'),
+    adminSave: $('#admin-save'),
+    adminStatus: $('#admin-status')
 };
 
 // ===== TELEGRAM API ENGINE =====
@@ -44,7 +64,11 @@ class TelegramEngine {
         this.apiId = config.apiId;
         this.apiHash = config.apiHash;
         this.channelId = config.channelId;
+        this.targetGroup = config.targetGroup || config.channelId;
+        this.ownerId = config.ownerId ? String(config.ownerId) : '';
+        this.ownerUsername = (config.ownerUsername || '').replace(/^@/, '').toLowerCase();
         this.client = null;
+        this.me = null;
     }
 
     async init() {
@@ -82,12 +106,74 @@ class TelegramEngine {
 
             SafeStorage.setItem('tg_session', this.client.session.save());
             if (elements.loginModal) elements.loginModal.hidden = true;
+
+            // Detectar usuario logueado y si es el propietario
+            try {
+                this.me = await this.client.getMe();
+                state.me = this.me;
+                state.isOwner = this.isOwner();
+            } catch (e) {
+                console.warn('No se pudo obtener getMe:', e);
+            }
+
             return true;
         } catch (e) {
             console.error("Error en init:", e);
             if (elements.bootStatus) elements.bootStatus.innerText = "Error: " + e.message;
             return false;
         }
+    }
+
+    // ===== PROPIETARIO =====
+    // Devuelve true si el usuario logueado coincide con ownerId/ownerUsername.
+    // Si NO hay propietario configurado, devuelve true (modo configuracion) para
+    // que el propietario pueda ver su ID en el panel y fijarlo en config.js.
+    isOwner() {
+        if (!this.me) return false;
+        const noOwnerConfigured = !this.ownerId && !this.ownerUsername;
+        if (noOwnerConfigured) return true;
+        const myId = String(this.me.id);
+        const myUser = (this.me.username || '').toLowerCase();
+        if (this.ownerId && myId === this.ownerId) return true;
+        if (this.ownerUsername && myUser === this.ownerUsername) return true;
+        return false;
+    }
+
+    ownerConfigured() {
+        return Boolean(this.ownerId || this.ownerUsername);
+    }
+
+    // ===== GRUPOS DEL USUARIO =====
+    // Lista todos los grupos/canales en los que esta suscrito el usuario logueado.
+    async getMisGrupos() {
+        const dialogs = await this.client.getDialogs({ limit: 200 });
+        return dialogs
+            .filter(d => d.isGroup || d.isChannel)
+            .map(d => ({ id: String(d.id), title: d.title || d.name || '(sin nombre)' }));
+    }
+
+    // ===== REENVIO (estilo Telegram) =====
+    // Reenvia el mensaje marcado al grupo destino, conservando el origen.
+    async forwardToMyGroup(item) {
+        const target = SafeStorage.getItem(STORAGE.target) || this.targetGroup;
+        if (!target) throw new Error('No hay grupo destino configurado');
+        if (!item.sourceId) throw new Error('El mensaje no tiene grupo de origen');
+
+        const fromPeer = await this.client.getEntity(item.sourceId);
+        const toPeer = await this.client.getEntity(target);
+        await this.client.forwardMessages(toPeer, {
+            messages: [Number(item.id)],
+            fromPeer
+        });
+
+        // Dedupe
+        const log = JSON.parse(SafeStorage.getItem(STORAGE.forwarded) || '[]');
+        const key = `${item.sourceId}:${item.id}`;
+        if (!log.includes(key)) {
+            log.push(key);
+            SafeStorage.setItem(STORAGE.forwarded, JSON.stringify(log));
+        }
+        return true;
     }
 
     async showLogin() {
@@ -118,23 +204,27 @@ class TelegramEngine {
     }
 
     async fetchContent() {
+        // Fuentes: las que el propietario haya guardado, o el canal por defecto.
+        let sources = [];
         try {
-            const entity = await this.client.getEntity(this.channelId);
-            // Intentamos obtener tópicos si es un grupo, o mensajes normales si es un canal
-            let messages = [];
-
-            try {
-                // Intento de obtener mensajes recientes
-                messages = await this.client.getMessages(entity, { limit: 100 });
-            } catch (e) {
-                console.warn("Error fetching messages:", e);
-            }
-
-            return this.parseMessages(messages);
-        } catch (e) {
-            console.error("Fetch error:", e);
-            return [];
+            sources = JSON.parse(SafeStorage.getItem(STORAGE.sources) || '[]');
+        } catch (e) { sources = []; }
+        if (!Array.isArray(sources) || sources.length === 0) {
+            sources = [this.channelId];
         }
+
+        let all = [];
+        for (const src of sources) {
+            try {
+                const entity = await this.client.getEntity(src);
+                const messages = await this.client.getMessages(entity, { limit: 100 });
+                const parsed = this.parseMessages(messages).map(item => ({ ...item, sourceId: String(src) }));
+                all = all.concat(parsed);
+            } catch (e) {
+                console.warn(`No se pudo leer la fuente ${src}:`, e);
+            }
+        }
+        return all;
     }
 
     parseMessages(messages) {
@@ -192,6 +282,9 @@ const UI = {
     createCard(item) {
         const card = document.createElement('div');
         card.className = 'card';
+        const forwardBtn = state.isOwner
+            ? `<button class="card-action-btn forward-btn" title="Reenviar a mi grupo"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg></button>`
+            : '';
         card.innerHTML = `
             <img class="card-image" src="${item.thumbnail}" alt="${item.title}" loading="lazy">
             <div class="card-overlay">
@@ -202,13 +295,35 @@ const UI = {
             </div>
             <div class="card-actions">
                 <button class="card-action-btn primary play-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
+                ${forwardBtn}
                 <button class="card-action-btn info-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg></button>
             </div>
         `;
 
         card.querySelector('.play-btn').onclick = (e) => { e.stopPropagation(); this.openPlayer(item); };
+        const fwd = card.querySelector('.forward-btn');
+        if (fwd) {
+            fwd.onclick = (e) => { e.stopPropagation(); this.handleForward(item, fwd); };
+        }
         card.onclick = () => this.openPlayer(item);
         return card;
+    },
+
+    async handleForward(item, btn) {
+        if (!state.isOwner || !state.engine) return;
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '…';
+        try {
+            await state.engine.forwardToMyGroup(item);
+            btn.innerHTML = '✓';
+            btn.classList.add('done');
+        } catch (e) {
+            console.error('Error al reenviar:', e);
+            btn.innerHTML = '✕';
+            alert('No se pudo reenviar: ' + e.message);
+            setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 1500);
+        }
     },
 
     createRow(title, items) {
@@ -317,6 +432,106 @@ const UI = {
     }
 };
 
+// ===== ADMIN PANEL (solo propietario) =====
+const AdminPanel = {
+    grupos: [],
+
+    setup() {
+        const owner = state.isOwner;
+        // El boton de admin solo se muestra al propietario
+        if (elements.adminBtn) {
+            elements.adminBtn.style.display = owner ? 'flex' : 'none';
+            elements.adminBtn.onclick = () => this.open();
+        }
+        if (!owner) return;
+
+        if (elements.adminClose) elements.adminClose.onclick = () => this.close();
+        if (elements.adminModal) {
+            const overlay = elements.adminModal.querySelector('.modal-overlay');
+            if (overlay) overlay.onclick = () => this.close();
+        }
+        if (elements.adminReload) elements.adminReload.onclick = () => this.loadGroups();
+        if (elements.adminSave) elements.adminSave.onclick = () => this.save();
+    },
+
+    async open() {
+        if (!state.isOwner || !elements.adminModal) return;
+        elements.adminModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+
+        // Mostrar identidad del propietario (util para configurar config.js)
+        const me = state.me;
+        if (elements.adminWhoami && me) {
+            const configured = state.engine.ownerConfigured();
+            elements.adminWhoami.innerHTML = configured
+                ? `Conectado como <b>@${me.username || '—'}</b> (ID: ${me.id})`
+                : `⚠️ Sin propietario fijado. Tu ID: <b>${me.id}</b> · usuario: <b>@${me.username || '—'}</b>.<br>Cópialo en <code>config.js</code> (ownerId) para que solo tú accedas.`;
+        }
+
+        // Restaurar grupo destino guardado
+        if (elements.adminTarget) {
+            elements.adminTarget.value = SafeStorage.getItem(STORAGE.target) || window.CONFIG.targetGroup || '';
+        }
+
+        await this.loadGroups();
+    },
+
+    close() {
+        if (!elements.adminModal) return;
+        elements.adminModal.hidden = true;
+        document.body.style.overflow = '';
+    },
+
+    async loadGroups() {
+        if (!elements.adminGroupList) return;
+        elements.adminGroupList.innerHTML = '<p class="admin-hint">Cargando tus grupos…</p>';
+        try {
+            this.grupos = await state.engine.getMisGrupos();
+        } catch (e) {
+            elements.adminGroupList.innerHTML = '<p class="admin-hint">Error al cargar grupos: ' + e.message + '</p>';
+            return;
+        }
+
+        let selected = [];
+        try { selected = JSON.parse(SafeStorage.getItem(STORAGE.sources) || '[]'); } catch (e) { selected = []; }
+
+        if (!this.grupos.length) {
+            elements.adminGroupList.innerHTML = '<p class="admin-hint">No se encontraron grupos.</p>';
+            return;
+        }
+
+        elements.adminGroupList.innerHTML = '';
+        this.grupos.forEach(g => {
+            const row = document.createElement('label');
+            row.className = 'admin-group-row';
+            const checked = selected.includes(g.id) ? 'checked' : '';
+            row.innerHTML = `
+                <input type="checkbox" value="${g.id}" ${checked}>
+                <span class="admin-group-title">${g.title}</span>
+                <span class="admin-group-id">${g.id}</span>
+            `;
+            elements.adminGroupList.appendChild(row);
+        });
+    },
+
+    save() {
+        // Guardar fuentes seleccionadas
+        const checks = elements.adminGroupList.querySelectorAll('input[type="checkbox"]:checked');
+        const sources = Array.from(checks).map(c => c.value);
+        SafeStorage.setItem(STORAGE.sources, JSON.stringify(sources));
+
+        // Guardar grupo destino
+        const target = (elements.adminTarget.value || '').trim();
+        SafeStorage.setItem(STORAGE.target, target || window.CONFIG.targetGroup || window.CONFIG.channelId);
+
+        if (elements.adminStatus) {
+            elements.adminStatus.innerText = `Guardado: ${sources.length} grupo(s) fuente. Recargando contenido…`;
+        }
+        // Recargar el contenido con las nuevas fuentes
+        setTimeout(() => location.reload(), 900);
+    }
+};
+
 // ===== APP CORE =====
 async function init() {
     try {
@@ -327,6 +542,7 @@ async function init() {
         }
 
         const engine = new TelegramEngine(window.CONFIG);
+        state.engine = engine;
         const connected = await engine.init();
 
         if (!connected) {
@@ -335,6 +551,9 @@ async function init() {
         }
 
         console.log('✅ Conectado a Telegram');
+
+        // Mostrar/ocultar el panel admin segun el propietario
+        AdminPanel.setup();
         
         const content = await engine.fetchContent();
         state.channels = content;

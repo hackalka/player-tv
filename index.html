@@ -69,6 +69,11 @@
                     <path fill="currentColor" d="M21.71 20.29L18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a1 1 0 0 0 1.42 0 1 1 0 0 0 0-1.39zM11 18a7 7 0 1 1 7-7 7 7 0 0 1-7 7z"/>
                 </svg>
             </button>
+            <button class="admin-btn" id="admin-btn" aria-label="Administrar grupos" style="display:none;">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.48-.41h-3.84a.49.49 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94 0 .32.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
+                </svg>
+            </button>
             <div class="profile-dropdown">
                 <img src="logo512.png" alt="Perfil" class="profile-avatar">
             </div>
@@ -104,6 +109,36 @@
         <!-- Las filas se generan dinámicamente -->
         <div class="rows-container" id="rows-container"></div>
     </main>
+
+    <!-- Modal de Administracion (solo propietario) -->
+    <div class="modal" id="admin-modal" hidden>
+        <div class="modal-overlay"></div>
+        <div class="modal-content admin-box">
+            <button class="modal-close" id="admin-close" aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+            <h2 class="modal-title">Administrar grupos</h2>
+            <p id="admin-whoami" class="admin-whoami"></p>
+
+            <label class="admin-label" for="admin-target">Grupo destino (a donde se reenvia)</label>
+            <input type="text" id="admin-target" class="admin-input" placeholder="@migrupo o id del grupo">
+
+            <div class="admin-toolbar">
+                <span class="admin-label">Tus grupos suscritos (marca los que quieras usar como fuente)</span>
+                <button class="btn-sm" id="admin-reload">Recargar</button>
+            </div>
+            <div class="admin-group-list" id="admin-group-list">
+                <p class="admin-hint">Pulsa "Recargar" para ver tus grupos.</p>
+            </div>
+
+            <div class="admin-footer">
+                <span id="admin-status" class="admin-status"></span>
+                <button class="btn btn-play" id="admin-save">Guardar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal de Login Telegram -->
     <div class="modal" id="login-modal" hidden>
