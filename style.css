@@ -665,3 +665,190 @@ body {
         display: none;
     }
 }
+
+
+/* =====================================================================
+ *  EXTENSIONES: doble vista (Netflix + Telegram), reproductor y estados
+ * ===================================================================== */
+
+body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+
+/* Logo texto */
+.logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.logo-text { color: var(--netflix-red); font-weight: 700; letter-spacing: 1px; font-size: 1.1rem; }
+
+/* Conmutador de vista (centro del navbar) */
+.navbar-center.view-switch {
+    display: flex; gap: 6px; background: rgba(255,255,255,.08);
+    padding: 4px; border-radius: 999px;
+}
+.view-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; background: transparent; color: var(--netflix-light-gray);
+    padding: 6px 16px; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: .85rem; font-weight: 600;
+    transition: all var(--transition-fast);
+}
+.view-btn.active { background: var(--netflix-red); color: #fff; }
+.view-btn:not(.active):hover { color: #fff; }
+
+/* Hero badge */
+.hero-badge {
+    display: inline-block; background: var(--netflix-red); color: #fff;
+    font-size: .75rem; font-weight: 700; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 4px; margin-bottom: 12px; text-transform: uppercase;
+}
+.badge-hd {
+    border: 1px solid rgba(255,255,255,.4); border-radius: 3px;
+    padding: 0 4px; font-size: .65rem;
+}
+
+/* Estado vacío */
+.empty-state, .chat-empty, .chat-loading {
+    color: var(--netflix-light-gray); text-align: center; padding: 4rem 1rem; line-height: 1.7;
+}
+
+/* ===== REPRODUCTOR: video + estado ===== */
+.player-wrapper video,
+.player-wrapper iframe { width: 100%; height: 100%; border: none; background: #000; }
+.player-wrapper video[hidden], .player-wrapper iframe[hidden] { display: none; }
+.player-status {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.85); color: #fff; text-align: center; padding: 1rem; font-size: .95rem;
+}
+
+/* ===== LOADING ===== */
+.loading-inner { text-align: center; }
+.loading-inner p { margin-top: 16px; color: var(--netflix-light-gray); font-size: .9rem; }
+.loader.small { width: 28px; height: 28px; border-width: 3px; }
+
+/* Login helpers */
+.login-help { color: var(--netflix-light-gray); margin-bottom: 18px; font-size: .9rem; line-height: 1.5; }
+.qr-box { background: #fff; padding: 10px; display: inline-block; border-radius: 6px; min-height: 40px; }
+.boot-status { margin-top: 18px; font-weight: 600; color: var(--netflix-red); font-size: .85rem; min-height: 1.2em; }
+
+/* Search category chip */
+.search-cat {
+    display: inline-block; margin-top: 8px; font-size: .72rem; color: #fff;
+    background: var(--netflix-red); padding: 2px 8px; border-radius: 4px; align-self: flex-start;
+}
+
+/* =====================================================================
+ *  VISTA TELEGRAM
+ * ===================================================================== */
+#telegram-view[hidden] { display: none; }
+body.telegram-mode { background: #0e1621; overflow: hidden; }
+
+.tg-layout {
+    display: grid; grid-template-columns: 340px 1fr;
+    height: 100vh; padding-top: var(--navbar-height);
+}
+.tg-sidebar {
+    background: #17212b; border-right: 1px solid rgba(255,255,255,.06);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.tg-sidebar-header {
+    padding: 16px 18px; font-weight: 700; color: #fff; font-size: .95rem;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.chat-list { overflow-y: auto; flex: 1; }
+.chat-item {
+    display: flex; gap: 12px; align-items: center; padding: 11px 16px; cursor: pointer;
+    transition: background var(--transition-fast); border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.chat-item:hover { background: rgba(255,255,255,.04); }
+.chat-item.active { background: #2b5278; }
+.chat-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #4b6cb7, #182848); color: #fff; font-size: 1.2rem;
+}
+.chat-item.is-media .chat-avatar { background: linear-gradient(135deg, #E50914, #7b0a10); }
+.chat-item-body { min-width: 0; flex: 1; }
+.chat-item-top { display: flex; justify-content: space-between; }
+.chat-item-name { color: #fff; font-weight: 600; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-item-sub { color: #6d7f8f; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tg-chat {
+    display: flex; flex-direction: column; overflow: hidden;
+    background:
+        radial-gradient(circle at 20% 30%, rgba(43,82,120,.25), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(43,82,120,.25), transparent 40%),
+        #0e1621;
+}
+.tg-chat-header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+    background: #17212b; border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.tg-chat-avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: linear-gradient(135deg, #4b6cb7, #182848); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+}
+.tg-chat-title { color: #fff; font-weight: 600; }
+.tg-chat-meta { color: #6d7f8f; font-size: .8rem; }
+
+.chat-messages { flex: 1; overflow-y: auto; padding: 20px 8% 30px; display: flex; flex-direction: column; gap: 6px; }
+.tg-message { display: flex; }
+.tg-bubble {
+    background: #182533; color: #e9edf0; border-radius: 12px 12px 12px 4px;
+    padding: 8px 12px 6px; max-width: 70%; position: relative;
+    box-shadow: 0 1px 1px rgba(0,0,0,.3);
+}
+.tg-bubble.playable { cursor: pointer; transition: background var(--transition-fast); }
+.tg-bubble.playable:hover { background: #20313f; }
+.tg-text { font-size: .95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.tg-text a { color: #62a0e0; }
+.tg-time { font-size: .68rem; color: #5d7488; text-align: right; margin-top: 2px; }
+.tg-media {
+    height: 180px; border-radius: 8px; margin-bottom: 6px;
+    background: #0e1621 center/cover no-repeat; display: flex; align-items: center; justify-content: center;
+}
+.tg-media-icon {
+    width: 54px; height: 54px; border-radius: 50%; background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #fff;
+}
+
+/* En modo Telegram, ocultar elementos Netflix del navbar */
+body.telegram-mode .nav-links { visibility: hidden; }
+
+/* Responsive vista Telegram */
+@media (max-width: 768px) {
+    .tg-layout { grid-template-columns: 1fr; }
+    .tg-sidebar { display: none; }
+    .navbar-center.view-switch { position: static; }
+    .logo-text { display: none; }
+}
+
+
+/* ===== LOGIN (teléfono + QR) ===== */
+.login-box { max-width: 420px; text-align: center; }
+.login-tabs {
+    display: flex; gap: 6px; background: rgba(255,255,255,.06);
+    padding: 4px; border-radius: 10px; margin: 18px 0 22px;
+}
+.login-tab {
+    flex: 1; border: none; background: transparent; color: var(--netflix-light-gray);
+    padding: 9px 0; border-radius: 8px; cursor: pointer; font-family: inherit;
+    font-weight: 600; font-size: .9rem; transition: all var(--transition-fast);
+}
+.login-tab.active { background: var(--netflix-red); color: #fff; }
+.login-pane[hidden] { display: none; }
+.login-step[hidden] { display: none; }
+.login-label {
+    display: block; text-align: left; color: var(--netflix-light-gray);
+    font-size: .82rem; margin-bottom: 6px;
+}
+.login-input {
+    width: 100%; box-sizing: border-box; padding: 13px 14px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.4); color: #fff;
+    font-size: 1.05rem; margin-bottom: 14px; outline: none; transition: border-color var(--transition-fast);
+}
+.login-input:focus { border-color: var(--netflix-red); }
+.login-action { width: 100%; justify-content: center; }
+.btn-link {
+    display: inline-block; margin-top: 12px; background: none; border: none;
+    color: var(--netflix-light-gray); cursor: pointer; font-size: .85rem; text-decoration: underline;
+}
+.btn-link:hover { color: #fff; }
+.boot-status { white-space: pre-wrap; }
