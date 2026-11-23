@@ -2316,8 +2316,6 @@ window.TVPlus_onBack = function () {
         //    — primero los de encima. Cerramos pulsando su botón cerrar.
         const overlays = [
             ['tg-player-overlay', '.tg-pl-close'],
-            ['tg-mine-dialog', '.tg-mine-close'],
-            ['tg-fwd-dialog', '.tg-fwd-close'],
             ['tg-topics-drawer', '#tg-topics-close']
         ];
         for (const [id, sel] of overlays) {
@@ -2332,10 +2330,8 @@ window.TVPlus_onBack = function () {
         if (synm && !synm.hidden) { synm.hidden = true; document.body.style.overflow = ''; return true; }
         const covm = document.getElementById('cover-tmdb-modal');
         if (covm && !covm.hidden) { covm.hidden = true; document.body.style.overflow = ''; return true; }
-        const tp = document.getElementById('tg-personal');
         if (el.adminEditor && !el.adminEditor.hidden) { AdminPanel.closeEditor(); return true; }
         if (el.adminPanel && !el.adminPanel.hidden) { AdminPanel.close(); return true; }
-        if (tp && !tp.hidden) { const b = tp.querySelector('[data-tg-close]'); if (b) { b.click(); return true; } }
         if (el.searchOverlay && !el.searchOverlay.hidden) { App.closeSearch(); return true; }
         if (el.playerModal && !el.playerModal.hidden) { Detail.close(); return true; }
     } catch (e) {}

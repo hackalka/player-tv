@@ -86,38 +86,6 @@
     }
 
     /* ---------------- LOGIN ---------------- */
-    // Acciones que necesitan File/Blob (no caben en el JSON shim) - API directa.
-    window.TVP_ADMIN = {
-        // Subir archivo: file=File, peer=string, caption?, replyTo?, onProgress?
-        async sendFile(peer, file, caption, replyTo, onProgress) {
-            const r = await requireService(); if (r.err) throw new Error('Sin sesión');
-            return await r.svc.sendFileTo(peer, file, caption, replyTo, onProgress);
-        },
-        // Reemplazar el archivo de un mensaje.
-        async replaceFile(peer, msgId, file, caption) {
-            const r = await requireService(); if (r.err) throw new Error('Sin sesión');
-            await r.svc.replaceFileIn(peer, msgId, file, caption);
-            return true;
-        },
-        // Descargar miniatura de un mensaje (devuelve Blob para mostrar).
-        async getThumb(peer, msgId) {
-            const r = await requireService(); if (r.err) return null;
-            const data = await r.svc.downloadAnyThumb(peer, msgId);
-            if (!data) return null;
-            const u = data instanceof Uint8Array ? data : new Uint8Array(data);
-            return new Blob([u], { type: 'image/jpeg' });
-        },
-        // Descargar avatar (foto de perfil) de un peer.
-        async getAvatar(peer) {
-            const r = await requireService(); if (r.err) return null;
-            try {
-                const data = await r.svc.downloadAvatar(peer);
-                if (!data) return null;
-                const u = data instanceof Uint8Array ? data : new Uint8Array(data);
-                return new Blob([u], { type: 'image/jpeg' });
-            } catch { return null; }
-        }
-    };
 
     // Login con QR: el usuario escanea el codigo desde su app de Telegram movil
     // (Ajustes -> Dispositivos -> Vincular dispositivo) y entra sin SMS ni codigo.
@@ -433,37 +401,10 @@
                 return json({ info: await r.svc.tmdbDetails(parts[3], parts[4]) });
             }
 
-            // ====== HERRAMIENTAS DE ADMIN GENERICO (gestor de grupos) ======
-            // Listar grupos donde el usuario participa (con marca admin/dueno).
+            // Lista de grupos disponibles para seleccionar un origen.
             if (rest === 'admin/groups') {
                 const r = await requireService(); if (r.err) return r.err;
                 return json({ groups: await r.svc.getMisGrupos() });
-            }
-            // Historial de un grupo concreto: /api/admin/group/:peer/messages?topic=...&limit=...&offsetId=...
-            if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'messages') {
-                const r = await requireService(); if (r.err) return r.err;
-                const peer = safeDecode(parts[2]);
-                const limit = Number(u.searchParams.get('limit') || 50);
-                const topic = Number(u.searchParams.get('topic') || 0);
-                const offsetId = Number(u.searchParams.get('offsetId') || 0);
-                return json({ messages: await r.svc.getChatHistory(peer, limit, topic, offsetId) });
-            }
-            // Enviar texto: { peer, text, replyTo? }
-            if (rest === 'admin/send-text' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                return json({ message: await r.svc.sendTextTo(body.peer, body.text, body.replyTo) });
-            }
-            // Editar texto: { peer, msgId, text }
-            if (rest === 'admin/edit-text' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                await r.svc.editTextIn(body.peer, body.msgId, body.text);
-                return json({ ok: true });
-            }
-            // Borrar mensajes: { peer, msgIds: [] }
-            if (rest === 'admin/delete-msgs' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                await r.svc.deleteMessagesIn(body.peer, body.msgIds || []);
-                return json({ ok: true });
             }
             // Incrustar metadatos del admin en el mensaje del grupo:
             // { msgId, patch: {cover?, backdrop?, title?, desc?, video?, tmdb?, year?, rating?, ...} }
@@ -475,54 +416,6 @@
                     return json(res);
                 } catch (e) { return json({ ok: false, error: e.message }); }
             }
-            // Reenviar mensajes: { fromPeer, msgIds: [], toPeer, asCopy, topMsgId? }
-            if (rest === 'admin/forward' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], body.toPeer, !!body.asCopy, body.topMsgId);
-                return json({ ok: true });
-            }
-            // Reenviar al grupo principal de TV+: { fromPeer, msgIds: [], topMsgId?, asCopy? }
-            // El destino siempre es cfg.groupId. Por defecto asCopy=true (anonimo).
-            if (rest === 'admin/forward-to-mine' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                const asCopy = body.asCopy === false ? false : true;
-                await r.svc.forwardMessages(body.fromPeer, body.msgIds || [], cfg.groupId, asCopy, body.topMsgId);
-                _catalog = null; // invalidar cache para que el catalogo recoja lo nuevo
-                return json({ ok: true });
-            }
-            // Lista de temas del grupo principal de TV+ (para el selector de destino)
-            if (rest === 'admin/dest-topics') {
-                const r = await requireService(); if (r.err) return r.err;
-                let topics = [];
-                try { topics = await r.svc.getGroupTopics(cfg.groupId); } catch (e) { console.warn('[api] dest-topics:', e.message); }
-                return json({ groupId: cfg.groupId, topics });
-            }
-            // Lista de topicos de un grupo foro: /api/admin/group/:peer/topics
-            if (parts[0] === 'admin' && parts[1] === 'group' && parts[3] === 'topics') {
-                const r = await requireService(); if (r.err) return r.err;
-                const peer = safeDecode(parts[2]);
-                return json({ topics: await r.svc.getGroupTopics(peer) });
-            }
-            // Crear un nuevo topic en un grupo: { peer, title, iconColor? }
-            if (rest === 'admin/topic-create' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
-                await r.svc.createTopic(body.peer, body.title, body.iconColor);
-                return json({ ok: true });
-            }
-            // Datos de la cuenta logueada (para mostrar Premium/etc.)
-            if (rest === 'admin/account') {
-                const r = await requireService(); if (r.err) return r.err;
-                return json({ account: await r.svc.getMyAccount() });
-            }
-            // Busqueda global: /api/admin/search?q=...&kind=all|videos|photos|docs|links&limit=30
-            if (rest === 'admin/search') {
-                const r = await requireService(); if (r.err) return r.err;
-                const q = u.searchParams.get('q') || '';
-                const kind = u.searchParams.get('kind') || 'all';
-                const lim = Number(u.searchParams.get('limit') || 30);
-                return json({ results: await r.svc.searchGlobal(q, lim, kind) });
-            }
-
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);
         } catch (e) {
             console.error('[api]', rest, e);

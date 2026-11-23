@@ -1385,27 +1385,6 @@ body.cinema-mode .modal-details:hover, body.cinema-mode .episodes:hover, body.ci
 .tg-topic.active { background: var(--netflix-red); color: #fff; border-color: var(--netflix-red); }
 .tg-topic .tg-unread { padding: 0 6px; }
 
-/* ====== Dialogo de reenvío ====== */
-#tg-fwd-dialog { position: fixed; inset: 0; z-index: 10000; }
-#tg-fwd-dialog .tg-fwd-back { position: absolute; inset: 0; background: rgba(0,0,0,.7); }
-#tg-fwd-dialog .tg-fwd-card {
-    position: relative; width: 92%; max-width: 480px; margin: 6vh auto; background: #181818;
-    border-radius: 10px; padding: 20px;
-}
-#tg-fwd-dialog .tg-fwd-close { position: absolute; top: 8px; right: 12px; background: transparent; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; }
-#tg-fwd-dialog h3 { margin-bottom: 12px; color: #fff; }
-#tg-fwd-dialog .tg-search { width: 100%; margin: 0 0 10px; padding: 9px 12px; background: #2a2a2a; border: 1px solid #3a3a3a; color: #fff; border-radius: 6px; font: inherit; font-size: 0.9rem; }
-#tg-fwd-dialog .tg-fwd-list { max-height: 50vh; overflow-y: auto; border: 1px solid #2a2a2a; border-radius: 6px; }
-#tg-fwd-dialog .tg-fwd-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #232323; }
-#tg-fwd-dialog .tg-fwd-item:hover { background: rgba(255,255,255,.05); }
-#tg-fwd-dialog .tg-avatar.small { width: 32px; height: 32px; font-size: 0.8rem; }
-#tg-fwd-dialog .tg-fwd-item-body { flex: 1; min-width: 0; font-size: 0.9rem; color: #eee; }
-#tg-fwd-dialog .tg-fwd-item-sub { color: #888; font-size: 0.72rem; }
-#tg-fwd-dialog .tg-fwd-opt { display: flex; align-items: center; gap: 8px; padding: 12px 4px 4px; color: #ddd; font-size: 0.85rem; }
-#tg-fwd-dialog .tg-fwd-info { color: #aaa; font-size: 0.83rem; padding-top: 6px; }
-
-
-
 /* === Boton play en mensajes + tema "+ Nuevo" === */
 .tg-msg-actions .msg-act.primary { background: var(--netflix-red); border-color: var(--netflix-red); color: #fff; }
 .tg-msg-actions .msg-act.primary:hover { background: var(--netflix-red-hover); }
@@ -1736,81 +1715,7 @@ html.tv-mode a:focus {
     border-color: #3ee65c; color: #3ee65c;
 }
 
-/* --- Barra flotante en modo selección --- */
-.tg-sel-bar {
-    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-    background: #0a1a3a; border: 1px solid #3ee65c;
-    border-radius: 12px; padding: 10px 14px;
-    display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(62, 230, 92, 0.2);
-    z-index: 10; animation: tgSelBarIn 200ms ease-out;
-}
-@keyframes tgSelBarIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.tg-sel-count { color: #fff; font-size: 0.9rem; padding-right: 8px; border-right: 1px solid #2a3a5a; }
-.tg-sel-count b { color: #3ee65c; font-size: 1.05rem; }
-.tg-sel-bar .btn-sm.primary {
-    background: #3ee65c; color: #0a1a3a; border-color: #3ee65c; font-weight: 700;
-}
-.tg-sel-bar .btn-sm.primary:hover { background: #2cd24a; border-color: #2cd24a; }
-
-/* La sección principal necesita position:relative para alojar la barra */
-#tg-personal .tg-main { position: relative; }
-
-/* --- Diálogo "Enviar a mi grupo TV+" --- */
-#tg-mine-dialog { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; }
-.tg-mine-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(2px); }
-.tg-mine-card {
-    position: relative; background: #1a1a1a; color: #fff;
-    border-radius: 14px; padding: 22px 24px; min-width: 360px; max-width: 92vw; max-height: 86vh; overflow-y: auto;
-    border: 1px solid rgba(62, 230, 92, 0.25);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-}
-.tg-mine-card h3 { margin: 0 0 6px; color: #3ee65c; font-size: 1.05rem; }
-.tg-mine-sub { color: #aaa; font-size: 0.85rem; margin-bottom: 14px; }
-.tg-mine-close {
-    position: absolute; right: 10px; top: 8px;
-    background: transparent; border: 0; color: #888;
-    font-size: 1.6rem; cursor: pointer; line-height: 1; padding: 4px 8px;
-}
-.tg-mine-close:hover { color: #fff; }
-.tg-mine-topics { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.tg-mine-topic {
-    background: #232323; border: 1px solid #2a2a2a; color: #ddd;
-    padding: 10px 14px; border-radius: 8px; cursor: pointer;
-    text-align: left; font-size: 0.95rem; transition: all 150ms;
-}
-.tg-mine-topic:hover {
-    background: rgba(62, 230, 92, 0.12); border-color: #3ee65c; color: #fff;
-}
-.tg-mine-topic.selected {
-    border-color: #3ee65c; background: rgba(62, 230, 92, 0.08); color: #3ee65c;
-    font-weight: 600;
-}
-.tg-mine-topic:disabled { opacity: 0.5; cursor: wait; }
-.tg-mine-opt {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 0; color: #aaa; font-size: 0.85rem; cursor: pointer;
-    user-select: none; border-top: 1px solid #2a2a2a;
-}
-.tg-mine-opt input { width: 16px; height: 16px; accent-color: #3ee65c; }
-.tg-mine-info {
-    margin-top: 10px; padding: 10px 12px; min-height: 1.2em;
-    background: #0e1a14; border: 1px solid #1f3a26;
-    border-radius: 6px; color: #ddd; font-size: 0.85rem;
-}
-.tg-mine-info b { color: #3ee65c; }
-
-/* === Móvil: barra flotante a ancho completo y diálogo más grande === */
 @media (max-width: 600px) {
-    .tg-sel-bar {
-        left: 8px; right: 8px; transform: none; width: auto;
-        flex-wrap: wrap; justify-content: center;
-    }
-    .tg-sel-bar .btn-sm { flex: 1 1 auto; min-width: 80px; }
-    .tg-mine-card { min-width: 0; width: calc(100vw - 24px); padding: 18px; }
     .tg-head-pin { font-size: 0.75rem; padding: 4px 8px; }
 }
 
