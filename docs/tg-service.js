@@ -109,12 +109,32 @@
         async getForumTopics() {
             const entity = await this.resolveGroup();
             try {
-                const res = await this.client.invoke(new Api.channels.GetForumTopics({
-                    channel: entity, limit: 100, offsetDate: 0, offsetId: 0, offsetTopic: 0
-                }));
-                return (res.topics || [])
-                    .filter(t => t.id !== undefined && t.title !== undefined)
-                    .map(t => ({ id: t.id, title: t.title || ('Tema ' + t.id) }));
+                const topics = [], seen = new Set();
+                let offsetDate = 0, offsetId = 0, offsetTopic = 0;
+                for (let page = 0; page < 100; page++) {
+                    const res = await this.client.invoke(new Api.channels.GetForumTopics({
+                        channel: entity, limit: 100, offsetDate, offsetId, offsetTopic
+                    }));
+                    const pageTopics = (res.topics || []).filter(t => t.id !== undefined && t.title !== undefined);
+                    let added = 0;
+                    pageTopics.forEach(topic => {
+                        const id = String(topic.id);
+                        if (seen.has(id)) return;
+                        seen.add(id);
+                        topics.push({ id: topic.id, title: topic.title || ('Tema ' + topic.id) });
+                        added++;
+                    });
+                    if (!added || pageTopics.length < 100 || (res.count && topics.length >= res.count)) break;
+
+                    const last = pageTopics[pageTopics.length - 1];
+                    const topMessageId = Number(last.topMessage || 0);
+                    const topMessage = (res.messages || []).find(message => Number(message.id) === topMessageId);
+                    offsetDate = Number((topMessage && topMessage.date) || last.date || 0);
+                    offsetId = topMessageId;
+                    offsetTopic = Number(last.id) || 0;
+                    if (!offsetTopic) break;
+                }
+                return topics;
             } catch (e) {
                 console.warn('GetForumTopics fallo:', e.message);
                 return [];
@@ -292,8 +312,8 @@
                 tvgramUrl: firstTvgram ? firstTvgram.url : '',
                 externalUrl: firstHttp ? firstHttp.url : '',
                 hasThumb,
-                streamUrl: isVideo ? `tgstream/${topic.id}/${message.id}` : '',
-                thumbUrl: hasThumb ? `tgthumb/${topic.id}/${message.id}` : ''
+                streamUrl: isVideo ? `tgstream/${topic.id}/${message.id}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}` : '',
+                thumbUrl: hasThumb ? `tgthumb/${topic.id}/${message.id}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}` : ''
             };
 
             // Aplicar metadatos embebidos (#tvplus) -> mandan sobre lo detectado
@@ -343,9 +363,9 @@
 
         _linkPlayable(link) {
             if (link.kind === 'tg') return {
-                streamUrl: `tgstreamlink/${encodeURIComponent(link.channel)}/${link.msgId}`,
+                streamUrl: `tgstreamlink/${encodeURIComponent(link.channel)}/${link.msgId}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}`,
                 externalUrl: link.url,
-                thumbUrl: `tgthumblink/${encodeURIComponent(link.channel)}/${link.msgId}`,
+                thumbUrl: `tgthumblink/${encodeURIComponent(link.channel)}/${link.msgId}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}`,
                 playableInBrowser: true
             };
             if (link.kind === 'ace') return { aceUrl: link.url, externalUrl: '', playableInBrowser: false };
@@ -847,12 +867,6 @@
             });
         }
 
-        async editMessageText(msgId, text) {
-            const entity = await this.resolveGroup();
-            await this.client.editMessage(entity, { message: Number(msgId), text: String(text) });
-            this._msgCache.delete(Number(msgId));
-        }
-
         // Escribe en el mensaje del grupo, de forma VISIBLE y limpia (sin enlaces,
         // sin nada oculto): pone el título correcto y la sinopsis como texto. Así
         // todos los usuarios ven la sinopsis (va en el propio mensaje) y la
@@ -884,12 +898,6 @@
             this._msgCache.delete(id);
             return { ok: true };
         }
-        async deleteMessage(msgId) {
-            const entity = await this.resolveGroup();
-            await this.client.deleteMessages(entity, [Number(msgId)], { revoke: true });
-            this._msgCache.delete(Number(msgId));
-        }
-
         // ================== HERRAMIENTAS DE ADMIN GENERICO ==================
         // (cualquier grupo donde el usuario tenga permisos, no solo el del config)
 

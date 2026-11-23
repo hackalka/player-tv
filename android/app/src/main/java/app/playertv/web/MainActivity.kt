@@ -241,7 +241,7 @@ class MainActivity : AppCompatActivity() {
      * en el reproductor NATIVO ExoPlayer dentro de esta misma app.
      */
     inner class NativeHost {
-        /** ref = JSON {kind,a,b} que identifica el mensaje de Telegram.
+        /** ref = JSON {kind,a,b,group} que identifica el mensaje de Telegram y su grupo.
          *  engine = "exo" | "vlc" | "" (auto segun formato). */
         @JavascriptInterface
         fun play(refJson: String, title: String?, mime: String?, engine: String?) {

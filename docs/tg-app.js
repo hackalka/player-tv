@@ -18,9 +18,11 @@
     let _client = null;          // cliente autorizado
     let _clientPromise = null;
     let _service = null;
+    const _groupServices = new Map();
     let _loginClient = null;     // cliente temporal durante el login
     let _login = {};             // { phone, hash }
-    let _catalog = null, _catalogTime = 0;
+    const _catalogs = new Map();
+    const _fastCatalogs = new Map();
 
     function json(data, status) {
         return new Response(JSON.stringify(data || {}), {
@@ -79,6 +81,19 @@
         if (!c) return null;
         _service = new window.TelegramService(c, cfg);
         return _service;
+    }
+
+    async function serviceForGroup(groupId) {
+        const key = String(groupId || cfg.groupId).trim();
+        if (key === String(cfg.groupId).trim()) return ensureService();
+        const client = await ensureClient();
+        if (!client) return null;
+        if (!_groupServices.has(key)) {
+            _groupServices.set(key, new window.TelegramService(
+                client, Object.assign({}, cfg, { groupId: key })
+            ));
+        }
+        return _groupServices.get(key);
     }
 
     function saveSession(client) {
@@ -252,8 +267,8 @@
         return json({ loggedIn: true, isAdmin, isOwner, ownerConfigured, name, userId, username, inGroup });
     }
 
-    async function requireService() {
-        const svc = await ensureService();
+    async function requireServiceForGroup(groupId) {
+        const svc = await serviceForGroup(groupId);
         if (!svc) return { err: json({ needLogin: true }, 401) };
         try { await svc.resolveGroup(); }
         catch (e) {
@@ -269,25 +284,42 @@
         }
         return { svc };
     }
-    async function requireAdmin() {
-        const r = await requireService();
+    async function requireService() {
+        return requireServiceForGroup(cfg.groupId);
+    }
+    async function requireAdminForGroup(groupId) {
+        const r = await requireServiceForGroup(groupId);
         if (r.err) return r;
         let isAdmin = false;
         try { isAdmin = await r.svc.isGroupAdmin(); } catch {}
         if (!isAdmin) return { err: json({ error: 'Solo para administradores del grupo.' }, 403) };
         return r;
     }
+    async function requireAdmin() {
+        return requireAdminForGroup(cfg.groupId);
+    }
 
     async function handleCatalog(u) {
-        const r = await requireService();
+        const groupId = String(u.searchParams.get('group') || cfg.groupId);
+        const r = await requireServiceForGroup(groupId);
         if (r.err) return r.err;
         const fresh = u.searchParams.get('refresh') === '1';
         const fast = u.searchParams.get('fast') === '1'; // carga rapida (300 por tema)
-        if (!_catalog || fresh || Date.now() - _catalogTime > 60000) {
-            _catalog = await r.svc.getCatalog(fast ? { limit: 300 } : undefined);
-            _catalogTime = Date.now();
+        const cacheKey = groupId.trim();
+        const fullCache = _catalogs.get(cacheKey);
+        if (fast && !fresh) {
+            if (fullCache && Date.now() - fullCache.time <= 60000) return json(fullCache.data);
+            const fastCache = _fastCatalogs.get(cacheKey);
+            if (!fastCache || Date.now() - fastCache.time > 60000) {
+                _fastCatalogs.set(cacheKey, { data: await r.svc.getCatalog({ limit: 300 }), time: Date.now() });
+            }
+            return json(_fastCatalogs.get(cacheKey).data);
         }
-        return json(_catalog);
+        if (!fullCache || fresh || Date.now() - fullCache.time > 60000) {
+            _catalogs.set(cacheKey, { data: await r.svc.getCatalog(), time: Date.now() });
+            _fastCatalogs.delete(cacheKey);
+        }
+        return json(_catalogs.get(cacheKey).data);
     }
 
     function tmdbHeaders() { return cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' }; }
@@ -322,6 +354,7 @@
                 try { const c = await ensureClient(); if (c) { try { await c.invoke(new window.telegram.Api.auth.LogOut()); } catch {} await c.disconnect(); } } catch {}
                 try { localStorage.removeItem(SS_KEY); } catch {}
                 _client = null; _service = null;
+                _groupServices.clear(); _catalogs.clear(); _fastCatalogs.clear();
                 return json({ ok: true });
             }
 
@@ -357,40 +390,11 @@
             }
 
             // Admin
-            if (rest === 'topics') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                const topics = await r.svc.getAutoTopics();
-                return json({ topics: topics.map(t => ({ id: t.id, title: t.name, icon: t.icon })) });
-            }
-            if (parts[0] === 'chat') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                const topicId = parts[1];
-                const msgs = await r.svc.getTopicMessages(topicId, 60);
-                const out = msgs.map(m => {
-                    const doc = m.media && m.media.document;
-                    const isVideo = !!(doc && /video/.test(doc.mimeType || ''));
-                    const hasThumb = !!(m.media && (m.media.photo || (doc && doc.thumbs && doc.thumbs.length)));
-                    return {
-                        id: m.id, text: m.message || '', date: m.date, hasMedia: !!m.media, isVideo,
-                        thumbUrl: hasThumb ? `tgthumb/${topicId}/${m.id}` : '',
-                        streamUrl: isVideo ? `tgstream/${topicId}/${m.id}` : ''
-                    };
-                });
-                return json({ messages: out });
-            }
-            if (rest === 'admin/edit') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                await r.svc.editMessageText(body.msgId, body.text || ''); _catalog = null;
-                return json({ ok: true });
-            }
-            if (rest === 'admin/delete') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                await r.svc.deleteMessage(body.msgId); _catalog = null;
-                return json({ ok: true });
-            }
             if (rest === 'admin/refresh') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                _catalog = null; return json({ ok: true });
+                const groupId = String(u.searchParams.get('group') || cfg.groupId);
+                const r = await requireAdminForGroup(groupId); if (r.err) return r.err;
+                _catalogs.delete(groupId.trim()); _fastCatalogs.delete(groupId.trim());
+                return json({ ok: true });
             }
             if (rest === 'admin/tmdb/search') {
                 const r = await requireAdmin(); if (r.err) return r.err;
@@ -403,16 +407,18 @@
 
             // Lista de grupos disponibles para seleccionar un origen.
             if (rest === 'admin/groups') {
-                const r = await requireService(); if (r.err) return r.err;
-                return json({ groups: await r.svc.getMisGrupos() });
+                const svc = await ensureService();
+                if (!svc) return json({ needLogin: true }, 401);
+                return json({ groups: await svc.getMisGrupos() });
             }
             // Incrustar metadatos del admin en el mensaje del grupo:
             // { msgId, patch: {cover?, backdrop?, title?, desc?, video?, tmdb?, year?, rating?, ...} }
             if (rest === 'admin/embed' && method === 'POST') {
-                const r = await requireService(); if (r.err) return r.err;
+                const groupId = String(u.searchParams.get('group') || cfg.groupId);
+                const r = await requireServiceForGroup(groupId); if (r.err) return r.err;
                 try {
                     const res = await r.svc.embedMeta(body.msgId, body.patch || {});
-                    _catalog = null; // refrescar catalogo
+                    _catalogs.delete(groupId.trim()); _fastCatalogs.delete(groupId.trim());
                     return json(res);
                 } catch (e) { return json({ ok: false, error: e.message }); }
             }
@@ -446,8 +452,8 @@
         if (kind === 'tgstream' || kind === 'tgthumb') return svc.getMessageById(b);
         return svc.getMessageByRef(safeDecode(a), b); // tgstreamlink / tgthumblink
     }
-    async function swInfo(kind, a, b) {
-        const svc = await ensureService(); if (!svc) return null;
+    async function swInfo(kind, a, b, group) {
+        const svc = await serviceForGroup(group); if (!svc) return null;
         try {
             const msg = await resolveMessage(svc, kind, a, b);
             if (!msg) { console.warn('[sw-bridge] sin mensaje para', kind, a, b); return null; }
@@ -468,8 +474,8 @@
             return null;
         }
     }
-    async function swChunk(kind, a, b, start, length) {
-        const svc = await ensureService(); if (!svc) return null;
+    async function swChunk(kind, a, b, group, start, length) {
+        const svc = await serviceForGroup(group); if (!svc) return null;
         const msg = await resolveMessage(svc, kind, a, b);
         const info = svc.docInfo(msg); if (!info) return null;
         const alignedStart = Math.floor(start / ALIGN) * ALIGN;
@@ -485,8 +491,8 @@
         const slice = full.subarray(start - alignedStart, start - alignedStart + length);
         return new Uint8Array(slice); // copia con buffer propio
     }
-    async function swThumb(kind, a, b) {
-        const svc = await ensureService(); if (!svc) return null;
+    async function swThumb(kind, a, b, group) {
+        const svc = await serviceForGroup(group); if (!svc) return null;
         let data;
         if (kind === 'tgthumb') data = await svc.downloadThumb(null, b);
         else data = await svc.downloadThumbByRef(safeDecode(a), b);
@@ -499,15 +505,15 @@
         const port = ev.ports && ev.ports[0];
         if (!port || !msg.op) return;
         try {
-            if (msg.op === 'info') { port.postMessage(await swInfo(msg.kind, msg.a, msg.b)); return; }
+            if (msg.op === 'info') { port.postMessage(await swInfo(msg.kind, msg.a, msg.b, msg.group)); return; }
             if (msg.op === 'thumb') {
-                const u = await swThumb(msg.kind, msg.a, msg.b);
+                const u = await swThumb(msg.kind, msg.a, msg.b, msg.group);
                 if (!u) return port.postMessage(null);
                 const buf = u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength);
                 port.postMessage(buf, [buf]); return;
             }
             if (msg.op === 'chunk') {
-                const u = await swChunk(msg.kind, msg.a, msg.b, msg.start, msg.length);
+                const u = await swChunk(msg.kind, msg.a, msg.b, msg.group, msg.start, msg.length);
                 if (!u) return port.postMessage(null);
                 const buf = u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength);
                 port.postMessage(buf, [buf]); return;
@@ -539,7 +545,7 @@
         catch (e) { return 0; }
     }
     function parseRef(refJson) {
-        try { const o = JSON.parse(refJson); return { kind: o.kind, a: o.a, b: o.b }; }
+        try { const o = JSON.parse(refJson); return { kind: o.kind, a: o.a, b: o.b, group: o.group }; }
         catch (e) { return null; }
     }
     window.NativeStream = {
@@ -548,7 +554,7 @@
             const port = nativePort(); if (!port) return;
             const r = parseRef(refJson); if (!r) return this._failMeta(port, reqId);
             try {
-                const info = await swInfo(r.kind, r.a, r.b);
+                const info = await swInfo(r.kind, r.a, r.b, r.group);
                 await fetch(`http://127.0.0.1:${port}/meta?id=${encodeURIComponent(reqId)}`, {
                     method: 'POST',
                     headers: { 'x-size': String((info && info.size) || 0), 'x-mime': (info && info.mime) || '' }
@@ -563,7 +569,7 @@
             const port = nativePort(); if (!port) return;
             const r = parseRef(refJson); if (!r) return this._failFeed(port, reqId);
             try {
-                const u = await swChunk(r.kind, r.a, r.b, Number(start), Number(length));
+                const u = await swChunk(r.kind, r.a, r.b, r.group, Number(start), Number(length));
                 const body = u ? (u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength)) : new ArrayBuffer(0);
                 await fetch(`http://127.0.0.1:${port}/feed?id=${encodeURIComponent(reqId)}`, {
                     method: 'POST',

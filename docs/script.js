@@ -3,7 +3,7 @@
  *  - Catálogo Netflix (películas/series/deportes) desde la API
  *  - Continuar viendo + Mi lista (favoritos) en localStorage
  *  - Reproductores externos (VLC / AceStream) para mkv/avi/enlaces
- *  - Chat solo para administradores (editar / borrar)
+ *  - Selector de grupo y catálogo por cuenta de Telegram
  *  - Navegación con mando de TV Box (flechas + OK + atrás)
  * ===================================================================== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -27,7 +27,6 @@ function placeholderImage(seed, label) {
 function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; } return h; }
 function escapeXml(s) { return String(s).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c])); }
 function escapeHtml(s) { return String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
-function fmtTime(d) { try { return new Date(d * 1000).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; } }
 function absUrl(p) { return p ? new URL(p, location.href).href : ''; }
 
 async function api(path, opts = {}) {
@@ -194,17 +193,19 @@ const CloudStore = {
     async saveOverrides() { if (!this.db) return; try { await this.db.collection('shared').doc('overrides').set({ overrides: Store.overrides }, { merge: true }); } catch {} }
 };
 
-const state = { catalog: { categories: [] }, allItems: [], itemsById: {}, topics: [], chatCache: {}, activeTopic: null, isAdmin: false, adminEnabled: false };
+const state = {
+    catalog: { categories: [] }, allItems: [], itemsById: {},
+    groups: [], activeGroup: '', favoriteGroup: '', groupPreferenceKey: 'tvp_selected_group:account',
+    account: null, isAdmin: false, adminEnabled: false
+};
 
 const el = {
     body: document.body,
     brand: $('#brand-name'),
-    netflixView: $('#netflix-view'),
-    telegramView: $('#telegram-view'),
+    groupPicker: $('#group-picker'),
+    groupSelect: $('#group-select'),
+    groupFavorite: $('#group-favorite'),
     navbar: $('.navbar'),
-    navNetflix: $('#nav-netflix'),
-    navTelegram: $('#nav-telegram'),
-    viewSwitch: $('.view-switch'),
     navLinks: $('#nav-links'),
     adminLock: $('#admin-lock'),
     adminRefresh: $('#admin-refresh'),
@@ -271,10 +272,6 @@ const el = {
     searchOverlay: $('#search-overlay'),
     searchInput: $('#search-input'),
     searchResults: $('#search-results'),
-    chatList: $('#chat-list'),
-    chatMessages: $('#chat-messages'),
-    chatHeaderTitle: $('#chat-header-title'),
-    chatHeaderMeta: $('#chat-header-meta'),
     loadingScreen: $('#loading-screen'),
     loadingText: $('#loading-text'),
     loginModal: $('#login-modal'),
@@ -459,7 +456,8 @@ async function embedToGroup(item, patch) {
     try {
         if (!item || !/^\d+$/.test(String(item.id))) return;
         if (!state.isAdmin) return;
-        await api('/api/admin/embed', { method: 'POST', body: JSON.stringify({ msgId: Number(item.id), patch: patch || {} }) });
+        const group = encodeURIComponent(state.activeGroup || '');
+        await api('/api/admin/embed?group=' + group, { method: 'POST', body: JSON.stringify({ msgId: Number(item.id), patch: patch || {} }) });
     } catch (e) { console.warn('[embed] ', e && e.message); }
 }
 
@@ -937,7 +935,9 @@ const ExternalPlayers = {
         if (m) {
             const topic = m[1], msg = m[2];
             const cfg = window.TVP_CONFIG || {};
-            const gid = String(cfg.groupId || '').replace(/^-100/, '').replace(/^-/, '');
+            let groupId = cfg.groupId || '';
+            try { groupId = new URL(su, location.href).searchParams.get('group') || groupId; } catch {}
+            const gid = String(groupId).replace(/^-100/, '').replace(/^-/, '');
             if (!gid) return '';
             return (topic && topic !== '0' && topic !== '1')
                 ? `https://t.me/c/${gid}/${topic}/${msg}`
@@ -1097,12 +1097,13 @@ const Player = {
             else {
                 const mC = u.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
                 const mU = !mC && u.match(/t\.me\/([A-Za-z0-9_]+)\/(?:\d+\/)?(\d+)/i);
+                const group = encodeURIComponent(state.activeGroup || '');
                 if (mC) {
-                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent('-100' + mC[1])}/${mC[2]}`;
+                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent('-100' + mC[1])}/${mC[2]}?group=${group}`;
                     replaced.externalUrl = u;
                     replaced.playableInBrowser = true;
                 } else if (mU) {
-                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent(mU[1])}/${mU[2]}`;
+                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent(mU[1])}/${mU[2]}?group=${group}`;
                     replaced.externalUrl = u;
                     replaced.playableInBrowser = true;
                 } else if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(u)) {
@@ -1250,7 +1251,9 @@ const Player = {
         const su = (playable && playable.streamUrl) || '';
         const m = su.match(/^(tgstream|tgstreamlink)\/([^/]+)\/([^/?#]+)/);
         if (!m) return null;
-        return JSON.stringify({ kind: m[1], a: m[2], b: m[3] });
+        let group = '';
+        try { group = new URL(su, location.href).searchParams.get('group') || ''; } catch {}
+        return JSON.stringify({ kind: m[1], a: m[2], b: m[3], group });
     },
     // ¿Está disponible el reproductor nativo de la APK Android?
     _hasNative() {
@@ -1440,11 +1443,12 @@ const Admin = {
         try {
             // Toast no-bloqueante mientras refresca
             App.toast && App.toast('Actualizando catálogo…', 0);
-            await api('/api/admin/refresh', { method: 'POST', body: '{}' });
-            const catalog = await api('/api/catalog?refresh=1');
+            const group = encodeURIComponent(state.activeGroup || '');
+            await api('/api/admin/refresh?group=' + group, { method: 'POST', body: '{}' });
+            const catalog = await api('/api/catalog?group=' + group + '&refresh=1');
             state.catalog = catalog; state.allItems = []; state.itemsById = {};
             catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
-            try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
+            try { sessionStorage.setItem('tvp_catalog:' + group, JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
             App.populateFilters(); Netflix.render();
             App.toast ? App.toast('✅ Catálogo actualizado', 2200) : null;
         } catch (e) {
@@ -1453,8 +1457,6 @@ const Admin = {
     },
     reflect() {
         const a = !!state.isAdmin;
-        el.navTelegram.hidden = !a;
-        if (el.viewSwitch) el.viewSwitch.hidden = !a;
         el.adminRefresh.hidden = !a;
         if (el.adminPanelBtn) el.adminPanelBtn.hidden = !a;
         el.adminLock.hidden = false; // botón de cerrar sesión, visible al estar logado
@@ -1584,13 +1586,19 @@ const AdminPanel = {
             <button class="btn btn-play focusable" id="tool-refresh" tabindex="0">🔄 Actualizar catálogo (Telegram)</button>
             <button class="btn btn-play focusable" id="tool-autofix" tabindex="0">✨ Auto-rellenar fichas sin carátula (TMDB)</button>
             <button class="btn btn-fav focusable" id="tool-cache" tabindex="0">🧹 Borrar caché local</button>
-            <button class="btn btn-fav focusable" id="tool-chat" tabindex="0">💬 Editar posts de Telegram</button>
             <div class="admin-tools-progress" id="autofix-progress" hidden></div>
-            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo de Telegram y refresca TMDB. «Auto-rellenar» busca en TMDB cada título sin carátula y le pone la primera coincidencia (luego puedes repasar en Auditoría). «Borrar caché» limpia la caché del navegador (no borra favoritos). «Editar posts» abre la vista de chat para editar/borrar mensajes del grupo.</p>`;
+            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo seleccionado y refresca TMDB. «Auto-rellenar» busca en TMDB cada título sin carátula y le pone la primera coincidencia (luego puedes repasar en Auditoría). «Borrar caché» limpia la caché de catálogos del navegador (no borra favoritos).</p>`;
         const r = $('#tool-refresh', el.adminTools); if (r) r.onclick = async () => { r.disabled = true; r.innerText = 'Actualizando...'; await Admin.refresh(); this.renderStats(); this.renderList(); r.disabled = false; r.innerText = '🔄 Actualizar catálogo (Telegram)'; };
         const af = $('#tool-autofix', el.adminTools); if (af) af.onclick = () => this.autoFix(af);
-        const c = $('#tool-cache', el.adminTools); if (c) c.onclick = () => { try { sessionStorage.removeItem('tvp_catalog'); } catch {} alert('Caché local borrada. Recarga para volver a leer del servidor.'); };
-        const ch = $('#tool-chat', el.adminTools); if (ch) ch.onclick = () => { this.close(); App.switchView('telegram'); };
+        const c = $('#tool-cache', el.adminTools); if (c) c.onclick = () => {
+            try {
+                for (let i = sessionStorage.length - 1; i >= 0; i--) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('tvp_catalog')) sessionStorage.removeItem(key);
+                }
+            } catch {}
+            alert('Caché local borrada. Recarga para volver a leer del servidor.');
+        };
     },
     async autoFix(btn) {
         const prog = $('#autofix-progress');
@@ -1780,82 +1788,6 @@ const AdminPanel = {
         this.renderList();
         Netflix.render();
     }
-};
-
-/* ===== VISTA CHAT (solo admin) ===== */
-const Chat = {
-    async load() {
-        try { const r = await api('/api/topics'); state.topics = r.topics || []; }
-        catch (e) { el.chatList.innerHTML = `<div class="chat-empty">${escapeHtml(e.message)}</div>`; return; }
-        this.renderList();
-    },
-    renderList() {
-        el.chatList.innerHTML = '';
-        if (!state.topics.length) { el.chatList.innerHTML = '<div class="chat-empty" style="padding:2rem 1rem">No hay temas.</div>'; return; }
-        state.topics.forEach(t => {
-            const item = document.createElement('div');
-            item.className = 'chat-item is-media focusable'; item.tabIndex = 0;
-            item.innerHTML = `<div class="chat-avatar">${t.icon || '#'}</div>
-                <div class="chat-item-body"><div class="chat-item-top"><span class="chat-item-name">${escapeHtml(t.title)}</span></div>
-                <div class="chat-item-sub">Tema</div></div>`;
-            item.onclick = () => this.open(t, item);
-            el.chatList.appendChild(item);
-        });
-        TVNav.refresh();
-    },
-    async open(topic, node) {
-        state.activeTopic = topic.id;
-        $$('.chat-item', el.chatList).forEach(c => c.classList.remove('active'));
-        if (node) node.classList.add('active');
-        el.chatHeaderTitle.innerText = topic.title;
-        el.chatHeaderMeta.innerText = 'cargando...';
-        el.chatMessages.innerHTML = '<div class="chat-loading"><div class="loader small"></div></div>';
-        let msgs;
-        try { const r = await api('/api/chat/' + topic.id); msgs = r.messages || []; state.chatCache[topic.id] = msgs; }
-        catch (e) { el.chatMessages.innerHTML = '<div class="chat-empty">Error: ' + escapeHtml(e.message) + '</div>'; return; }
-        el.chatHeaderMeta.innerText = msgs.length + ' mensajes';
-        this.renderMessages(msgs, topic);
-    },
-    renderMessages(msgs, topic) {
-        el.chatMessages.innerHTML = '';
-        const ordered = msgs.slice().reverse();
-        if (!ordered.length) { el.chatMessages.innerHTML = '<div class="chat-empty">No hay mensajes.</div>'; return; }
-        ordered.forEach(m => {
-            const b = document.createElement('div');
-            b.className = 'tg-message';
-            const media = m.hasMedia ? `<div class="tg-media" ${m.thumbUrl ? `style="background-image:url(${m.thumbUrl})"` : ''}><span class="tg-media-icon">${m.isVideo ? '▶' : '🖼'}</span></div>` : '';
-            b.innerHTML = `<div class="tg-bubble">
-                ${media}
-                ${m.text ? `<div class="tg-text">${this.linkify(escapeHtml(m.text))}</div>` : ''}
-                <div class="tg-actions">
-                    <button class="tg-edit focusable" tabindex="0">✎ Editar</button>
-                    <button class="tg-del focusable" tabindex="0">🗑 Borrar</button>
-                </div>
-                <div class="tg-time">${fmtTime(m.date)}</div>
-            </div>`;
-            if (m.isVideo) {
-                const bub = b.querySelector('.tg-bubble');
-                bub.classList.add('playable');
-            }
-            $('.tg-edit', b).onclick = () => this.edit(topic, m);
-            $('.tg-del', b).onclick = () => this.del(topic, m);
-            el.chatMessages.appendChild(b);
-        });
-        el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
-        TVNav.refresh();
-    },
-    async edit(topic, m) {
-        const text = prompt('Editar mensaje:', m.text || '');
-        if (text == null) return;
-        try { await api('/api/admin/edit', { method: 'POST', body: JSON.stringify({ topicId: topic.id, msgId: m.id, text }) }); this.open(topic); }
-        catch (e) { alert('Error al editar: ' + e.message); }
-    },
-    async del(topic, m) {
-        if (!confirm('¿Borrar este mensaje del grupo? No se puede deshacer.')) return;
-        try { await api('/api/admin/delete', { method: 'POST', body: JSON.stringify({ topicId: topic.id, msgId: m.id }) }); this.open(topic); }
-        catch (e) { alert('Error al borrar: ' + e.message); }
-    },
-    linkify(t) { return t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 };
 
 /* ===== Selector de carátula desde TMDB ===== */
@@ -2065,24 +1997,6 @@ const App = {
             el._t = setTimeout(() => { el.classList.remove('show'); }, ms || 2200);
         }
     },
-    switchView(view) {
-        state.currentView = view;
-        const isNet = view === 'netflix';
-        el.netflixView.hidden = !isNet;
-        el.telegramView.hidden = isNet;
-        el.body.classList.toggle('telegram-mode', !isNet);
-        el.navNetflix.classList.toggle('active', isNet);
-        el.navTelegram.classList.toggle('active', !isNet);
-        if (!isNet) {
-            Chat.load().then(() => {
-                if (!state.activeTopic && state.topics.length) {
-                    const node = $$('.chat-item', el.chatList)[0];
-                    Chat.open(state.topics[0], node);
-                }
-            });
-        }
-        TVNav.refresh();
-    },
     // Construye un indice rapido de busqueda y deteccion de calidad/idioma
     // a partir del titulo original. Se llama tras cargar el catalogo.
     _buildSearchIndex() {
@@ -2218,7 +2132,7 @@ const Voice = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .chat-item, .opt-btn, .source-btn, .filter-select, .nav-links a, .view-btn, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, .tg-edit, .tg-del, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
+    SEL: '.card, .card-remove, .btn, .episode, .opt-btn, .source-btn, .filter-select, .nav-links a, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, #group-select, #group-favorite, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
@@ -2342,6 +2256,134 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { if (window.TVPlus_onBack()) { e.preventDefault(); e.stopPropagation(); } }
 }, { capture: true });
 
+let groupLoadVersion = 0;
+
+function applyCatalog(catalog, groupId) {
+    state.catalog = catalog || { categories: [] };
+    state.allItems = [];
+    state.itemsById = {};
+    (state.catalog.categories || []).forEach(category => (category.items || []).forEach(item => {
+        item.category = category.name;
+        state.allItems.push(item);
+        state.itemsById[item.id] = item;
+    }));
+    try {
+        sessionStorage.setItem('tvp_catalog:' + encodeURIComponent(groupId), JSON.stringify({
+            ts: Date.now(), data: state.catalog
+        }));
+    } catch {}
+    App.populateFilters();
+    Netflix.render();
+}
+
+async function loadGroupCatalog(groupId, useCache) {
+    const selectedGroup = String(groupId || '').trim();
+    if (!selectedGroup) throw new Error('Selecciona un grupo de Telegram.');
+    const requestId = ++groupLoadVersion;
+    state.activeGroup = selectedGroup;
+    try { localStorage.setItem(state.groupPreferenceKey, selectedGroup); } catch {}
+
+    const endpoint = '/api/catalog?group=' + encodeURIComponent(selectedGroup);
+    const cacheKey = 'tvp_catalog:' + encodeURIComponent(selectedGroup);
+    let cached = null;
+    if (useCache) {
+        try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch {}
+    }
+    const refresh = async () => {
+        const catalog = await api(endpoint + '&refresh=1');
+        if (requestId === groupLoadVersion && state.activeGroup === selectedGroup) {
+            applyCatalog(catalog, selectedGroup);
+        }
+    };
+    if (cached && cached.data && cached.ts && Date.now() - cached.ts < 30 * 60 * 1000) {
+        applyCatalog(cached.data, selectedGroup);
+        refresh().catch(e => console.warn('No se pudo actualizar el catálogo del grupo:', e.message));
+        return;
+    }
+
+    el.rowsContainer.innerHTML = '<div class="empty-state">Cargando grupo…</div>';
+    const fastCatalog = await api(endpoint + '&fast=1');
+    if (requestId !== groupLoadVersion) return;
+    applyCatalog(fastCatalog, selectedGroup);
+    setTimeout(() => refresh().catch(e => console.warn('No se pudo completar el catálogo del grupo:', e.message)), 200);
+}
+
+function groupPreferenceKey(me, kind) {
+    const identity = me.userId || me.username || me.name || 'account';
+    return `tvp_${kind}_group:${encodeURIComponent(String(identity).toLowerCase())}`;
+}
+
+function renderGroupPicker(selectedId) {
+    const favoriteId = state.favoriteGroup;
+    const choices = state.groups.slice().sort((a, b) => {
+        if (a.peerId === favoriteId) return -1;
+        if (b.peerId === favoriteId) return 1;
+        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+    });
+    el.groupSelect.innerHTML = choices.map(group => {
+        const type = group.isChannel ? ' · Canal' : ' · Grupo';
+        const favorite = group.peerId === favoriteId ? '★ ' : '';
+        return `<option value="${escapeHtml(group.peerId)}">${favorite}${escapeHtml(group.title + type)}</option>`;
+    }).join('');
+    el.groupPicker.hidden = state.groups.length < 2;
+    if (selectedId && state.groups.some(group => group.peerId === selectedId)) el.groupSelect.value = selectedId;
+    const isFavorite = !!selectedId && selectedId === favoriteId;
+    el.groupFavorite.disabled = !selectedId;
+    el.groupFavorite.setAttribute('aria-pressed', String(isFavorite));
+    el.groupFavorite.title = isFavorite ? 'Quitar de favoritos' : 'Marcar grupo como favorito';
+    el.groupFavorite.setAttribute('aria-label', el.groupFavorite.title);
+    el.groupFavorite.textContent = isFavorite ? '★' : '☆';
+}
+
+function setCatalogGroups(groups, me) {
+    const configuredId = String((window.TVP_CONFIG && window.TVP_CONFIG.groupId) || '').trim();
+    const seenGroups = new Set();
+    const choices = (groups || []).filter(group => {
+        if (!group || group.peerId == null || (!group.isGroup && !group.isChannel)) return false;
+        const id = String(group.peerId);
+        if (seenGroups.has(id)) return false;
+        seenGroups.add(id);
+        return true;
+    }).map(group => Object.assign({}, group, {
+        peerId: String(group.peerId),
+        title: String(group.title || 'Sin nombre')
+    }));
+    if (!choices.length && me.inGroup && configuredId) {
+        choices.push({ peerId: configuredId, title: 'Grupo configurado', isGroup: true });
+    }
+
+    state.account = me;
+    state.groupPreferenceKey = groupPreferenceKey(me, 'selected');
+    state.groups = choices;
+    const configuredUsername = configuredId.replace(/^@/, '').toLowerCase();
+    let selected = '', favorite = '';
+    try {
+        selected = localStorage.getItem(state.groupPreferenceKey) || localStorage.getItem('tvp_selected_group') || '';
+        favorite = localStorage.getItem(groupPreferenceKey(me, 'favorite')) || '';
+    } catch {}
+    state.favoriteGroup = favorite;
+    let chosen = choices.find(group => group.peerId === favorite);
+    if (!chosen) chosen = choices.find(group => group.peerId === selected);
+    if (!chosen) chosen = choices.find(group =>
+        group.peerId === configuredId || (group.username || '').toLowerCase() === configuredUsername
+    );
+    if (!chosen) chosen = choices[0];
+    renderGroupPicker(chosen ? chosen.peerId : '');
+    return chosen ? chosen.peerId : '';
+}
+
+function toggleFavoriteGroup() {
+    const groupId = el.groupSelect.value || state.activeGroup;
+    if (!groupId || !state.account) return;
+    state.favoriteGroup = state.favoriteGroup === groupId ? '' : groupId;
+    try {
+        const key = groupPreferenceKey(state.account, 'favorite');
+        if (state.favoriteGroup) localStorage.setItem(key, state.favoriteGroup);
+        else localStorage.removeItem(key);
+    } catch {}
+    renderGroupPicker(groupId);
+}
+
 async function boot() {
     try {
         const info = await api('/api/app').catch(() => null);
@@ -2349,17 +2391,23 @@ async function boot() {
 
         const me = await api('/api/me').catch(() => ({ loggedIn: false }));
         if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
-        if (me.inGroup === false) {
-            el.loadingScreen.classList.add('hidden');
-            el.rowsContainer.innerHTML = `<div class="empty-state">🔒 Tu cuenta <b>${escapeHtml(me.name || '')}</b> no es miembro del grupo.<br><br>
-                Pide al administrador que te añada al grupo de Telegram para poder ver el contenido.<br><br>
-                <button class="btn btn-play" onclick="location.reload()" style="display:inline-flex">Reintentar</button></div>`;
-            return;
-        }
-
         state.isAdmin = !!me.isAdmin;
         state.userName = me.name || '';
         Admin.reflect();
+
+        let groupList;
+        try {
+            groupList = await api('/api/admin/groups');
+        } catch (e) {
+            if (!me.inGroup) throw e;
+            console.warn('No se pudo listar los grupos; se usará el grupo configurado:', e.message);
+            groupList = { groups: [] };
+        }
+        const selectedGroup = setCatalogGroups(groupList.groups, me);
+        if (!selectedGroup) {
+            el.rowsContainer.innerHTML = `<div class="empty-state">No se encontraron grupos o canales de Telegram disponibles para <b>${escapeHtml(me.name || '')}</b>.</div>`;
+            return;
+        }
 
         // Firebase: sincronizar favoritos y progreso del usuario
         CloudStore.init(me.name || 'user');
@@ -2370,57 +2418,7 @@ async function boot() {
         await CloudStore.syncOverrides();
 
         el.loadingText.innerText = 'Cargando catálogo...';
-        // 1) Mostrar caché del navegador inmediatamente (si existe y es de hoy)
-        let usedCache = false;
-        try {
-            const cached = JSON.parse(sessionStorage.getItem('tvp_catalog') || 'null');
-            if (cached && cached.ts && (Date.now() - cached.ts) < 30 * 60 * 1000) {
-                state.catalog = cached.data;
-                state.allItems = []; state.itemsById = {};
-                state.catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
-                App.populateFilters(); Netflix.render(); App.switchView('netflix');
-                usedCache = true;
-            }
-        } catch {}
-
-        // Función helper: aplicar un catálogo nuevo y refrescar la UI
-        const applyCatalog = (cat) => {
-            state.catalog = cat;
-            state.allItems = []; state.itemsById = {};
-            cat.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
-            try { sessionStorage.setItem('tvp_catalog', JSON.stringify({ ts: Date.now(), data: cat })); } catch {}
-            App.populateFilters(); Netflix.render();
-        };
-
-        // Carga progresiva: 1) rápida (300/tema), 2) completa en background.
-        if (usedCache) {
-            // Solo refrescamos en background con el catálogo completo
-            (async () => {
-                try {
-                    const fresh = await api('/api/catalog?refresh=1');
-                    applyCatalog(fresh);
-                } catch {}
-            })();
-            return;
-        }
-        try {
-            // 1) Carga rápida: aparece el catálogo casi al instante
-            const fast = await api('/api/catalog?fast=1');
-            applyCatalog(fast);
-            App.switchView('netflix');
-            App.toast && App.toast('Cargando catálogo completo en segundo plano…', 2500);
-            // 2) Carga completa en background, sin bloquear
-            setTimeout(async () => {
-                try {
-                    const full = await api('/api/catalog?refresh=1');
-                    applyCatalog(full);
-                    App.toast && App.toast('✅ Catálogo completo cargado', 1800);
-                } catch (e) { console.warn('full catalog fallo:', e.message); }
-            }, 200);
-        } catch (e) {
-            console.error('catalog error:', e);
-            el.bootStatus && (el.bootStatus.innerText = 'Error: ' + e.message);
-        }
+        await loadGroupCatalog(selectedGroup, true);
         setTimeout(() => { const f = $('.card'); if (f) f.focus(); }, 200);
     } catch (e) {
         console.error(e);
@@ -2431,8 +2429,14 @@ async function boot() {
 }
 
 function wireUi() {
-    el.navNetflix.onclick = (e) => { e.preventDefault(); App.switchView('netflix'); };
-    el.navTelegram.onclick = (e) => { e.preventDefault(); App.switchView('telegram'); };
+    if (el.groupSelect) el.groupSelect.onchange = () => {
+        const groupId = el.groupSelect.value;
+        loadGroupCatalog(groupId, false).catch(e => {
+            if (state.activeGroup !== groupId) return;
+            el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el grupo.<br>${escapeHtml(e.message)}</div>`;
+        });
+    };
+    if (el.groupFavorite) el.groupFavorite.onclick = toggleFavoriteGroup;
     el.adminLock.onclick = () => Admin.logout();
     $('#btn-send-code').onclick = () => Login.sendCode();
     $('#btn-verify-code').onclick = () => Login.verifyCode();
@@ -2504,8 +2508,6 @@ function wireUi() {
         else if (k === 'm') { e.preventDefault(); v.muted = !v.muted; }
     });
     window.addEventListener('scroll', () => { el.navbar.classList.toggle('scrolled', window.scrollY > 50); });
-    // ocultar Chat hasta que haya admin
-    el.navTelegram.hidden = true;
     TVNav.init();
 }
 

@@ -31,17 +31,12 @@
             </a>
             <ul class="nav-links" id="nav-links"></ul>
         </div>
-        <div class="navbar-center view-switch" hidden>
-            <button id="nav-netflix" class="view-btn active" type="button">
-                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-                Cine
-            </button>
-            <button id="nav-telegram" class="view-btn" type="button">
-                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
-                Chat
-            </button>
-        </div>
         <div class="navbar-right">
+            <div class="group-picker" id="group-picker" hidden>
+                <label for="group-select">Grupo</label>
+                <select id="group-select" aria-label="Seleccionar grupo de Telegram"></select>
+                <button id="group-favorite" class="group-favorite" type="button" aria-pressed="false" title="Marcar grupo como favorito">☆</button>
+            </div>
             <button class="icon-btn" id="admin-panel-btn" aria-label="Panel de administración" hidden>
                 <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
             </button>
@@ -83,28 +78,6 @@
         <main class="main-content">
             <div class="rows-container" id="rows-container"></div>
         </main>
-    </div>
-
-    <!-- ===== VISTA CHAT (Telegram) ===== -->
-    <div id="telegram-view" hidden>
-        <div class="tg-layout">
-            <aside class="tg-sidebar">
-                <div class="tg-sidebar-header">Temas del grupo</div>
-                <div class="chat-list" id="chat-list"></div>
-            </aside>
-            <section class="tg-chat">
-                <header class="tg-chat-header">
-                    <div class="tg-chat-avatar">#</div>
-                    <div>
-                        <div class="tg-chat-title" id="chat-header-title">Selecciona un tema</div>
-                        <div class="tg-chat-meta" id="chat-header-meta"></div>
-                    </div>
-                </header>
-                <div class="chat-messages" id="chat-messages">
-                    <div class="chat-empty">Elige un tema en la lista de la izquierda.</div>
-                </div>
-            </section>
-        </div>
     </div>
 
     <!-- ===== DETALLE + REPRODUCTOR ===== -->
