@@ -195,20 +195,18 @@ const CloudStore = {
 
 const state = {
     catalog: { categories: [] }, allItems: [], itemsById: {},
-    groups: [], activeGroup: '', favoriteGroup: '', groupPreferenceKey: 'tvp_selected_group:account',
+    groups: [], activeGroup: '', favoriteGroups: [], groupPreferenceKey: 'tvp_selected_group:account',
     account: null, isAdmin: false, adminEnabled: false
 };
 
 const el = {
     body: document.body,
     brand: $('#brand-name'),
-    groupPicker: $('#group-picker'),
-    groupSelect: $('#group-select'),
-    groupFavorite: $('#group-favorite'),
     navbar: $('.navbar'),
     navLinks: $('#nav-links'),
     adminLock: $('#admin-lock'),
     adminRefresh: $('#admin-refresh'),
+    groupsTabBtn: $('#groups-tab-btn'),
     filterGenre: $('#filter-genre'),
     filterYear: $('#filter-year'),
     filterQuality: $('#filter-quality'),
@@ -292,6 +290,7 @@ const Netflix = {
         const cats = state.catalog.categories.filter(c => c.items && c.items.length);
 
         el.navLinks.innerHTML = '<li><a href="#" class="active" data-cat="">Inicio</a></li>' +
+            '<li><a href="#" data-cat="__groups">Grupos</a></li>' +
             cats.map(c => `<li><a href="#" data-cat="${escapeHtml(c.name)}">${escapeHtml(c.name)}</a></li>`).join('');
 
         // Filas dinámicas: Continuar viendo + Mi lista + categorías
@@ -318,7 +317,7 @@ const Netflix = {
                     thumbUrl: x.poster, backdropUrl: x.backdrop, meta: { rating: x.rating ? String(x.rating) : '' },
                     isUpcoming: true, _upcomingDate: x.date
                 }));
-                if (state._upcoming.length) Netflix.render();
+                if (state._upcoming.length && !$('#nav-links [data-cat="__groups"].active')) Netflix.render();
             }).catch(() => {});
         }
 
@@ -2132,7 +2131,7 @@ const Voice = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .opt-btn, .source-btn, .filter-select, .nav-links a, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, #group-select, #group-favorite, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
+    SEL: '.card, .card-remove, .btn, .episode, .opt-btn, .source-btn, .filter-select, .nav-links a, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, .groups-search, .group-open, .group-favorite, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
         if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
@@ -2313,26 +2312,63 @@ function groupPreferenceKey(me, kind) {
     return `tvp_${kind}_group:${encodeURIComponent(String(identity).toLowerCase())}`;
 }
 
-function renderGroupPicker(selectedId) {
-    const favoriteId = state.favoriteGroup;
+function renderGroupsList(query) {
+    const list = $('#groups-list');
+    if (!list) return;
+    query = String(query || '').trim().toLocaleLowerCase();
+    const favoriteIds = new Set(state.favoriteGroups);
     const choices = state.groups.slice().sort((a, b) => {
-        if (a.peerId === favoriteId) return -1;
-        if (b.peerId === favoriteId) return 1;
+        const favoriteOrder = Number(favoriteIds.has(b.peerId)) - Number(favoriteIds.has(a.peerId));
+        if (favoriteOrder) return favoriteOrder;
         return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+    }).filter(group => !query || [group.title, group.username, group.subtitle, group.peerId]
+        .some(value => String(value || '').toLocaleLowerCase().includes(query)));
+    list.innerHTML = choices.map(group => {
+        const title = escapeHtml(group.title);
+        const type = group.isChannel ? 'Canal' : 'Grupo';
+        const isFavorite = favoriteIds.has(group.peerId);
+        const isCurrent = group.peerId === state.activeGroup;
+        const meta = [type, group.username ? '@' + escapeHtml(group.username) : '', isCurrent ? 'Grupo actual' : ''].filter(Boolean).join(' · ');
+        return `<article class="group-row${isCurrent ? ' current' : ''}">
+            <button type="button" class="group-open" data-group-id="${escapeHtml(group.peerId)}" aria-label="Abrir ${title}">
+                <span class="group-name">${isFavorite ? '★ ' : ''}${title}</span>
+                <span class="group-meta">${meta}</span>
+            </button>
+            <button type="button" class="group-favorite" data-group-id="${escapeHtml(group.peerId)}" aria-pressed="${isFavorite}" aria-label="${isFavorite ? 'Quitar' : 'Añadir'} ${title} ${isFavorite ? 'de' : 'a'} favoritos">${isFavorite ? '★' : '☆'}</button>
+        </article>`;
+    }).join('') || '<div class="empty-state">No se encontraron grupos.</div>';
+    $$('.group-open', list).forEach(button => button.onclick = () => {
+        const groupId = button.dataset.groupId;
+        loadGroupCatalog(groupId, false).catch(e => {
+            if (state.activeGroup !== groupId) return;
+            el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el grupo.<br>${escapeHtml(e.message)}</div>`;
+        });
     });
-    el.groupSelect.innerHTML = choices.map(group => {
-        const type = group.isChannel ? ' · Canal' : ' · Grupo';
-        const favorite = group.peerId === favoriteId ? '★ ' : '';
-        return `<option value="${escapeHtml(group.peerId)}">${favorite}${escapeHtml(group.title + type)}</option>`;
-    }).join('');
-    el.groupPicker.hidden = state.groups.length < 2;
-    if (selectedId && state.groups.some(group => group.peerId === selectedId)) el.groupSelect.value = selectedId;
-    const isFavorite = !!selectedId && selectedId === favoriteId;
-    el.groupFavorite.disabled = !selectedId;
-    el.groupFavorite.setAttribute('aria-pressed', String(isFavorite));
-    el.groupFavorite.title = isFavorite ? 'Quitar de favoritos' : 'Marcar grupo como favorito';
-    el.groupFavorite.setAttribute('aria-label', el.groupFavorite.title);
-    el.groupFavorite.textContent = isFavorite ? '★' : '☆';
+    $$('.group-favorite', list).forEach(button => button.onclick = () => {
+        const groupId = button.dataset.groupId;
+        toggleFavoriteGroup(groupId, query);
+        const focusTarget = $$('.group-favorite', list).find(item => item.dataset.groupId === groupId);
+        if (focusTarget) focusTarget.focus();
+    });
+    TVNav.refresh();
+}
+
+function renderGroupsPage() {
+    el.rowsContainer.innerHTML = `<section class="groups-page">
+        <header class="groups-page-header">
+            <div><h1 class="groups-page-title">Grupos</h1><p class="groups-page-description">Busca tus grupos y marca favoritos para tenerlos arriba.</p></div>
+            <input id="groups-search" class="groups-search" type="search" placeholder="Buscar grupos..." aria-label="Buscar grupos">
+        </header>
+        <div id="groups-list" class="groups-list"></div>
+    </section>`;
+    const search = $('#groups-search');
+    search.oninput = () => renderGroupsList(search.value);
+    renderGroupsList('');
+}
+
+function openGroupsPage() {
+    $$('#nav-links a').forEach(link => link.classList.toggle('active', link.dataset.cat === '__groups'));
+    renderGroupsPage();
 }
 
 function setCatalogGroups(groups, me) {
@@ -2355,39 +2391,46 @@ function setCatalogGroups(groups, me) {
     state.account = me;
     state.groupPreferenceKey = groupPreferenceKey(me, 'selected');
     state.groups = choices;
+    if (el.groupsTabBtn) el.groupsTabBtn.hidden = !choices.length;
     const configuredUsername = configuredId.replace(/^@/, '').toLowerCase();
-    let selected = '', favorite = '';
+    let selected = '', favorites = [];
     try {
         selected = localStorage.getItem(state.groupPreferenceKey) || localStorage.getItem('tvp_selected_group') || '';
-        favorite = localStorage.getItem(groupPreferenceKey(me, 'favorite')) || '';
+        const savedFavorites = localStorage.getItem(groupPreferenceKey(me, 'favorite')) || '';
+        if (savedFavorites) {
+            try {
+                const parsed = JSON.parse(savedFavorites);
+                favorites = Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
+            } catch { favorites = [savedFavorites]; }
+        }
     } catch {}
-    state.favoriteGroup = favorite;
-    let chosen = choices.find(group => group.peerId === favorite);
+    state.favoriteGroups = [...new Set(favorites)];
+    let chosen = choices.find(group => state.favoriteGroups.includes(group.peerId));
     if (!chosen) chosen = choices.find(group => group.peerId === selected);
     if (!chosen) chosen = choices.find(group =>
         group.peerId === configuredId || (group.username || '').toLowerCase() === configuredUsername
     );
     if (!chosen) chosen = choices[0];
-    renderGroupPicker(chosen ? chosen.peerId : '');
     return chosen ? chosen.peerId : '';
 }
 
-function toggleFavoriteGroup() {
-    const groupId = el.groupSelect.value || state.activeGroup;
+function toggleFavoriteGroup(groupId, query) {
     if (!groupId || !state.account) return;
-    state.favoriteGroup = state.favoriteGroup === groupId ? '' : groupId;
+    state.favoriteGroups = state.favoriteGroups.includes(groupId)
+        ? state.favoriteGroups.filter(id => id !== groupId)
+        : state.favoriteGroups.concat(groupId);
     try {
         const key = groupPreferenceKey(state.account, 'favorite');
-        if (state.favoriteGroup) localStorage.setItem(key, state.favoriteGroup);
+        if (state.favoriteGroups.length) localStorage.setItem(key, JSON.stringify(state.favoriteGroups));
         else localStorage.removeItem(key);
     } catch {}
-    renderGroupPicker(groupId);
+    renderGroupsList(query);
 }
 
 async function boot() {
     try {
         const info = await api('/api/app').catch(() => null);
-        if (info && info.appName) { el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
+        if (info && info.appName) { if (el.brand) el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
 
         const me = await api('/api/me').catch(() => ({ loggedIn: false }));
         if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
@@ -2429,14 +2472,6 @@ async function boot() {
 }
 
 function wireUi() {
-    if (el.groupSelect) el.groupSelect.onchange = () => {
-        const groupId = el.groupSelect.value;
-        loadGroupCatalog(groupId, false).catch(e => {
-            if (state.activeGroup !== groupId) return;
-            el.rowsContainer.innerHTML = `<div class="empty-state">No se pudo cargar el grupo.<br>${escapeHtml(e.message)}</div>`;
-        });
-    };
-    if (el.groupFavorite) el.groupFavorite.onclick = toggleFavoriteGroup;
     el.adminLock.onclick = () => Admin.logout();
     $('#btn-send-code').onclick = () => Login.sendCode();
     $('#btn-verify-code').onclick = () => Login.verifyCode();
@@ -2458,11 +2493,13 @@ function wireUi() {
     if (el.filterLang) el.filterLang.addEventListener('change', () => App.search());
     if (el.filterCat) el.filterCat.addEventListener('change', () => App.search());
     el.adminRefresh.onclick = () => Admin.refresh();
+    if (el.groupsTabBtn) el.groupsTabBtn.onclick = openGroupsPage;
     el.navLinks.addEventListener('click', (e) => {
         const a = e.target.closest('a[data-cat]'); if (!a) return;
         e.preventDefault();
         $$('#nav-links a').forEach(x => x.classList.remove('active'));
         a.classList.add('active');
+        if (a.dataset.cat === '__groups') { openGroupsPage(); return; }
         if (!a.dataset.cat) { Netflix.render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
         Netflix.renderCategory(a.dataset.cat);
     });

@@ -102,30 +102,60 @@ body {
     align-items: center;
     gap: 20px;
 }
-.group-picker {
+.groups-tab-btn { display: none; }
+.groups-tab-btn[hidden] { display: none; }
+.groups-page { padding: clamp(18px, 3vw, 36px); }
+.groups-page-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: var(--netflix-light-gray);
-    font-size: .85rem;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 20px;
 }
-.group-picker[hidden] { display: none; }
-.group-picker select {
-    max-width: min(28vw, 260px);
-    padding: 8px 10px;
+.groups-page-title { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); }
+.groups-page-description { margin: 6px 0 0; color: var(--netflix-light-gray); }
+.groups-search {
+    width: min(360px, 45vw);
+    min-width: 0;
+    padding: 10px 12px;
     border: 1px solid rgba(255,255,255,.25);
     border-radius: 6px;
     background: #181818;
     color: #fff;
     font: inherit;
 }
-.group-picker select:focus {
-    outline: 3px solid #fff;
-    outline-offset: 2px;
+.groups-search::placeholder { color: var(--netflix-light-gray); }
+.groups-list { display: grid; gap: 10px; max-width: 1100px; }
+.group-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,.04);
 }
+.group-row.current { border-color: var(--netflix-red); }
+.group-open {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    padding: 8px;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+.group-open:hover { background: rgba(255,255,255,.06); }
+.group-name { font-weight: 600; overflow-wrap: anywhere; }
+.group-meta { color: var(--netflix-light-gray); font-size: .82rem; }
 .group-favorite {
-    min-width: 38px;
-    min-height: 38px;
+    min-width: 42px;
+    min-height: 42px;
     border: 1px solid rgba(255,255,255,.25);
     border-radius: 6px;
     background: #181818;
@@ -135,12 +165,11 @@ body {
     line-height: 1;
 }
 .group-favorite[aria-pressed="true"] { color: #ffd166; }
-.group-favorite:focus { outline: 3px solid #fff; outline-offset: 2px; }
+.group-favorite:focus, .group-open:focus, .groups-search:focus { outline: 3px solid #fff; outline-offset: 2px; }
 @media (max-width: 600px) {
-    .navbar-right { gap: 8px; }
-    .group-picker { gap: 4px; }
-    .group-picker label { display: none; }
-    .group-picker select { max-width: 34vw; padding: 7px 5px; }
+    .groups-page-header { align-items: stretch; flex-direction: column; }
+    .groups-search { width: 100%; }
+    .group-row { padding: 6px; }
     .group-favorite { min-width: 34px; min-height: 34px; }
 }
 .search-btn {
@@ -154,7 +183,6 @@ body {
 .search-btn:hover {
     transform: scale(1.1);
 }
-@media (max-width: 768px) { .logo-text { font-size: 1rem; } }
 .profile-avatar {
     width: 32px;
     height: 32px;
@@ -665,6 +693,10 @@ body {
     .nav-links {
         display: none;
     }
+
+    .groups-tab-btn:not([hidden]) {
+        display: inline-flex;
+    }
 }
 @media (max-width: 768px) {
     :root {
@@ -715,7 +747,6 @@ body {
 body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
 .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-.logo-text { color: #3ee65c; font-weight: 700; letter-spacing: 1px; font-size: 1.15rem; text-shadow: 0 0 8px rgba(62, 230, 92, 0.4); }
 
 /* Hero badge */
 .hero-badge {
@@ -864,7 +895,7 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
 /* ===== Foco para mando de TV Box ===== */
 .card:focus, .btn:focus, .episode:focus, .opt-btn:focus,
-.nav-links a:focus, .icon-btn:focus, .search-btn:focus, .group-picker select:focus, .group-favorite:focus,
+.nav-links a:focus, .icon-btn:focus, .search-btn:focus, .groups-search:focus, .group-open:focus, .group-favorite:focus,
 .slider-arrow:focus, .search-card:focus, .modal-close:focus {
     outline: 3px solid #fff;
     outline-offset: 2px;
@@ -980,7 +1011,7 @@ a.source-btn { text-decoration: none; }
 /* ===== Logo de marca (imagen) adaptable por dispositivo ===== */
 .brand-logo { height: 34px; width: auto; border-radius: 8px; display: block; }
 .logo { gap: 10px; }
-@media (max-width: 640px) { .brand-logo { height: 28px; } .logo-text { display: none; } }
+@media (max-width: 640px) { .brand-logo { height: 28px; } }
 @media (min-width: 1600px) { .brand-logo { height: 44px; } }  /* TV / pantallas grandes */
 
 
