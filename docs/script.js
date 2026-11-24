@@ -214,6 +214,133 @@ const el = {
     loginModal: $('#login-modal'),
 };
 
+const App = {
+    _searchTimer: null,
+    _normalize(value) {
+        return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    },
+    toast(message, duration, error) {
+        let node = document.getElementById('tvp-toast');
+        if (!node) {
+            node = document.createElement('div');
+            node.id = 'tvp-toast';
+            node.className = 'tvp-toast';
+            document.body.appendChild(node);
+        }
+        clearTimeout(this._toastTimer);
+        node.textContent = message;
+        node.classList.toggle('error', !!error);
+        node.classList.add('show');
+        if (duration !== 0) {
+            this._toastTimer = setTimeout(() => node.classList.remove('show'), duration || 2200);
+        }
+    },
+    _buildSearchIndex() {
+        state.allItems.forEach(item => {
+            const title = item.title || '';
+            const quality = (title.match(/\b(2160p|4k|uhd|1080p|720p|480p|hdr|hdr10|dolby vision|dv)\b/i) || [])[0];
+            const language = (title.match(/\b(latino|castellano|espa[ñn]ol|spanish|english|ingles|vose|vos|dual|subtitulado)\b/i) || [])[0];
+            item._quality = quality ? quality.toUpperCase() : '';
+            item._lang = language ? language.toLowerCase() : '';
+            item._search = this._normalize([
+                title, item.description, item.category,
+                (item.meta && item.meta.genres) || '',
+                String(item.year || ''), item._quality, item._lang
+            ].join(' '));
+        });
+    },
+    search() {
+        clearTimeout(this._searchTimer);
+        this._searchTimer = setTimeout(() => this._doSearch(), 180);
+    },
+    _doSearch() {
+        if (!el.searchInput || !el.searchResults) return;
+        const query = this._normalize(el.searchInput.value.trim());
+        const genre = this._normalize(el.filterGenre && el.filterGenre.value);
+        const year = el.filterYear && el.filterYear.value || '';
+        const quality = el.filterQuality && el.filterQuality.value || '';
+        const language = el.filterLang && el.filterLang.value || '';
+        const category = el.filterCat && el.filterCat.value || '';
+        if (!query && !genre && !year && !quality && !language && !category) {
+            el.searchResults.innerHTML = '';
+            return;
+        }
+        const tokens = query ? query.split(/\s+/).filter(Boolean) : [];
+        const results = state.allItems.filter(item => {
+            if (!item._search || tokens.some(token => !item._search.includes(token))) return false;
+            if (genre && !this._normalize(item.meta && item.meta.genres).includes(genre)) return false;
+            if (year && String(item.year) !== year) return false;
+            if (quality && item._quality !== quality.toUpperCase()) return false;
+            if (language && !item._lang.includes(language.toLowerCase())) return false;
+            if (category && item.category !== category) return false;
+            return true;
+        });
+        if (!results.length) {
+            el.searchResults.innerHTML = '<div class="search-empty">Sin resultados.</div>';
+            return;
+        }
+        const visible = results.slice(0, 240);
+        el.searchResults.innerHTML = visible.map(item => `<div class="search-card focusable" tabindex="0" data-id="${escapeHtml(item.id)}">
+            <img class="search-image" src="${escapeHtml(item.thumbUrl || placeholderImage(item.id, item.title))}" alt=""
+                onerror="this.src='${placeholderImage(item.id, item.title)}'">
+            <div class="search-meta"><h3>${escapeHtml(item.title)}</h3>
+                <p>${escapeHtml((item.description || '').slice(0, 140))}</p>
+                <span class="search-cat">${escapeHtml(item.category || '')}</span>
+                ${item._quality ? `<span class="search-tag">${escapeHtml(item._quality)}</span>` : ''}
+                ${item._lang ? `<span class="search-tag lang">${escapeHtml(item._lang)}</span>` : ''}
+            </div></div>`).join('') +
+            (results.length > visible.length ? `<div class="search-more">Mostrando ${visible.length} de ${results.length} resultados. Refina tu búsqueda para ver más.</div>` : '');
+        $$('#search-results .search-card').forEach(card => {
+            card.onclick = () => {
+                const item = state.itemsById[card.dataset.id];
+                if (!item) return;
+                this.closeSearch();
+                Detail.open(item);
+            };
+        });
+        TVNav.refresh();
+    },
+    populateFilters() {
+        const genres = new Set(), years = new Set(), qualities = new Set(), languages = new Set(), categories = new Set();
+        this._buildSearchIndex();
+        state.allItems.forEach(item => {
+            if (item.meta && item.meta.genres) {
+                item.meta.genres.split(/[,/]/).forEach(value => {
+                    const genre = value.trim();
+                    if (genre) genres.add(genre);
+                });
+            }
+            if (item.year) years.add(String(item.year));
+            if (item._quality) qualities.add(item._quality);
+            if (item._lang) languages.add(item._lang);
+            if (item.category) categories.add(item.category);
+        });
+        const options = (values, placeholder, sort) => '<option value="">' + placeholder + '</option>' +
+            [...values].sort(sort || ((a, b) => a.localeCompare(b)))
+                .map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+        if (el.filterGenre) el.filterGenre.innerHTML = options(genres, 'Todos los géneros');
+        if (el.filterYear) el.filterYear.innerHTML = options(years, 'Todos los años', (a, b) => b - a);
+        if (el.filterQuality) el.filterQuality.innerHTML = options(qualities, 'Cualquier calidad');
+        if (el.filterLang) el.filterLang.innerHTML = options(languages, 'Cualquier idioma');
+        if (el.filterCat) el.filterCat.innerHTML = options(categories, 'Todas las categorías');
+    },
+    openSearch() {
+        if (!el.searchOverlay) return;
+        el.searchOverlay.hidden = false;
+        if (el.searchInput) el.searchInput.focus();
+        el.body.style.overflow = 'hidden';
+    },
+    closeSearch() {
+        if (el.searchOverlay) el.searchOverlay.hidden = true;
+        if (el.searchInput) el.searchInput.value = '';
+        [el.filterGenre, el.filterYear, el.filterQuality, el.filterLang, el.filterCat].forEach(filter => {
+            if (filter) filter.value = '';
+        });
+        if (el.searchResults) el.searchResults.innerHTML = '';
+        el.body.style.overflow = '';
+    }
+};
+
 /* ===== NETFLIX ===== */
 const Netflix = {
     _vis(items) { return (items || []).filter(Boolean); },
