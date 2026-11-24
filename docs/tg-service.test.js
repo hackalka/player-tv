@@ -35,6 +35,53 @@ test('links a numbered Telegram video to its poster without showing a duplicate 
     assert.equal(items[0].links[0].streamUrl, 'tgstream/2/451?group=-1001');
 });
 
+test('deduplicates equivalent Telegram links and hides linked video cards', async () => {
+    const service = new window.TelegramService({}, {
+        groupId: '-1003924237464', messagesPerTopic: 20
+    });
+    const topic = { id: 2, name: 'Películas', type: 'movie' };
+    service.getAutoTopics = async () => [topic];
+    service.getTopicMessages = async () => [
+        {
+            id: 92,
+            message: 'Shutter Island\nurl=2451\nhttps://t.me/c/3924237464/2/2451'
+        },
+        {
+            id: 2451, message: 'Shutter Island archivo',
+            media: { document: {
+                id: 'video-2451', mimeType: 'video/mp4', size: 1024,
+                attributes: [{ className: 'DocumentAttributeFilename', fileName: 'shutter-island.mp4' }],
+                thumbs: []
+            } }
+        }
+    ];
+
+    const catalog = await service.getCatalog();
+    assert.equal(catalog.categories[0].items.length, 1);
+    assert.equal(catalog.categories[0].items[0].links.length, 1);
+    assert.equal(catalog.categories[0].items[0].links[0].streamUrl, 'tgstream/2/2451?group=-1003924237464');
+});
+
+test('builds download offsets with GramJS BigInteger instances', () => {
+    class GramJsInteger {
+        constructor(value) { this.value = Number(value); }
+        subtract(other) { return new GramJsInteger(this.value - other.value); }
+        add(value) { return new GramJsInteger(this.value + Number(value)); }
+    }
+    let downloadOptions;
+    const service = new window.TelegramService({
+        iterDownload(options) {
+            downloadOptions = options;
+            return 'download';
+        }
+    }, {});
+    const id = new GramJsInteger(2451);
+
+    assert.equal(service.streamRange({ location: { id }, dcId: 2 }, 5242880, 1024), 'download');
+    assert.ok(downloadOptions.offset instanceof GramJsInteger);
+    assert.equal(downloadOptions.offset.value, 5242880);
+});
+
 test('fast catalog returns a limited catalog without external enrichment', async () => {
     const service = new window.TelegramService({}, {
         groupId: '-1001', messagesPerTopic: 300

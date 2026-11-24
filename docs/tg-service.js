@@ -7,10 +7,8 @@
 (function () {
     'use strict';
     let Api = null;
-    let bigInt = null;
     function _libs() {
         Api = window.telegram.Api;
-        bigInt = window.bigInt || (window.telegram && window.telegram.bigInt);
     }
 
     class TelegramService {
@@ -472,17 +470,36 @@
                 } catch (e) { console.warn(`Tema ${topic.name} fallo:`, e.message); }
                 categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
             }
-            const linkedVideoIds = new Set();
+            const linkedVideoRefs = new Set();
             categories.forEach(category => category.items.forEach(item => {
                 (item.links || []).forEach(link => {
-                    const id = link.telegramMessageId || (link.kind === 'tg-local' ? link.msgId : '');
-                    if (id) linkedVideoIds.add(String(id));
+                    const ref = this._telegramMessageRef(link.streamUrl);
+                    if (ref) linkedVideoRefs.add(`${ref.channel}:${ref.msgId}`);
                 });
             }));
+            const catalogGroup = this._normalizeTelegramChannel(this.cfg.groupId);
             categories.forEach(category => {
-                category.items = category.items.filter(item => !linkedVideoIds.has(String(item.id)));
+                category.items = category.items.filter(item =>
+                    !linkedVideoRefs.has(`${catalogGroup}:${item.id}`)
+                );
             });
             return { categories, partial: !!opts.limit };
+        }
+
+        _normalizeTelegramChannel(channel) {
+            return String(channel || '').trim().replace(/^@/, '').toLowerCase();
+        }
+
+        _telegramMessageRef(streamUrl) {
+            const match = String(streamUrl || '').match(/^tgstream(link)?\/([^/]+)\/(\d+)/);
+            if (!match) return null;
+            const channel = match[1]
+                ? decodeURIComponent(match[2])
+                : this.cfg.groupId;
+            return {
+                channel: this._normalizeTelegramChannel(channel),
+                msgId: match[3].replace(/^0+(?=\d)/, '')
+            };
         }
 
         _buildTopicItems(msgs, topic) {
@@ -540,7 +557,10 @@
                         if (it.uid) { if (seenUid.has(it.uid)) continue; seenUid.add(it.uid); }
                         const subs = this._movieSources(it);
                         subs.forEach(s => {
-                            const sig = s.aceUrl || s.tvgramUrl || s.streamUrl || s.externalUrl || s.label;
+                            const telegramRef = this._telegramMessageRef(s.streamUrl);
+                            const sig = telegramRef
+                                ? `tg:${telegramRef.channel}:${telegramRef.msgId}`
+                                : (s.aceUrl || s.tvgramUrl || s.streamUrl || s.externalUrl || s.label);
                             if (!sig || seenSig.has(sig)) return;
                             seenSig.add(sig);
                             if (subs.length === 1) {
@@ -551,9 +571,13 @@
                         });
                     }
                     const merged = Object.assign({}, base);
-                    if (sources.length > 1) {
+                    if (sources.length) {
                         merged.links = sources;
-                        merged.aceUrl = ''; merged.streamUrl = ''; merged.externalUrl = '';
+                        if (sources.length > 1) {
+                            merged.aceUrl = ''; merged.streamUrl = ''; merged.externalUrl = '';
+                        } else {
+                            Object.assign(merged, sources[0]);
+                        }
                     }
                     out.push(merged);
                 }
@@ -709,8 +733,10 @@
         }
 
         streamRange(info, start, length) {
+            // GramJS valida su propia instancia BigInteger; no acepta otra copia de la librería.
+            const offset = info.location.id.subtract(info.location.id).add(start);
             return this.client.iterDownload({
-                file: info.location, offset: bigInt(start), limit: length,
+                file: info.location, offset, limit: length,
                 requestSize: 1024 * 1024, // 1 MB por bloque (mas velocidad)
                 dcId: info.dcId
             });
