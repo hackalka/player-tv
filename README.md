@@ -5,9 +5,7 @@ cada persona entra con **su propia cuenta** (teléfono + 2FA) y el contenido se 
 de **su** sesión. Pensado para desplegar en **Railway** (o cualquier host de Node).
 
 - **Vista Cine (Netflix):** temas con la etiqueta configurada (películas, series, deportes…).
-- **Vista Chat (Telegram):** solo para **administradores del grupo** (editar / borrar contenido).
 - **Login por usuario** dentro de la web (sin terminal, sin bots).
-- **Admin automático:** quien sea administrador/creador del grupo en Telegram ve el panel de chat.
 
 ## Arranque rápido (Railway)
 
@@ -22,8 +20,7 @@ de **su** sesión. Pensado para desplegar en **Railway** (o cualquier host de No
 4. **Settings → Networking → Generate Domain** para tener la URL pública.
 5. Abre la web: cada usuario inicia sesión con **su teléfono + código + 2FA**.
 
-> Sin `TG_SESSION` ni `ADMIN_PASSWORD`: el acceso es por usuario y el rol de admin se detecta
-> automáticamente según los permisos de esa cuenta en el grupo.
+> El acceso al catálogo solo necesita que la cuenta pertenezca al grupo configurado.
 
 ## Local
 
@@ -41,7 +38,7 @@ server/
   sessions.js   Una sesión/cliente de Telegram POR usuario (login + persistencia)
   telegram.js   Motor ligado al cliente de cada usuario (catálogo, temas, streaming)
   config.js     Configuración por variables de entorno
-public/         Frontend (login, catálogo Netflix, chat admin, navegación TV)
+public/         Frontend (login, catálogo Netflix y navegación TV)
 ```
 
 Cada usuario tiene su propio cliente de Telegram en el servidor (relé), así que **el streaming
@@ -56,6 +53,11 @@ etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
 ## Formatos de publicación admitidos
 
 - **Vídeo subido a Telegram** (mp4/mkv/avi…): se reproduce dentro (mkv/avi → reproductor externo).
+- **Carátula y vídeo separados**: publica el enlace de ficha y `url=091` en la carátula; el número
+  identifica el prefijo del mensaje de vídeo (`091-Título`) o su ID de mensaje de Telegram. El
+  vídeo queda asociado a la carátula y no aparece como otra película.
+- Enlaces de FilmAffinity son solo de ficha, no se abren como fuentes de vídeo. No se consultan
+  servicios externos de metadatos: la sinopsis y la carátula deben venir del mensaje de Telegram.
 - **Varios enlaces en un post** (deportes/multicanal): "Enlace DAZN 1/2/3", AceStream, `.mp4`, etc.
 - **Serie en un solo post**: título + metadatos + sinopsis + episodios como enlaces `t.me`
   (se reproducen aunque estén en otro canal público al que el usuario tenga acceso).
@@ -67,7 +69,7 @@ etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
 - **Continuar viendo** (con botón ✕ para quitar) y **Mi lista** (favoritos).
 - **Novedades** y **buscador con filtros** por género/año.
 - Reproductores externos (VLC / AceStream) y copiar enlace.
-- **Chat admin** (editar/borrar) solo para administradores del grupo.
+- No incluye panel, edición de fichas ni funciones administrativas.
 - Navegación con **mando de TV Box** (flechas / OK / atrás).
 - Caché de miniaturas, streaming con reintentos y cabeceras de seguridad básicas.
 

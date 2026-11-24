@@ -55,7 +55,7 @@ async function api(path, opts = {}) {
     return data;
 }
 
-/* ===== Almacenamiento local (progreso / favoritos / admin) ===== */
+/* ===== Almacenamiento local (progreso / favoritos) ===== */
 const Store = {
     _get(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } },
     _set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -65,9 +65,6 @@ const Store = {
     set favs(v) { this._set('tvp_favs', v); },
     get lastEp() { return this._get('tvp_lastep', {}); },
     set lastEp(v) { this._set('tvp_lastep', v); },
-    get adminKey() { try { return localStorage.getItem('tvp_admin') || ''; } catch { return ''; } },
-    set adminKey(v) { try { v ? localStorage.setItem('tvp_admin', v) : localStorage.removeItem('tvp_admin'); } catch {} },
-
     saveProgress(playable, parent, time, duration) {
         if (!playable || !playable.id || !time || time < 8) return;
         const p = this.progress;
@@ -100,23 +97,6 @@ const Store = {
     set watched(v) { this._set('tvp_watched', v); },
     isWatched(id) { return !!this.watched[id]; },
     toggleWatched(id) { const w = this.watched; if (w[id]) delete w[id]; else w[id] = Date.now(); this.watched = w; return !!w[id]; },
-    // Carátulas personalizadas (override por admin cuando TMDB no acierta)
-    get covers() { return this._get('tvp_covers', {}); },
-    set covers(v) { this._set('tvp_covers', v); },
-    setCover(id, url) { const c = this.covers; if (url) c[id] = url; else delete c[id]; this.covers = c; },
-    getCover(id) { return this.covers[id] || ''; },
-    // Overrides de ficha (admin): título, sinopsis, fondo, tráiler — compartidos
-    get overrides() { return this._get('tvp_overrides', {}); },
-    set overrides(v) { this._set('tvp_overrides', v); },
-    getOverride(id) { return this.overrides[id] || {}; },
-    isHidden(id) { return !!(this.overrides[id] && this.overrides[id].hidden); },
-    setOverride(id, patch) {
-        const o = this.overrides;
-        const cur = Object.assign({}, o[id], patch);
-        Object.keys(cur).forEach(k => { if (cur[k] === '' || cur[k] == null) delete cur[k]; });
-        if (Object.keys(cur).length) o[id] = cur; else delete o[id];
-        this.overrides = o;
-    },
 };
 
 /* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
@@ -173,30 +153,12 @@ const CloudStore = {
         } catch {}
     },
     async saveWatched() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} },
-    // Carátulas personalizadas (admin) — compartidas para todos los usuarios
-    async syncCovers() {
-        if (!this.db) return;
-        try {
-            const doc = await this.db.collection('shared').doc('covers').get();
-            if (doc.exists && doc.data().covers) Store.covers = Object.assign({}, doc.data().covers, Store.covers);
-        } catch {}
-    },
-    async saveCovers() { if (!this.db) return; try { await this.db.collection('shared').doc('covers').set({ covers: Store.covers }, { merge: true }); } catch {} },
-    // Overrides de ficha (admin) — compartidos para todos los usuarios
-    async syncOverrides() {
-        if (!this.db) return;
-        try {
-            const doc = await this.db.collection('shared').doc('overrides').get();
-            if (doc.exists && doc.data().overrides) Store.overrides = Object.assign({}, doc.data().overrides, Store.overrides);
-        } catch {}
-    },
-    async saveOverrides() { if (!this.db) return; try { await this.db.collection('shared').doc('overrides').set({ overrides: Store.overrides }, { merge: true }); } catch {} }
 };
 
 const state = {
     catalog: { categories: [] }, allItems: [], itemsById: {},
     groups: [], activeGroup: '', favoriteGroups: [], groupPreferenceKey: 'tvp_selected_group:account',
-    account: null, isAdmin: false, adminEnabled: false
+    account: null
 };
 
 const el = {
@@ -204,8 +166,7 @@ const el = {
     brand: $('#brand-name'),
     navbar: $('.navbar'),
     navLinks: $('#nav-links'),
-    adminLock: $('#admin-lock'),
-    adminRefresh: $('#admin-refresh'),
+    logoutBtn: $('#logout-btn'),
     groupsTabBtn: $('#groups-tab-btn'),
     filterGenre: $('#filter-genre'),
     filterYear: $('#filter-year'),
@@ -228,7 +189,6 @@ const el = {
     detailBackdrop: $('#detail-backdrop'),
     detailPoster: $('#detail-poster'),
     detailGenres: $('#detail-genres'),
-    detailFinancials: $('#detail-financials'),
     modalRating: $('#modal-rating'),
     trailerIframe: $('#trailer-iframe'),
     trailerMute: $('#trailer-mute'),
@@ -236,30 +196,9 @@ const el = {
     detailPlay: $('#detail-play'),
     favBtn: $('#fav-btn'),
     watchedBtn: $('#watched-btn'),
-    coverBtn: $('#cover-btn'),
-    coverTmdbBtn: $('#cover-tmdb-btn'),
-    synopsisBtn: $('#synopsis-btn'),
-    synopsisTmdbBtn: $('#synopsis-tmdb-btn'),
-    videoLinkBtn: $('#video-link-btn'),
-    titleBtn: $('#title-btn'),
-    adminFab: $('#admin-fab'),
-    adminFabToggle: $('#admin-fab-toggle'),
-    adminFabMenu: $('#admin-fab-menu'),
-    coverTmdbModal: $('#cover-tmdb-modal'),
-    coverQ: $('#cover-q'),
-    coverType: $('#cover-type'),
-    coverResults: $('#cover-results'),
-    coverSearchGo: $('#cover-search-go'),
-    synopsisTmdbModal: $('#synopsis-tmdb-modal'),
-    synQ: $('#syn-q'),
-    synType: $('#syn-type'),
-    synResults: $('#syn-results'),
-    synSearchGo: $('#syn-search-go'),
     playerOptions: $('#player-options'),
     episodeList: $('#episode-list'),
     episodesTrack: $('#episodes-track'),
-    recoRow: $('#reco-row'),
-    recoTrack: $('#reco-track'),
     sources: $('#sources'),
     sourcesTrack: $('#sources-track'),
     modalTitle: $('#modal-title'),
@@ -273,18 +212,11 @@ const el = {
     loadingScreen: $('#loading-screen'),
     loadingText: $('#loading-text'),
     loginModal: $('#login-modal'),
-    adminPanelBtn: $('#admin-panel-btn'),
-    adminPanel: $('#admin-panel'),
-    adminStats: $('#admin-stats'),
-    adminFilters: $('#admin-filters'),
-    adminList: $('#admin-list'),
-    adminTools: $('#admin-tools'),
-    adminEditor: $('#admin-editor')
 };
 
 /* ===== NETFLIX ===== */
 const Netflix = {
-    _vis(items) { return (items || []).filter(it => it && !Store.isHidden(it.id)); },
+    _vis(items) { return (items || []).filter(Boolean); },
     render() {
         el.rowsContainer.innerHTML = '';
         const cats = state.catalog.categories.filter(c => c.items && c.items.length);
@@ -306,20 +238,6 @@ const Netflix = {
             .sort((a, b) => parseFloat(b.meta.rating) - parseFloat(a.meta.rating)).slice(0, 30);
         top.forEach((it, i) => it._rank = i + 1);
         if (top.length) el.rowsContainer.appendChild(this.row('🔥 Top valorados', top, 'top'));
-
-        // Próximamente (TMDB upcoming) — se carga async sin bloquear el render
-        if (state._upcoming && state._upcoming.length) {
-            el.rowsContainer.appendChild(this.row('🎬 Próximamente', state._upcoming, 'upcoming'));
-        } else {
-            api('/api/tmdb/upcoming').then(d => {
-                state._upcoming = (d.results || []).map(x => ({
-                    id: x.id, title: x.title, year: x.year, description: x.description,
-                    thumbUrl: x.poster, backdropUrl: x.backdrop, meta: { rating: x.rating ? String(x.rating) : '' },
-                    isUpcoming: true, _upcomingDate: x.date
-                }));
-                if (state._upcoming.length && !$('#nav-links [data-cat="__groups"].active')) Netflix.render();
-            }).catch(() => {});
-        }
 
         if (!cats.length && !cont.length && !favs.length) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontró contenido en los temas con la etiqueta configurada.</div>`;
@@ -343,7 +261,7 @@ const Netflix = {
     },
 
     row(title, items, kind) {
-        items = (kind === 'upcoming' || kind === 'continue') ? (items || []) : Netflix._vis(items);
+        items = kind === 'continue' ? (items || []) : Netflix._vis(items);
         const row = document.createElement('section');
         row.className = 'content-row';
         row.innerHTML = `
@@ -393,10 +311,9 @@ const Netflix = {
         const card = document.createElement('div');
         card.className = 'card focusable' + (Store.isWatched(item.id) ? ' watched' : '');
         card.tabIndex = 0;
-        const ov = Store.getOverride(item.id);
-        const title = ov.title || item.title || item.epTitle || '';
-        const year = ov.year || item.year || '';
-        const img = Store.getCover(item.id) || item.cover || ov.backdrop || item.thumbUrl || placeholderImage(item.id, title);
+        const title = item.title || item.epTitle || '';
+        const year = item.year || '';
+        const img = item.cover || item.thumbUrl || placeholderImage(item.id, title);
         const pct = (kind === 'continue' && item.duration) ? Math.min(100, Math.round(item.time / item.duration * 100)) : 0;
         card.innerHTML = `
             ${kind === 'top' && item._rank ? `<div class="card-rank">${item._rank}</div>` : ''}
@@ -418,10 +335,9 @@ const Netflix = {
             </div>`;
         const onActivate = () => {
             if (kind === 'continue') Detail.resume(item);
-            else if (item.isUpcoming) alert('🎬 Próximo estreno' + (item._upcomingDate ? ': ' + item._upcomingDate : ''));
             else Detail.open(item);
         };
-        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : (item.isUpcoming ? onActivate() : Detail.open(item, { autoplay: true })); };
+        $('.play-btn', card).onclick = (e) => { e.stopPropagation(); kind === 'continue' ? Detail.resume(item) : Detail.open(item, { autoplay: true }); };
         const rm = $('.card-remove', card);
         if (rm) rm.onclick = (e) => { e.stopPropagation(); Store.clearProgress(item.id); Netflix.render(); };
         card.onclick = onActivate;
@@ -430,17 +346,10 @@ const Netflix = {
 
     updateHero(item) {
         if (!item) return;
-        const ov = Store.getOverride(item.id);
-        const logo = ov.logo || item.tmdbLogo;
-        el.heroImage.src = Store.getCover(item.id) || item.backdrop || item.cover || ov.backdrop || item.backdropUrl || item.thumbUrl || placeholderImage(item.id, item.title);
+        el.heroImage.src = item.backdrop || item.cover || item.thumbUrl || placeholderImage(item.id, item.title);
         el.heroImage.onerror = () => { el.heroImage.src = placeholderImage(item.id, item.title); };
-        const title = ov.title || item.title || '';
-        if (logo && !ov.title) {
-            el.heroTitle.innerHTML = `<img class="hero-logo" src="${logo}" alt="${escapeHtml(title)}" onerror="this.parentNode.innerText=this.alt">`;
-        } else {
-            el.heroTitle.innerText = title;
-        }
-        el.heroDescription.innerText = ov.desc || item.description || '';
+        el.heroTitle.innerText = item.title || '';
+        el.heroDescription.innerText = item.description || '';
         el.heroBadge.innerText = item.category || '';
         el.heroPlay.onclick = () => Detail.open(item, { autoplay: true });
         el.heroInfo.onclick = () => Detail.open(item);
@@ -448,66 +357,34 @@ const Netflix = {
 };
 
 /* ===== DETALLE + favoritos + reproductores externos ===== */
-// Escribe los cambios del admin (carátula, sinopsis, título, TMDB, vídeo) DENTRO
-// del mensaje del grupo (#tvplus:{...}) para tenerlo controlado por las dos vías.
-// Solo aplica a fichas que son un mensaje real (id numérico).
-async function embedToGroup(item, patch) {
-    try {
-        if (!item || !/^\d+$/.test(String(item.id))) return;
-        if (!state.isAdmin) return;
-        const group = encodeURIComponent(state.activeGroup || '');
-        await api('/api/admin/embed?group=' + group, { method: 'POST', body: JSON.stringify({ msgId: Number(item.id), patch: patch || {} }) });
-    } catch (e) { console.warn('[embed] ', e && e.message); }
-}
-
 const Detail = {
     current: null,
     primary: null,
     open(item, opts = {}) {
         this.current = item;
-        const ov = Store.getOverride(item.id);
         const eps = item.episodes || [];
         const hasLinks = !!(item.links && item.links.length);
-        const ovLogo = ov.logo || item.tmdbLogo;
-        const ovRuntime = ov.runtime || item.tmdbRuntime;
-        if (ov.title) {
-            el.modalTitle.innerText = ov.title;
-        } else if (ovLogo) {
-            el.modalTitle.innerHTML = `<img class="tmdb-logo" src="${ovLogo}" alt="${escapeHtml(item.title)}" onerror="this.parentNode.innerText=this.alt">`;
-        } else {
-            el.modalTitle.innerText = item.title;
-        }
-        el.modalYear.innerText = ov.year || item.year || '';
+        el.modalTitle.innerText = item.title || '';
+        el.modalYear.innerText = item.year || '';
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
-            : (ovRuntime ? this._fmtRuntime(ovRuntime)
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
-            : (item.duration || (eps[0] && eps[0].duration) || item.size || '')));
-        el.modalDescription.innerText = ov.desc || item.description || 'Sin descripción disponible.';
-        const ovRating = ov.rating || (item.meta && item.meta.rating);
-        const ovGenres = ov.genres || (item.meta && item.meta.genres);
-        if (el.modalRating) el.modalRating.innerText = ovRating ? ('★ ' + ovRating) : '';
+            : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
+        el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        const rating = item.meta && item.meta.rating;
+        const genres = item.meta && item.meta.genres;
+        if (el.modalRating) el.modalRating.innerText = rating ? ('★ ' + rating) : '';
         if (el.detailGenres) {
-            const gs = ovGenres ? String(ovGenres).split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
+            const gs = genres ? String(genres).split(/[,/]/).map(g => g.trim()).filter(Boolean) : [];
             el.detailGenres.innerHTML = gs.map(g => `<span class="chip">${escapeHtml(g)}</span>`).join('');
         }
-        // Datos financieros (de TMDB) — duración, presupuesto, recaudación
-        if (el.detailFinancials) {
-            const bits = [];
-            if (ovRuntime) bits.push('⏱️ ' + this._fmtRuntime(ovRuntime));
-            if (ov.budget || item.tmdbBudget) bits.push('💰 ' + this._fmtMoney(ov.budget || item.tmdbBudget));
-            if (ov.revenue || item.tmdbRevenue) bits.push('📊 ' + this._fmtMoney(ov.revenue || item.tmdbRevenue));
-            el.detailFinancials.innerHTML = bits.map(b => `<span>${escapeHtml(b)}</span>`).join('');
-            el.detailFinancials.hidden = bits.length === 0;
-        }
-        const cover = Store.getCover(item.id) || item.cover;
-        const backdrop = cover || ov.backdrop || item.backdrop || item.backdropUrl || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
-        const poster = (Store.getCover(item.id) || item.cover) || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const backdrop = item.backdrop || item.cover || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
+        const poster = item.cover || item.thumbUrl || (eps[0] && eps[0].thumbUrl) || placeholderImage(item.id, item.title);
         el.detailBackdrop.src = backdrop;
         el.detailBackdrop.onerror = () => { el.detailBackdrop.src = placeholderImage(item.id, item.title); };
         if (el.detailPoster) { el.detailPoster.src = poster; el.detailPoster.onerror = () => { el.detailPoster.src = placeholderImage(item.id, item.title); }; }
 
         // Trailer YouTube (autoplay muted) — Netflix style con detección de errores
-        const trailerKey = ov.trailer || item.trailerKey;
+        const trailerKey = item.trailerKey || item.trailer;
         Detail._stopTrailer();
         Detail._currentTrailer = trailerKey || '';
         if (el.trailerBtn) {
@@ -548,83 +425,7 @@ const Detail = {
             this.updateWatched();
             el.watchedBtn.onclick = () => { Store.toggleWatched(item.id); this.updateWatched(); CloudStore.saveWatched && CloudStore.saveWatched(); Netflix.render(); };
         }
-        if (el.coverBtn) {
-            el.coverBtn.onclick = async () => {
-                const cur = Store.getCover(item.id) || '';
-                const url = prompt('Pega la URL de la carátula (deja vacío para quitar):', cur);
-                if (url === null) return;
-                Store.setCover(item.id, url.trim());
-                if (state.isAdmin) CloudStore.saveCovers();
-                embedToGroup(item, { cover: url.trim() });
-                Detail.open(item);
-                Netflix.render();   // refresca tarjetas
-            };
-        }
-        if (el.titleBtn) {
-            el.titleBtn.onclick = () => {
-                const ov = Store.getOverride(item.id) || {};
-                const cur = ov.title || item.title || '';
-                const t = prompt('Nuevo título para esta ficha (deja vacío para restaurar el original):', cur);
-                if (t === null) return;
-                Store.setOverride(item.id, { title: (t || '').trim() });
-                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
-                embedToGroup(item, { title: (t || '').trim() });
-                Detail.open(item);
-                Netflix.render();
-                App.toast && App.toast('✅ Título actualizado (web + grupo)', 1800);
-            };
-        }
-        if (el.coverTmdbBtn) {
-            el.coverTmdbBtn.onclick = () => CoverPicker.open(item);
-        }
-        if (el.synopsisBtn) {
-            el.synopsisBtn.onclick = () => {
-                const ov = Store.getOverride(item.id) || {};
-                const cur = ov.desc || item.description || '';
-                const t = prompt('Sinopsis para esta ficha (deja vacío para restaurar la original):', cur);
-                if (t === null) return;
-                Store.setOverride(item.id, { desc: (t || '').trim() });
-                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
-                embedToGroup(item, { desc: (t || '').trim() });
-                Detail.open(item);
-                App.toast && App.toast('✅ Sinopsis actualizada (web + grupo)', 1800);
-            };
-        }
-        if (el.synopsisTmdbBtn) {
-            el.synopsisTmdbBtn.onclick = () => SynopsisPicker.open(item);
-        }
-        if (el.adminFab) {
-            el.adminFab.hidden = !state.isAdmin;
-            // Si es admin, mover el FAB al <body> para que con position:fixed
-            // quede por encima del modal y NO se solape con el póster (antes
-            // estaba dentro de .detail-hero que tiene overflow:hidden y lo
-            // recortaba sobre el póster).
-            if (state.isAdmin && el.adminFab.parentNode !== document.body) {
-                document.body.appendChild(el.adminFab);
-            }
-            if (el.adminFabToggle) el.adminFabToggle.onclick = () => {
-                if (el.adminFabMenu) el.adminFabMenu.hidden = !el.adminFabMenu.hidden;
-            };
-        }
-        if (el.videoLinkBtn) {
-            el.videoLinkBtn.onclick = async () => {
-                const ov = Store.getOverride(item.id) || {};
-                const cur = ov.videoUrl || '';
-                const url = prompt(
-                    'Pega el enlace del vídeo para esta ficha (deja vacío para quitar el override).\n\n' +
-                    'Acepta:\n  • URL directa de vídeo (mp4, webm...)\n  • acestream://...\n  • tvgram://... (abre en TVGram Player)\n' +
-                    '  • magnet:...\n  • https://t.me/c/<id>/<msgId> (otro mensaje de Telegram)',
-                    cur
-                );
-                if (url === null) return;
-                Store.setOverride(item.id, { videoUrl: (url || '').trim() });
-                if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
-                embedToGroup(item, { video: (url || '').trim() });
-                Detail.open(item);
-            };
-        }
         if (opts.autoplay) Player.play(primary, item);
-        Detail._loadReco(item, ov);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
     },
@@ -856,33 +657,6 @@ const Detail = {
         }
         tryCreate();
     },
-    resetReco() { if (el.recoRow) { el.recoRow.hidden = true; if (el.recoTrack) el.recoTrack.innerHTML = ''; } },
-    async _loadReco(item, ov) {
-        if (!el.recoRow || !el.recoTrack) return;
-        el.recoRow.hidden = true; el.recoTrack.innerHTML = '';
-        const id = (ov && ov.tmdbId) || item.tmdbId;
-        const type = (((ov && ov.tmdbType) || item.tmdbType) === 'tv') ? 'tv' : 'movie';
-        if (!id) return;
-        let results;
-        try { const r = await api('/api/tmdb/recommendations/' + type + '/' + id); results = r.results || []; }
-        catch { return; }
-        if (!results.length || el.playerModal.hidden) return;
-        el.recoTrack.innerHTML = results.slice(0, 12).map(rc => `
-            <div class="reco-card focusable" tabindex="0" data-title="${escapeHtml(rc.title || '')}">
-                <img class="reco-card-img" src="${rc.poster || placeholderImage(rc.id, rc.title)}" alt="${escapeHtml(rc.title || '')}" loading="lazy" onerror="this.src='${placeholderImage(rc.id, rc.title)}'">
-                <div class="reco-card-cap">${escapeHtml(rc.title || '')}${rc.year ? ` <span>(${escapeHtml(rc.year)})</span>` : ''}</div>
-            </div>`).join('');
-        $$('.reco-card', el.recoTrack).forEach(c => { c.onclick = () => Detail._openByTitle(c.dataset.title); });
-        el.recoRow.hidden = false;
-        TVNav.refresh();
-    },
-    _openByTitle(title) {
-        const q = (title || '').toLowerCase().trim();
-        const found = state.allItems.find(it => !Store.isHidden(it.id) && (it.title || '').toLowerCase().trim() === q)
-            || state.allItems.find(it => !Store.isHidden(it.id) && (it.title || '').toLowerCase().includes(q));
-        if (found) { Detail.open(found); }
-        else { Detail.close(); App.openSearch(); el.searchInput.value = title; App.search(); }
-    },
     toggleTrailerSound() {
         if (!Detail._ytPlayer) return;
         try {
@@ -894,15 +668,11 @@ const Detail = {
     close() {
         Player.flushProgress();
         Detail._stopTrailer();
-        Detail.resetReco();
         el.playerModal.hidden = true;
         el.body.style.overflow = '';
-        // Ocultar FAB de admin y cerrar su menú al salir
-        if (el.adminFab) el.adminFab.hidden = true;
-        if (el.adminFabMenu) el.adminFabMenu.hidden = true;
         this.resetVideo();
         // refrescar filas (continuar viendo / favoritos)
-        if (state.currentView !== 'telegram') Netflix.render();
+        Netflix.render();
         TVNav.refresh();
     }
 };
@@ -1074,48 +844,6 @@ const Player = {
         this.flushProgress();
         this.current = { playable, parent };
         if (parent && parent.episodes && parent.episodes.length > 1) Store.setLastEp(parent.id, playable.id);
-
-        // Override de admin: si la ficha (parent) o el playable tienen un videoUrl
-        // alternativo guardado, usarlo en vez del original.
-        const ovId = (parent && parent.id) || playable.id;
-        const ov = Store.getOverride(ovId) || {};
-        if (ov.videoUrl) {
-            const u = String(ov.videoUrl).trim();
-            const replaced = Object.assign({}, playable);
-            // acestream:// → reproductor externo AceStream
-            if (/^acestream:/i.test(u)) {
-                replaced.aceUrl = u; replaced.streamUrl = ''; replaced.externalUrl = '';
-                replaced.playableInBrowser = false;
-            }
-            // tvgram:// → abrir en la app TVGram Player
-            else if (/^tvgram:/i.test(u)) {
-                replaced.tvgramUrl = u; replaced.streamUrl = ''; replaced.externalUrl = ''; replaced.aceUrl = '';
-                replaced.playableInBrowser = false;
-            }
-            // t.me/c/<id>/<msgId> → stream del propio servidor (versión cliente: SW maneja)
-            else {
-                const mC = u.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
-                const mU = !mC && u.match(/t\.me\/([A-Za-z0-9_]+)\/(?:\d+\/)?(\d+)/i);
-                const group = encodeURIComponent(state.activeGroup || '');
-                if (mC) {
-                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent('-100' + mC[1])}/${mC[2]}?group=${group}`;
-                    replaced.externalUrl = u;
-                    replaced.playableInBrowser = true;
-                } else if (mU) {
-                    replaced.streamUrl = `tgstreamlink/${encodeURIComponent(mU[1])}/${mU[2]}?group=${group}`;
-                    replaced.externalUrl = u;
-                    replaced.playableInBrowser = true;
-                } else if (/\.(mp4|m4v|webm|ogg|ogv|mov)(\?|#|$)/i.test(u)) {
-                    replaced.streamUrl = u; replaced.externalUrl = u;
-                    replaced.playableInBrowser = true;
-                } else {
-                    replaced.externalUrl = u; replaced.streamUrl = '';
-                    replaced.playableInBrowser = false;
-                }
-            }
-            playable = replaced;
-            this.current.playable = replaced;
-        }
 
         // 1) AceStream: nunca dentro -> abrir reproductor externo (acestream://)
         if (playable.aceUrl) {
@@ -1430,677 +1158,16 @@ const Login = {
     }
 };
 
-/* ===== Cuenta / admin ===== */
-const Admin = {
+/* ===== Cierre de sesión ===== */
+const Logout = {
     async logout() {
         if (!confirm('¿Cerrar tu sesión de Telegram en esta web?')) return;
         try { await api('/api/logout', { method: 'POST', body: '{}' }); } catch {}
         try { localStorage.removeItem('tvp_token'); } catch {}
         location.reload();
-    },
-    async refresh() {
-        try {
-            // Toast no-bloqueante mientras refresca
-            App.toast && App.toast('Actualizando catálogo…', 0);
-            const group = encodeURIComponent(state.activeGroup || '');
-            await api('/api/admin/refresh?group=' + group, { method: 'POST', body: '{}' });
-            const catalog = await api('/api/catalog?group=' + group + '&refresh=1');
-            state.catalog = catalog; state.allItems = []; state.itemsById = {};
-            catalog.categories.forEach(c => c.items.forEach(it => { it.category = c.name; state.allItems.push(it); state.itemsById[it.id] = it; }));
-            try { sessionStorage.setItem('tvp_catalog:' + group, JSON.stringify({ ts: Date.now(), data: catalog })); } catch {}
-            App.populateFilters(); Netflix.render();
-            App.toast ? App.toast('✅ Catálogo actualizado', 2200) : null;
-        } catch (e) {
-            App.toast ? App.toast('Error al actualizar: ' + e.message, 3500, true) : alert('Error al actualizar: ' + e.message);
-        }
-    },
-    reflect() {
-        const a = !!state.isAdmin;
-        el.adminRefresh.hidden = !a;
-        if (el.adminPanelBtn) el.adminPanelBtn.hidden = !a;
-        el.adminLock.hidden = false; // botón de cerrar sesión, visible al estar logado
     }
 };
 
-/* ===== PANEL DE ADMINISTRACIÓN (auditoría + edición de fichas) ===== */
-const AdminPanel = {
-    _filter: 'all',
-    _editId: null,
-    open() {
-        if (!state.isAdmin || !el.adminPanel) return;
-        el.adminPanel.hidden = false;
-        el.body.style.overflow = 'hidden';
-        this.showTab('overview');
-        this.renderStats();
-        this.renderFilters();
-        this.renderList();
-        this.renderTools();
-        TVNav.refresh();
-    },
-    close() {
-        if (!el.adminPanel) return;
-        this.closeEditor();
-        el.adminPanel.hidden = true;
-        el.body.style.overflow = '';
-        TVNav.refresh();
-    },
-    showTab(tab) {
-        $$('.admin-tab', el.adminPanel).forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-        $$('.admin-pane', el.adminPanel).forEach(p => p.hidden = p.dataset.pane !== tab);
-        TVNav.refresh();
-    },
-    // ---- diagnóstico de cada item ----
-    _audit(it) {
-        const ov = Store.getOverride(it.id);
-        const hasCover = !!(Store.getCover(it.id) || ov.backdrop || it.thumbUrl);
-        const hasTmdb = !!(it.tmdbId || ov.tmdbId);
-        const hasSynopsis = !!(ov.desc || (it.description && it.description.length > 20));
-        const hasTrailer = !!(ov.trailer || it.trailerKey);
-        const hasVideo = !!(it.streamUrl || it.aceUrl || it.tvgramUrl || it.externalUrl || (it.links && it.links.length) || (it.episodes && it.episodes.length));
-        return { hasCover, hasTmdb, hasSynopsis, hasTrailer, hasVideo };
-    },
-    _problems(it) {
-        const a = this._audit(it);
-        const p = [];
-        if (!a.hasCover) p.push('cover');
-        if (!a.hasTmdb) p.push('tmdb');
-        if (!a.hasSynopsis) p.push('synopsis');
-        if (!a.hasTrailer) p.push('trailer');
-        if (!a.hasVideo) p.push('video');
-        return p;
-    },
-    renderStats() {
-        const items = state.allItems;
-        const total = items.length;
-        const series = items.filter(i => i.isSeries || (i.episodes && i.episodes.length > 1)).length;
-        const movies = total - series;
-        let noCover = 0, noTmdb = 0, noSyn = 0, noTrailer = 0, noVideo = 0;
-        items.forEach(it => {
-            const a = this._audit(it);
-            if (!a.hasCover) noCover++;
-            if (!a.hasTmdb) noTmdb++;
-            if (!a.hasSynopsis) noSyn++;
-            if (!a.hasTrailer) noTrailer++;
-            if (!a.hasVideo) noVideo++;
-        });
-        const cats = state.catalog.categories.filter(c => c.items && c.items.length);
-        const card = (label, val, warn) => `<div class="stat-card${warn && val ? ' warn' : ''}"><div class="stat-val">${val}</div><div class="stat-label">${escapeHtml(label)}</div></div>`;
-        el.adminStats.innerHTML =
-            card('Total contenidos', total) +
-            card('Películas', movies) +
-            card('Series', series) +
-            card('Temas (categorías)', cats.length) +
-            card('Sin carátula', noCover, true) +
-            card('Sin ficha TMDB', noTmdb, true) +
-            card('Sin sinopsis', noSyn, true) +
-            card('Sin tráiler', noTrailer, true) +
-            card('Sin vídeo/enlace', noVideo, true) +
-            `<div class="stat-card"><div class="stat-val">${state.userName ? '✓' : '—'}</div><div class="stat-label">Admin: ${escapeHtml(state.userName || '')}</div></div>`;
-    },
-    renderFilters() {
-        const defs = [
-            ['all', 'Todos'], ['problems', '⚠ Con incidencias'],
-            ['cover', 'Sin carátula'], ['tmdb', 'Sin TMDB'],
-            ['synopsis', 'Sin sinopsis'], ['trailer', 'Sin tráiler'], ['video', 'Sin vídeo']
-        ];
-        el.adminFilters.innerHTML = defs.map(([k, l]) =>
-            `<button class="admin-chip focusable${this._filter === k ? ' active' : ''}" data-f="${k}" tabindex="0">${escapeHtml(l)}</button>`).join('');
-        $$('.admin-chip', el.adminFilters).forEach(b => b.onclick = () => { this._filter = b.dataset.f; this.renderFilters(); this.renderList(); });
-    },
-    _filteredItems() {
-        const items = state.allItems.slice().sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-        if (this._filter === 'all') return items;
-        if (this._filter === 'problems') return items.filter(it => this._problems(it).length);
-        return items.filter(it => this._problems(it).includes(this._filter));
-    },
-    renderList() {
-        const items = this._filteredItems();
-        if (!items.length) { el.adminList.innerHTML = '<div class="admin-empty">No hay contenidos en este filtro.</div>'; return; }
-        const dot = (ok, txt) => `<span class="admin-flag ${ok ? 'ok' : 'bad'}" title="${txt}">${ok ? '✓' : '✗'} ${txt}</span>`;
-        el.adminList.innerHTML = items.slice(0, 5000).map(it => {
-            const a = this._audit(it);
-            const ov = Store.getOverride(it.id);
-            const img = Store.getCover(it.id) || ov.backdrop || it.thumbUrl || placeholderImage(it.id, it.title);
-            const title = ov.title || it.title || '';
-            return `<div class="admin-row focusable" data-id="${escapeHtml(String(it.id))}" tabindex="0">
-                <img class="admin-row-img" src="${img}" alt="" onerror="this.src='${placeholderImage(it.id, title)}'">
-                <div class="admin-row-info">
-                    <div class="admin-row-title">${escapeHtml(title)} ${it.year ? `<span class="admin-row-year">(${escapeHtml(it.year)})</span>` : ''}${Store.isHidden(it.id) ? ' <span class="admin-hidden-badge">OCULTO</span>' : ''}</div>
-                    <div class="admin-flags">
-                        ${dot(a.hasCover, 'Carátula')}${dot(a.hasTmdb, 'TMDB')}${dot(a.hasSynopsis, 'Sinopsis')}${dot(a.hasTrailer, 'Tráiler')}${dot(a.hasVideo, 'Vídeo')}
-                    </div>
-                </div>
-                <button class="admin-row-edit focusable" tabindex="0">✎ Editar</button>
-            </div>`;
-        }).join('');
-        $$('.admin-row', el.adminList).forEach(row => {
-            const it = state.itemsById[row.dataset.id];
-            row.querySelector('.admin-row-edit').onclick = (e) => { e.stopPropagation(); this.editItem(it); };
-            row.onclick = () => this.editItem(it);
-        });
-        TVNav.refresh();
-    },
-    renderTools() {
-        el.adminTools.innerHTML = `
-            <button class="btn btn-play focusable" id="tool-refresh" tabindex="0">🔄 Actualizar catálogo (Telegram)</button>
-            <button class="btn btn-play focusable" id="tool-autofix" tabindex="0">✨ Auto-rellenar fichas sin carátula (TMDB)</button>
-            <button class="btn btn-fav focusable" id="tool-cache" tabindex="0">🧹 Borrar caché local</button>
-            <div class="admin-tools-progress" id="autofix-progress" hidden></div>
-            <p class="admin-tools-note">«Actualizar catálogo» vuelve a leer el grupo seleccionado y refresca TMDB. «Auto-rellenar» busca en TMDB cada título sin carátula y le pone la primera coincidencia (luego puedes repasar en Auditoría). «Borrar caché» limpia la caché de catálogos del navegador (no borra favoritos).</p>`;
-        const r = $('#tool-refresh', el.adminTools); if (r) r.onclick = async () => { r.disabled = true; r.innerText = 'Actualizando...'; await Admin.refresh(); this.renderStats(); this.renderList(); r.disabled = false; r.innerText = '🔄 Actualizar catálogo (Telegram)'; };
-        const af = $('#tool-autofix', el.adminTools); if (af) af.onclick = () => this.autoFix(af);
-        const c = $('#tool-cache', el.adminTools); if (c) c.onclick = () => {
-            try {
-                for (let i = sessionStorage.length - 1; i >= 0; i--) {
-                    const key = sessionStorage.key(i);
-                    if (key && key.startsWith('tvp_catalog')) sessionStorage.removeItem(key);
-                }
-            } catch {}
-            alert('Caché local borrada. Recarga para volver a leer del servidor.');
-        };
-    },
-    async autoFix(btn) {
-        const prog = $('#autofix-progress');
-        // Solo los que NO tienen carátula NI ficha TMDB
-        const pending = state.allItems.filter(it => { const a = this._audit(it); return !a.hasTmdb && !a.hasCover; });
-        if (!pending.length) { if (prog) { prog.hidden = false; prog.innerText = 'No hay fichas sin carátula. Todo en orden ✓'; } return; }
-        if (!confirm(`Se buscarán en TMDB ${pending.length} fichas sin carátula y se aplicará la primera coincidencia. ¿Continuar?`)) return;
-        if (btn) { btn.disabled = true; }
-        if (prog) prog.hidden = false;
-        let done = 0, fixed = 0;
-        const cap = Math.min(pending.length, 120); // límite de seguridad por pasada
-        for (let i = 0; i < cap; i++) {
-            const it = pending[i];
-            done++;
-            if (prog) prog.innerText = `Procesando ${done}/${cap}... (${fixed} arregladas)`;
-            try {
-                const type = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
-                const sr = await api('/api/admin/tmdb/search?q=' + encodeURIComponent(it.title || '') + (type ? '&type=' + type : ''));
-                const cand = (sr.results || [])[0];
-                if (cand) {
-                    const dr = await api('/api/admin/tmdb/details/' + cand.type + '/' + cand.id);
-                    const info = dr.info;
-                    if (info && info.poster) {
-                        Store.setOverride(it.id, {
-                            desc: info.overview || '', backdrop: info.backdrop || '', trailer: info.trailerKey || '',
-                            rating: info.rating || '', genres: info.genres || '', logo: info.logo || '',
-                            year: info.year || '', runtime: info.runtime || '', tmdbId: info.tmdbId || '', tmdbType: info.type || ''
-                        });
-                        Store.setCover(it.id, info.poster);
-                        fixed++;
-                    }
-                }
-            } catch {}
-            await new Promise(rs => setTimeout(rs, 220)); // no saturar TMDB
-        }
-        CloudStore.saveOverrides();
-        CloudStore.saveCovers();
-        if (prog) prog.innerText = `Listo: ${fixed} fichas arregladas de ${cap} procesadas.` + (pending.length > cap ? ` (Quedan ${pending.length - cap}; vuelve a pulsar para seguir.)` : '');
-        if (btn) btn.disabled = false;
-        this.renderStats();
-        this.renderList();
-        Netflix.render();
-    },
-    // ---- editor de ficha ----
-    editItem(it) {
-        if (!it) return;
-        this._editId = it.id;
-        this._pendingTmdb = null;
-        const ov = Store.getOverride(it.id);
-        $('#admin-editor-title').innerText = 'Editar: ' + (ov.title || it.title || '');
-        $('#edit-title').value = ov.title || '';
-        $('#edit-desc').value = ov.desc || '';
-        $('#edit-cover').value = Store.getCover(it.id) || '';
-        $('#edit-backdrop').value = ov.backdrop || '';
-        $('#edit-trailer').value = ov.trailer || it.trailerKey || '';
-        if ($('#edit-video')) $('#edit-video').value = ov.videoUrl || '';
-        // Buscador TMDB
-        const q = $('#tmdb-query'); if (q) q.value = ov.title || it.title || '';
-        const ts = $('#tmdb-type'); if (ts) ts.value = (it.isSeries || (it.episodes && it.episodes.length > 1)) ? 'tv' : '';
-        const tr = $('#tmdb-results'); if (tr) tr.innerHTML = '';
-        const hb = $('#edit-hide'); if (hb) hb.innerText = Store.isHidden(it.id) ? '👁 Mostrar' : '🚫 Ocultar';
-        this._editPlaceholders(it);
-        el.adminEditor.hidden = false;
-        TVNav.refresh();
-        setTimeout(() => $('#edit-title').focus(), 50);
-    },
-    async tmdbSearch() {
-        const box = $('#tmdb-results'); if (!box) return;
-        const q = ($('#tmdb-query').value || '').trim();
-        const type = $('#tmdb-type').value || '';
-        if (!q) { box.innerHTML = '<div class="admin-empty">Escribe un nombre para buscar.</div>'; return; }
-        box.innerHTML = '<div class="admin-empty">Buscando en TMDB...</div>';
-        let results;
-        try { const r = await api('/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '')); results = r.results || []; }
-        catch (e) { box.innerHTML = '<div class="admin-empty">Error: ' + escapeHtml(e.message) + '</div>'; return; }
-        if (!results.length) { box.innerHTML = '<div class="admin-empty">Sin coincidencias en TMDB.</div>'; return; }
-        box.innerHTML = results.map((c, i) => `
-            <div class="tmdb-card focusable" data-i="${i}" tabindex="0">
-                <img class="tmdb-card-img" src="${c.poster || placeholderImage(c.id, c.title)}" alt="" onerror="this.src='${placeholderImage(c.id, c.title)}'">
-                <div class="tmdb-card-info">
-                    <div class="tmdb-card-title">${escapeHtml(c.title)} ${c.year ? `<span>(${escapeHtml(c.year)})</span>` : ''} <span class="tmdb-card-type">${c.type === 'tv' ? 'Serie' : 'Película'}</span></div>
-                    <div class="tmdb-card-meta">${c.rating ? '★ ' + escapeHtml(c.rating) : ''} ${c.genres ? '· ' + escapeHtml(c.genres) : ''}</div>
-                    <div class="tmdb-card-ov">${escapeHtml((c.overview || '').slice(0, 160))}</div>
-                </div>
-                <button class="tmdb-card-pick" tabindex="0">Usar esta</button>
-            </div>`).join('');
-        $$('.tmdb-card', box).forEach(card => {
-            const cand = results[+card.dataset.i];
-            const pick = () => this.pickTmdb(cand, card);
-            card.querySelector('.tmdb-card-pick').onclick = (e) => { e.stopPropagation(); pick(); };
-            card.onclick = pick;
-        });
-        TVNav.refresh();
-    },
-    async pickTmdb(cand, cardEl) {
-        const box = $('#tmdb-results');
-        $$('.tmdb-card', box).forEach(c => c.classList.remove('selected'));
-        if (cardEl) cardEl.classList.add('selected');
-        let info;
-        try { const r = await api('/api/admin/tmdb/details/' + cand.type + '/' + cand.id); info = r.info; }
-        catch (e) { alert('Error al traer la ficha: ' + e.message); return; }
-        if (!info) { alert('No se pudieron obtener los detalles.'); return; }
-        // Rellenar campos visibles
-        if (info.overview) $('#edit-desc').value = info.overview;
-        if (info.poster) $('#edit-cover').value = info.poster;
-        if (info.backdrop) $('#edit-backdrop').value = info.backdrop;
-        if (info.trailerKey) $('#edit-trailer').value = info.trailerKey;
-        // Guardar el resto (se aplica al pulsar Guardar)
-        this._pendingTmdb = {
-            rating: info.rating || '', genres: info.genres || '', logo: info.logo || '',
-            year: info.year || '', runtime: info.runtime || '', budget: info.budget || '',
-            revenue: info.revenue || '', tmdbId: info.tmdbId || '', tmdbType: info.type || ''
-        };
-        if (cardEl) {
-            const note = cardEl.querySelector('.tmdb-card-pick');
-            if (note) note.innerText = '✓ Seleccionada';
-        }
-    },
-    _editPlaceholders(it) {
-        $('#edit-title').placeholder = it.title || '';
-        $('#edit-desc').placeholder = (it.description || 'Sin sinopsis').slice(0, 120);
-    },
-    _ytId(v) {
-        const s = String(v || '').trim();
-        if (!s) return '';
-        const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{6,})/);
-        return m ? m[1] : s.replace(/[^\w-]/g, '');
-    },
-    closeEditor() { if (el.adminEditor) el.adminEditor.hidden = true; this._editId = null; },
-    save() {
-        const id = this._editId; if (id == null) return;
-        const it = state.itemsById[id];
-        const patch = {
-            title: $('#edit-title').value.trim(),
-            desc: $('#edit-desc').value.trim(),
-            backdrop: $('#edit-backdrop').value.trim(),
-            trailer: this._ytId($('#edit-trailer').value),
-            videoUrl: ($('#edit-video') ? $('#edit-video').value.trim() : (ov.videoUrl || ''))
-        };
-        // Datos extra copiados de TMDB (nota, géneros, logo, año, duración...)
-        if (this._pendingTmdb) {
-            Object.assign(patch, {
-                rating: this._pendingTmdb.rating, genres: this._pendingTmdb.genres,
-                logo: this._pendingTmdb.logo, year: this._pendingTmdb.year,
-                runtime: this._pendingTmdb.runtime, budget: this._pendingTmdb.budget,
-                revenue: this._pendingTmdb.revenue, tmdbId: this._pendingTmdb.tmdbId,
-                tmdbType: this._pendingTmdb.tmdbType
-            });
-        }
-        Store.setOverride(id, patch);
-        Store.setCover(id, $('#edit-cover').value.trim());
-        CloudStore.saveOverrides();
-        CloudStore.saveCovers();
-        this._pendingTmdb = null;
-        this.closeEditor();
-        this.renderStats();
-        this.renderList();
-        Netflix.render();
-        if (it) { /* refrescar ficha si estuviera abierta no es necesario */ }
-    },
-    reset() {
-        const id = this._editId; if (id == null) return;
-        if (!confirm('¿Quitar todos los cambios manuales de esta ficha?')) return;
-        Store.setOverride(id, { title: '', desc: '', backdrop: '', trailer: '', rating: '', genres: '', logo: '', year: '', runtime: '', budget: '', revenue: '', tmdbId: '', tmdbType: '', hidden: '' });
-        Store.setCover(id, '');
-        CloudStore.saveOverrides();
-        CloudStore.saveCovers();
-        this._pendingTmdb = null;
-        this.closeEditor();
-        this.renderStats();
-        this.renderList();
-        Netflix.render();
-    },
-    openItem() {
-        const id = this._editId; const it = id != null && state.itemsById[id];
-        if (!it) return;
-        this.close();
-        Detail.open(it);
-    },
-    toggleHidden() {
-        const id = this._editId; if (id == null) return;
-        const now = !Store.isHidden(id);
-        Store.setOverride(id, { hidden: now ? '1' : '' });
-        CloudStore.saveOverrides();
-        const hb = $('#edit-hide'); if (hb) hb.innerText = now ? '👁 Mostrar' : '🚫 Ocultar';
-        this.renderStats();
-        this.renderList();
-        Netflix.render();
-    }
-};
-
-/* ===== Selector de carátula desde TMDB ===== */
-const CoverPicker = {
-    item: null,
-    open(item) {
-        this.item = item;
-        if (!el.coverTmdbModal) return;
-        el.coverTmdbModal.hidden = false;
-        document.body.style.overflow = 'hidden';
-        // Pre-rellenar con el título limpio
-        const ov = Store.getOverride(item.id) || {};
-        el.coverQ.value = (ov.title || item.title || '').replace(/\b(1080p|720p|480p|2160p|4k|hd|hdr|bluray|brrip|webrip|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|latino|castellano|espa[ñn]ol|spanish|english|sub|subs|temporada\s*\d+|t\d+|s\d+|cap[ií]tulo\s*\d+|cap\s*\d+|ep\.?\s*\d+|episodio\s*\d+)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim();
-        // tipo según la categoría
-        const isSeries = /serie/i.test(item.category || '') || item.isSeries;
-        el.coverType.value = isSeries ? 'tv' : (/pel[ií]cul/i.test(item.category || '') ? 'movie' : '');
-        el.coverResults.innerHTML = '<div class="cover-empty">Pulsa Buscar para ver carátulas en TMDB.</div>';
-        // Wire eventos (solo la primera vez)
-        if (!this._wired) {
-            this._wired = true;
-            $$('[data-cover-close]').forEach(b => b.onclick = () => this.close());
-            el.coverSearchGo.onclick = () => this.search();
-            el.coverQ.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.search(); } });
-        }
-        // Auto-buscar
-        setTimeout(() => this.search(), 100);
-    },
-    close() {
-        if (!el.coverTmdbModal) return;
-        el.coverTmdbModal.hidden = true;
-        document.body.style.overflow = '';
-    },
-    async search() {
-        const q = (el.coverQ.value || '').trim();
-        if (!q) return;
-        el.coverResults.innerHTML = '<div class="cover-loading">Buscando…</div>';
-        try {
-            const type = el.coverType.value || '';
-            const url = '/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '');
-            const r = await api(url);
-            const list = r.results || [];
-            if (!list.length) { el.coverResults.innerHTML = '<div class="cover-empty">Sin resultados.</div>'; return; }
-            el.coverResults.innerHTML = list.map(c => `
-                <div class="cover-card focusable" tabindex="0" data-poster="${escapeHtml(c.poster || '')}" data-id="${c.id}" data-type="${c.type}">
-                    <img src="${escapeHtml(c.poster || placeholderImage(c.id, c.title))}" alt="${escapeHtml(c.title)}" onerror="this.src='${placeholderImage(c.id, c.title)}'">
-                    <div class="cover-card-info">
-                        <div class="cover-card-title">${escapeHtml(c.title)}</div>
-                        <div class="cover-card-sub">${c.year ? c.year + ' · ' : ''}${c.type === 'tv' ? 'Serie' : 'Película'}${c.rating ? ' · ⭐ ' + c.rating : ''}</div>
-                    </div>
-                </div>`).join('');
-            $$('#cover-results .cover-card').forEach(card => {
-                card.onclick = () => this.pick(card.dataset.poster, card.dataset.type, card.dataset.id);
-            });
-        } catch (e) {
-            el.coverResults.innerHTML = `<div class="cover-error">Error: ${escapeHtml(e.message)}</div>`;
-        }
-    },
-    async pick(posterUrl, type, tmdbId) {
-        if (!this.item) return;
-        if (!posterUrl) { App.toast('Esa ficha no tiene carátula', 2500, true); return; }
-        // Guarda como override de cover (para verlo al instante en tu navegador)
-        Store.setCover(this.item.id, posterUrl);
-        let info = null;
-        if (tmdbId) {
-            try {
-                const dr = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId);
-                info = dr && dr.details ? dr.details : null;
-                if (info) {
-                    Store.setOverride(this.item.id, {
-                        desc: info.overview || '', backdrop: info.backdrop || '', trailer: info.trailerKey || '',
-                        logo: info.logo || '', rating: info.rating || '', year: info.year || '',
-                        runtime: info.runtime || '', tmdbId: info.tmdbId || tmdbId, tmdbType: info.type || type || ''
-                    });
-                }
-            } catch (e) { /* al menos tenemos el poster */ }
-        }
-        if (state.isAdmin) { CloudStore.saveCovers(); CloudStore.saveOverrides && CloudStore.saveOverrides(); }
-        // Escribir en el GRUPO de forma VISIBLE (sin enlaces, nada oculto):
-        // - el título correcto de TMDB -> hace que la CARÁTULA salga sola para
-        //   todos (el catálogo auto-busca en TMDB por el título).
-        // - la SINOPSIS como texto -> la ven todos en el propio mensaje.
-        embedToGroup(this.item, {
-            title: (info && info.title) || undefined,
-            desc: (info && info.overview) || undefined
-        });
-        App.toast('✅ Carátula y sinopsis puestas (web + grupo)', 2000);
-        this.close();
-        Detail.open(this.item);
-        Netflix.render();
-    }
-};
-
-/* ===== Selector de sinopsis desde TMDB =====
- * Mismo patrón que CoverPicker pero solo aplica la descripción + metadatos
- * (no toca la carátula). Útil para fichas en las que el poster es el correcto
- * pero la sinopsis está vacía o desactualizada.
- */
-const SynopsisPicker = {
-    open(item) {
-        if (!el.synopsisTmdbModal) return;
-        this.item = item;
-        const ov = Store.getOverride(item.id) || {};
-        // Pre-rellenar el campo de búsqueda con el título actual
-        if (el.synQ) el.synQ.value = ov.title || item.title || '';
-        // Tipo según pista: serie/película
-        if (el.synType) {
-            const isSeries = item.isSeries || (item.episodes && item.episodes.length > 1) || (ov.tmdbType === 'tv');
-            el.synType.value = isSeries ? 'tv' : '';
-        }
-        if (el.synResults) el.synResults.innerHTML = '';
-        el.synopsisTmdbModal.hidden = false;
-        document.body.style.overflow = 'hidden';
-        if (!this._wired) {
-            this._wired = true;
-            $$('[data-syn-close]').forEach(b => b.onclick = () => this.close());
-            el.synSearchGo.onclick = () => this.search();
-            el.synQ.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.search(); } });
-        }
-        setTimeout(() => this.search(), 100);
-    },
-    close() {
-        if (!el.synopsisTmdbModal) return;
-        el.synopsisTmdbModal.hidden = true;
-        document.body.style.overflow = '';
-    },
-    async search() {
-        const q = (el.synQ.value || '').trim();
-        if (!q) return;
-        el.synResults.innerHTML = '<div class="cover-loading">Buscando…</div>';
-        try {
-            const type = el.synType.value || '';
-            const url = '/api/admin/tmdb/search?q=' + encodeURIComponent(q) + (type ? '&type=' + type : '');
-            const r = await api(url);
-            const list = r.results || [];
-            if (!list.length) { el.synResults.innerHTML = '<div class="cover-empty">Sin resultados.</div>'; return; }
-            // Renderizamos cada resultado mostrando ya un trozo de sinopsis para que
-            // el admin elija con criterio (no a ciegas como en el cover picker).
-            el.synResults.innerHTML = list.map(c => {
-                const desc = (c.description || c.overview || '').slice(0, 220);
-                return `
-                <div class="cover-card syn-card focusable" tabindex="0" data-id="${c.id}" data-type="${c.type}">
-                    <img src="${escapeHtml(c.poster || placeholderImage(c.id, c.title))}" alt="${escapeHtml(c.title)}" onerror="this.src='${placeholderImage(c.id, c.title)}'">
-                    <div class="cover-card-info">
-                        <div class="cover-card-title">${escapeHtml(c.title)}</div>
-                        <div class="cover-card-sub">${c.year ? c.year + ' · ' : ''}${c.type === 'tv' ? 'Serie' : 'Película'}${c.rating ? ' · ⭐ ' + c.rating : ''}</div>
-                        <div class="syn-card-desc">${desc ? escapeHtml(desc) + (desc.length === 220 ? '…' : '') : '<i style="color:#666">Sin sinopsis disponible</i>'}</div>
-                        <div class="syn-card-actions"><button class="btn btn-play syn-pick-btn">📝 Usar esta sinopsis</button></div>
-                    </div>
-                </div>`;
-            }).join('');
-            $$('#syn-results .syn-card').forEach(card => {
-                const btn = card.querySelector('.syn-pick-btn');
-                if (btn) btn.onclick = () => this.pick(card.dataset.type, card.dataset.id);
-            });
-        } catch (e) {
-            el.synResults.innerHTML = `<div class="cover-error">Error: ${escapeHtml(e.message)}</div>`;
-        }
-    },
-    async pick(type, tmdbId) {
-        if (!this.item || !tmdbId) return;
-        try {
-            const dr = await api('/api/admin/tmdb/details/' + (type || 'movie') + '/' + tmdbId);
-            const info = dr && dr.details ? dr.details : null;
-            if (!info || !info.overview) { App.toast('Esa ficha no tiene sinopsis en TMDB', 2500, true); return; }
-            // Solo actualizamos descripción + metadatos asociados; la carátula NO se toca.
-            Store.setOverride(this.item.id, {
-                desc: info.overview,
-                backdrop: info.backdrop || '',
-                trailer: info.trailerKey || '',
-                logo: info.logo || '',
-                rating: info.rating || '',
-                year: info.year || '',
-                runtime: info.runtime || '',
-                tmdbId: info.tmdbId || tmdbId,
-                tmdbType: info.type || type || ''
-            });
-            if (state.isAdmin) CloudStore.saveOverrides && CloudStore.saveOverrides();
-            embedToGroup(this.item, {
-                title: info.title || undefined,
-                desc: info.overview || undefined
-            });
-            App.toast('✅ Sinopsis actualizada (web + grupo)', 1800);
-            this.close();
-            Detail.open(this.item);
-        } catch (e) {
-            App.toast('Error: ' + e.message, 3000, true);
-        }
-    }
-};
-
-/* ===== APP / VISTAS / BÚSQUEDA ===== */
-const App = {
-    // Toast: mensajes no-bloqueantes en la esquina inferior. Ms=0 -> permanente
-    // hasta que llamen otra vez con un texto distinto. error=true -> color rojo.
-    toast(msg, ms, error) {        let el = document.getElementById('tvp-toast');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'tvp-toast';
-            el.className = 'tvp-toast';
-            document.body.appendChild(el);
-        }
-        clearTimeout(el._t);
-        el.textContent = msg;
-        el.classList.toggle('error', !!error);
-        el.classList.add('show');
-        if (ms !== 0) {
-            el._t = setTimeout(() => { el.classList.remove('show'); }, ms || 2200);
-        }
-    },
-    // Construye un indice rapido de busqueda y deteccion de calidad/idioma
-    // a partir del titulo original. Se llama tras cargar el catalogo.
-    _buildSearchIndex() {
-        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        state.allItems.forEach(it => {
-            const t = it.title || '';
-            const ov = Store.getOverride(it.id) || {};
-            const realTitle = ov.title || t;
-            // Deteccion de calidad
-            const q = (t.match(/\b(2160p|4k|uhd|1080p|720p|480p|hdr|hdr10|dolby vision|dv)\b/i) || [])[0];
-            it._quality = q ? q.toUpperCase() : '';
-            // Deteccion de idioma
-            const lang = (t.match(/\b(latino|castellano|espa[ñn]ol|spanish|english|ingles|vose|vos|dual|subtitulado)\b/i) || [])[0];
-            it._lang = lang ? lang.toLowerCase() : '';
-            // Texto buscable: titulo + descripcion + categoria + generos, normalizado.
-            it._search = norm([
-                realTitle, it.description, it.category,
-                (it.meta && it.meta.genres) || '',
-                String(it.year || ''),
-                it._quality, it._lang
-            ].join(' '));
-        });
-    },
-    search() {
-        // Debounce: agrupar pulsaciones rapidas en una sola busqueda.
-        clearTimeout(this._searchTimer);
-        this._searchTimer = setTimeout(() => this._doSearch(), 180);
-    },
-    _doSearch() {
-        const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const q = norm((el.searchInput.value || '').trim());
-        const genre = norm((el.filterGenre.value || '').trim());
-        const year = el.filterYear.value || '';
-        const quality = el.filterQuality && el.filterQuality.value || '';
-        const lang = el.filterLang && el.filterLang.value || '';
-        const cat = el.filterCat && el.filterCat.value || '';
-        if (!q && !genre && !year && !quality && !lang && !cat) { el.searchResults.innerHTML = ''; return; }
-        // Para queries con varias palabras, todas tienen que aparecer.
-        const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
-        const res = state.allItems.filter(it => {
-            if (Store.isHidden(it.id)) return false;
-            if (!it._search) return false; // sin indice (no deberia pasar)
-            for (const tk of tokens) { if (it._search.indexOf(tk) === -1) return false; }
-            if (genre && !norm((it.meta && it.meta.genres) || '').includes(genre)) return false;
-            if (year && String(it.year) !== year) return false;
-            if (quality && (it._quality || '').toUpperCase() !== quality.toUpperCase()) return false;
-            if (lang && !(it._lang || '').includes(lang.toLowerCase())) return false;
-            if (cat && (it.category || '') !== cat) return false;
-            return true;
-        });
-        if (!res.length) { el.searchResults.innerHTML = '<div class="search-empty">Sin resultados.</div>'; return; }
-        // Limitar resultados visibles para no petar el DOM
-        const view = res.slice(0, 240);
-        const html = view.map(it => `<div class="search-card focusable" tabindex="0" data-id="${escapeHtml(it.id)}">
-            <img class="search-image" src="${it.thumbUrl || placeholderImage(it.id, it.title)}" alt=""
-                onerror="this.src='${placeholderImage(it.id, it.title)}'">
-            <div class="search-meta"><h3>${escapeHtml(it.title)}</h3>
-                <p>${escapeHtml((it.description || '').slice(0, 140))}</p>
-                <span class="search-cat">${escapeHtml(it.category || '')}</span>
-                ${it._quality ? `<span class="search-tag">${escapeHtml(it._quality)}</span>` : ''}
-                ${it._lang ? `<span class="search-tag lang">${escapeHtml(it._lang)}</span>` : ''}
-            </div></div>`).join('');
-        el.searchResults.innerHTML = html + (res.length > view.length ? `<div class="search-more">Mostrando ${view.length} de ${res.length} resultados. Refina tu búsqueda para ver más.</div>` : '');
-        $$('#search-results .search-card').forEach(card => {
-            card.onclick = () => {
-                const it = state.itemsById[card.dataset.id]; if (!it) return;
-                this.closeSearch(); Detail.open(it);
-            };
-        });
-        TVNav.refresh();
-    },
-    populateFilters() {
-        const genres = new Set(), years = new Set(), qualities = new Set(), langs = new Set(), cats = new Set();
-        // Construir indice si aun no
-        this._buildSearchIndex();
-        state.allItems.forEach(it => {
-            if (it.meta && it.meta.genres) it.meta.genres.split(/[,/]/).forEach(g => { const t = g.trim(); if (t) genres.add(t); });
-            if (it.year) years.add(String(it.year));
-            if (it._quality) qualities.add(it._quality);
-            if (it._lang) langs.add(it._lang);
-            if (it.category) cats.add(it.category);
-        });
-        const opts = (set, def, sortFn) => `<option value="">${def}</option>` +
-            [...set].sort(sortFn || ((a, b) => a.localeCompare(b))).map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-        if (el.filterGenre) el.filterGenre.innerHTML = opts(genres, 'Todos los géneros');
-        if (el.filterYear) el.filterYear.innerHTML = opts(years, 'Todos los años', (a, b) => b - a);
-        if (el.filterQuality) el.filterQuality.innerHTML = opts(qualities, 'Cualquier calidad');
-        if (el.filterLang) el.filterLang.innerHTML = opts(langs, 'Cualquier idioma');
-        if (el.filterCat) el.filterCat.innerHTML = opts(cats, 'Todas las categorías');
-    },
-    openSearch() { el.searchOverlay.hidden = false; el.searchInput.focus(); el.body.style.overflow = 'hidden'; },
-    closeSearch() {
-        el.searchOverlay.hidden = true;
-        if (el.searchInput) el.searchInput.value = '';
-        if (el.filterGenre) el.filterGenre.value = '';
-        if (el.filterYear) el.filterYear.value = '';
-        if (el.filterQuality) el.filterQuality.value = '';
-        if (el.filterLang) el.filterLang.value = '';
-        if (el.filterCat) el.filterCat.value = '';
-        if (el.searchResults) el.searchResults.innerHTML = '';
-        el.body.style.overflow = '';
-    }
-};
-
-/* ===== Búsqueda por voz (Web Speech API) ===== */
 const Voice = {
     rec: null,
     supported() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); },
@@ -2131,11 +1198,9 @@ const Voice = {
 
 /* ===== Navegación con mando de TV Box (flechas + OK + atrás) ===== */
 const TVNav = {
-    SEL: '.card, .card-remove, .btn, .episode, .opt-btn, .source-btn, .filter-select, .nav-links a, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, .groups-search, .group-open, .group-favorite, .modal-close, .admin-tab, .admin-chip, .admin-row, .admin-row-edit, .admin-input, .tmdb-card, .tmdb-card-pick, .reco-card',
+    SEL: '.card, .card-remove, .btn, .episode, .opt-btn, .source-btn, .filter-select, .nav-links a, .icon-btn, .search-btn, .search-voice, .slider-arrow, .search-card, #search-input, .groups-search, .group-open, .group-favorite, .modal-close',
     refresh() { $$(this.SEL).forEach(e => { if (e.tabIndex < 0) e.tabIndex = 0; }); },
     scope() {
-        if (el.adminEditor && !el.adminEditor.hidden) return el.adminEditor;
-        if (el.adminPanel && !el.adminPanel.hidden) return el.adminPanel;
         if (!el.playerModal.hidden) return el.playerModal;
         if (!el.searchOverlay.hidden) return el.searchOverlay;
         return document;
@@ -2211,9 +1276,7 @@ const TVNav = {
             }
             if (this._isBack(e)) {
                 if (inField) return;
-                if (el.adminEditor && !el.adminEditor.hidden) { e.preventDefault(); AdminPanel.closeEditor(); }
-                else if (el.adminPanel && !el.adminPanel.hidden) { e.preventDefault(); AdminPanel.close(); }
-                else if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
+                if (!el.playerModal.hidden) { e.preventDefault(); Detail.close(); }
                 else if (!el.searchOverlay.hidden) { e.preventDefault(); App.closeSearch(); }
             }
         }, { capture: true });
@@ -2225,26 +1288,6 @@ const TVNav = {
 // devuelve true si manejó la accion; si no, la app hara back/salir.
 window.TVPlus_onBack = function () {
     try {
-        // 1) Overlays del panel "Mi Telegram" (reproductor inline, diálogos)
-        //    — primero los de encima. Cerramos pulsando su botón cerrar.
-        const overlays = [
-            ['tg-player-overlay', '.tg-pl-close'],
-            ['tg-topics-drawer', '#tg-topics-close']
-        ];
-        for (const [id, sel] of overlays) {
-            const o = document.getElementById(id);
-            if (o && !o.hidden && o.offsetParent !== null) {
-                const b = o.querySelector(sel);
-                if (b) { b.click(); return true; }
-                o.hidden = true; return true;
-            }
-        }
-        const synm = document.getElementById('synopsis-tmdb-modal');
-        if (synm && !synm.hidden) { synm.hidden = true; document.body.style.overflow = ''; return true; }
-        const covm = document.getElementById('cover-tmdb-modal');
-        if (covm && !covm.hidden) { covm.hidden = true; document.body.style.overflow = ''; return true; }
-        if (el.adminEditor && !el.adminEditor.hidden) { AdminPanel.closeEditor(); return true; }
-        if (el.adminPanel && !el.adminPanel.hidden) { AdminPanel.close(); return true; }
         if (el.searchOverlay && !el.searchOverlay.hidden) { App.closeSearch(); return true; }
         if (el.playerModal && !el.playerModal.hidden) { Detail.close(); return true; }
     } catch (e) {}
@@ -2434,13 +1477,9 @@ async function boot() {
 
         const me = await api('/api/me').catch(() => ({ loggedIn: false }));
         if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
-        state.isAdmin = !!me.isAdmin;
-        state.userName = me.name || '';
-        Admin.reflect();
-
         let groupList;
         try {
-            groupList = await api('/api/admin/groups');
+            groupList = await api('/api/groups');
         } catch (e) {
             if (!me.inGroup) throw e;
             console.warn('No se pudo listar los grupos; se usará el grupo configurado:', e.message);
@@ -2452,13 +1491,18 @@ async function boot() {
             return;
         }
 
-        // Firebase: sincronizar favoritos y progreso del usuario
+        // Sincronizar en segundo plano para que la nube no bloquee el catálogo.
         CloudStore.init(me.name || 'user');
-        await CloudStore.syncFavs();
-        await CloudStore.syncProgress();
-        await CloudStore.syncWatched();
-        await CloudStore.syncCovers();
-        await CloudStore.syncOverrides();
+        Promise.all([
+            CloudStore.syncFavs(),
+            CloudStore.syncProgress(),
+            CloudStore.syncWatched()
+        ]).then(() => {
+            const activeLink = $('#nav-links a.active');
+            if (state.activeGroup === selectedGroup && activeLink && !activeLink.dataset.cat && !$('#groups-list')) {
+                Netflix.render();
+            }
+        }).catch(e => console.warn('No se pudo sincronizar los datos en la nube:', e.message));
 
         el.loadingText.innerText = 'Cargando catálogo...';
         await loadGroupCatalog(selectedGroup, true);
@@ -2472,7 +1516,7 @@ async function boot() {
 }
 
 function wireUi() {
-    el.adminLock.onclick = () => Admin.logout();
+    el.logoutBtn.onclick = () => Logout.logout();
     $('#btn-send-code').onclick = () => Login.sendCode();
     $('#btn-verify-code').onclick = () => Login.verifyCode();
     $('#btn-verify-password').onclick = () => Login.verifyPassword();
@@ -2492,7 +1536,6 @@ function wireUi() {
     if (el.filterQuality) el.filterQuality.addEventListener('change', () => App.search());
     if (el.filterLang) el.filterLang.addEventListener('change', () => App.search());
     if (el.filterCat) el.filterCat.addEventListener('change', () => App.search());
-    el.adminRefresh.onclick = () => Admin.refresh();
     if (el.groupsTabBtn) el.groupsTabBtn.onclick = openGroupsPage;
     el.navLinks.addEventListener('click', (e) => {
         const a = e.target.closest('a[data-cat]'); if (!a) return;
@@ -2505,26 +1548,10 @@ function wireUi() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (el.adminEditor && !el.adminEditor.hidden) AdminPanel.closeEditor();
-        else if (el.adminPanel && !el.adminPanel.hidden) AdminPanel.close();
-        else if (!el.searchOverlay.hidden) App.closeSearch();
+        if (!el.searchOverlay.hidden) App.closeSearch();
         else if (!el.playerModal.hidden) Detail.close();
     });
     if (el.trailerMute) el.trailerMute.onclick = () => Detail.toggleTrailerSound();
-
-    // ----- Panel de administración -----
-    if (el.adminPanelBtn) el.adminPanelBtn.onclick = () => AdminPanel.open();
-    if (el.adminPanel) {
-        $$('[data-admin-close]', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.close());
-        $$('.admin-tab', el.adminPanel).forEach(b => b.onclick = () => AdminPanel.showTab(b.dataset.tab));
-    }
-    const eClose = $('#admin-editor-close'); if (eClose) eClose.onclick = () => AdminPanel.closeEditor();
-    const eSave = $('#edit-save'); if (eSave) eSave.onclick = () => AdminPanel.save();
-    const eReset = $('#edit-reset'); if (eReset) eReset.onclick = () => AdminPanel.reset();
-    const eHide = $('#edit-hide'); if (eHide) eHide.onclick = () => AdminPanel.toggleHidden();
-    const eOpen = $('#edit-open'); if (eOpen) eOpen.onclick = () => AdminPanel.openItem();
-    const tSearch = $('#tmdb-search'); if (tSearch) tSearch.onclick = () => AdminPanel.tmdbSearch();
-    const tQuery = $('#tmdb-query'); if (tQuery) tQuery.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); AdminPanel.tmdbSearch(); } });
 
     // Atajos de teclado del reproductor (cuando se usa el <video> nativo).
     // Si Artplayer esta activo, el ya gestiona sus atajos (hotkey: true).

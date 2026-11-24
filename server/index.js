@@ -57,11 +57,6 @@ async function withUser(req, res, next) {
         res.status(503).json({ retry: true, error: e.message });
     }
 }
-function adminOnly(req, res, next) {
-    if (!req.user || !req.user.isAdmin) return res.status(403).json({ error: 'Solo para administradores del grupo.' });
-    next();
-}
-
 // ---- caché de miniaturas en disco ----
 const THUMB_DIR = path.join(os.tmpdir(), 'tvp-thumbs');
 try { fs.mkdirSync(THUMB_DIR, { recursive: true }); } catch {}
@@ -90,10 +85,10 @@ app.get('/api/me', (req, res) => {
     // Comprobación ligera (sin contactar a Telegram). Si el token está persistido, confiamos.
     if (sessions.users && sessions.users.has(token)) {
         const u = sessions.users.get(token);
-        return res.json({ loggedIn: true, isAdmin: u.isAdmin, name: u.name, inGroup: !!u.inGroup });
+        return res.json({ loggedIn: true, name: u.name, inGroup: !!u.inGroup });
     }
     if (sessions.persisted && sessions.persisted[token]) {
-        return res.json({ loggedIn: true, isAdmin: false, name: '', inGroup: true, _restoring: true });
+        return res.json({ loggedIn: true, name: '', inGroup: true, _restoring: true });
     }
     res.json({ loggedIn: false });
 });
@@ -116,14 +111,14 @@ app.post('/api/login/sign-in', async (req, res) => {
         const r = await sessions.signIn(req.body.loginId, req.body.code);
         if (r.needPassword) return res.json({ needPassword: true });
         setTokenCookie(res, r.token);
-        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name, token: r.token });
+        res.json({ ok: true, name: r.name, token: r.token });
     } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
 });
 app.post('/api/login/password', async (req, res) => {
     try {
         const r = await sessions.signInPassword(req.body.loginId, String(req.body.password || ''));
         setTokenCookie(res, r.token);
-        res.json({ ok: true, isAdmin: r.isAdmin, name: r.name, token: r.token });
+        res.json({ ok: true, name: r.name, token: r.token });
     } catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
 });
 app.post('/api/logout', async (req, res) => {
@@ -134,7 +129,6 @@ app.post('/api/logout', async (req, res) => {
 
 /* ===================== CATÁLOGO (requiere login) ===================== */
 let catalogCache = null, catalogTime = 0;
-function invalidateCatalog() { catalogCache = null; catalogTime = 0; }
 
 app.get('/api/catalog', withUser, async (req, res) => {
     try {
@@ -145,85 +139,6 @@ app.get('/api/catalog', withUser, async (req, res) => {
         }
         res.json(catalogCache);
     } catch (e) { console.error('catalog', e); res.status(500).json({ error: e.message }); }
-});
-
-// TMDB: recomendaciones por id (para "Porque viste...")
-app.get('/api/tmdb/recommendations/:type/:id', withUser, async (req, res) => {
-    try {
-        const t = req.params.type === 'tv' ? 'tv' : 'movie';
-        const url = `https://api.themoviedb.org/3/${t}/${req.params.id}/recommendations?language=es-ES` + (cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')));
-        const headers = cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
-        const r = await fetch(url, { headers });
-        const d = await r.json();
-        res.json({ results: (d.results || []).slice(0, 12).map(x => ({
-            id: x.id, type: t, title: x.title || x.name,
-            year: ((x.release_date || x.first_air_date || '').match(/^(\d{4})/) || [])[1] || '',
-            poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
-            rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
-        })) });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// TMDB: próximos estrenos (cine en próximos meses)
-app.get('/api/tmdb/upcoming', withUser, async (req, res) => {
-    try {
-        const url = `https://api.themoviedb.org/3/movie/upcoming?language=es-ES&region=ES&page=1` + (cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')));
-        const headers = cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
-        const r = await fetch(url, { headers });
-        const d = await r.json();
-        res.json({ results: (d.results || []).slice(0, 14).map(x => ({
-            id: 'up-' + x.id, type: 'movie', title: x.title,
-            year: ((x.release_date || '').match(/^(\d{4})/) || [])[1] || '',
-            date: x.release_date || '',
-            poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
-            backdrop: x.backdrop_path ? 'https://image.tmdb.org/t/p/w780' + x.backdrop_path : '',
-            description: x.overview || '',
-            rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
-        })) });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-/* ===================== CHAT (solo admin del grupo) ===================== */
-app.get('/api/topics', withUser, adminOnly, async (req, res) => {
-    try {
-        const topics = await req.user.service.getAutoTopics();
-        res.json({ topics: topics.map(t => ({ id: t.id, title: t.name, icon: t.icon })) });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get('/api/chat/:topicId', withUser, adminOnly, async (req, res) => {
-    try {
-        const msgs = await req.user.service.getTopicMessages(req.params.topicId, 60);
-        const out = msgs.map(m => {
-            const doc = m.media && m.media.document;
-            const isVideo = !!(doc && /video/.test(doc.mimeType || ''));
-            const hasThumb = !!(m.media && (m.media.photo || (doc && doc.thumbs && doc.thumbs.length)));
-            return {
-                id: m.id, text: m.message || '', date: m.date, hasMedia: !!m.media, isVideo,
-                thumbUrl: hasThumb ? `/api/thumb/${req.params.topicId}/${m.id}` : '',
-                streamUrl: isVideo ? `/api/stream/${req.params.topicId}/${m.id}` : ''
-            };
-        });
-        res.json({ messages: out });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.post('/api/admin/edit', withUser, adminOnly, async (req, res) => {
-    try { await req.user.service.editMessageText(req.body.msgId, req.body.text || ''); invalidateCatalog(); res.json({ ok: true }); }
-    catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
-});
-app.post('/api/admin/delete', withUser, adminOnly, async (req, res) => {
-    try { await req.user.service.deleteMessage(req.body.msgId); invalidateCatalog(); res.json({ ok: true }); }
-    catch (e) { res.status(500).json({ error: e.errorMessage || e.message }); }
-});
-app.post('/api/admin/refresh', withUser, adminOnly, (req, res) => { invalidateCatalog(); res.json({ ok: true }); });
-
-// Búsqueda manual en TMDB (panel de admin)
-app.get('/api/admin/tmdb/search', withUser, adminOnly, async (req, res) => {
-    try { res.json({ results: await req.user.service.tmdbSearch(String(req.query.q || '').trim(), req.query.type) }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get('/api/admin/tmdb/details/:type/:id', withUser, adminOnly, async (req, res) => {
-    try { res.json({ info: await req.user.service.tmdbDetails(req.params.type, req.params.id) }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 /* ===================== MINIATURAS ===================== */

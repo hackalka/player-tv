@@ -65,15 +65,6 @@
             throw new Error('Grupo no accesible para tu cuenta. Comprueba el groupId en tg-config.js o que estás suscrito al grupo.');
         }
 
-        async isGroupAdmin() {
-            try {
-                const entity = await this.resolveGroup();
-                const p = await this.client.invoke(new Api.channels.GetParticipant({ channel: entity, participant: 'me' }));
-                const cn = p && p.participant && p.participant.className;
-                return cn === 'ChannelParticipantCreator' || cn === 'ChannelParticipantAdmin';
-            } catch (e) { return false; }
-        }
-
         _cache(messages) { for (const m of messages) if (m && m.id != null) this._msgCache.set(m.id, m); }
 
         async getMessageById(id) {
@@ -209,7 +200,7 @@
 
         buildItem(message, topic) {
             const rawText = message.message || '';
-            // Metadatos embebidos por el admin desde la web: linea "#tvplus:{...}"
+            // Metadatos de la ficha publicados en el mensaje: linea "#tvplus:{...}"
             let embed = {};
             const emb = rawText.match(/#tvplus:(\{[\s\S]*?\})\s*$/im);
             if (emb) { try { embed = JSON.parse(emb[1]) || {}; } catch (e) { embed = {}; } }
@@ -218,6 +209,7 @@
             const allLines = text.split('\n').map(s => s.trim());
             const clean = s => (s || '').replace(/#[\wÀ-ÿ]+/g, '').replace(/https?:\/\/\S+/g, '').replace(/acestream:\/\/\S+/ig, '').replace(/tvgram:\/\/\S+/ig, '').trim();
             const isUrl = l => /^(acestream:\/\/|https?:\/\/|magnet:|tvgram:\/\/)/i.test(l);
+            const isLocalVideoRef = l => /^url\s*=\s*\d+$/i.test(l);
 
             const firstIdx = allLines.findIndex(l => l);
             let title = clean(allLines[firstIdx] || '') || topic.name;
@@ -228,9 +220,23 @@
             for (let i = firstIdx + 1; i < allLines.length; i++) {
                 const line = allLines[i];
                 if (!line) continue;
+                const localVideo = line.match(/^url\s*=\s*(\d+)\s*$/i);
+                const localVideoId = localVideo ? Number(localVideo[1]) : 0;
+                if (Number.isSafeInteger(localVideoId) && localVideoId > 0) {
+                    links.push({
+                        label: pendingLabel || 'Vídeo Telegram',
+                        url: line, kind: 'tg-local', msgId: localVideoId, topicId: topic.id
+                    });
+                    pendingLabel = '';
+                    continue;
+                }
                 if (isUrl(line)) {
                     let kind = /^acestream:/i.test(line) ? 'ace' : (/^tvgram:/i.test(line) ? 'tvgram' : 'http');
-                    const link = { label: (pendingLabel || ('Enlace ' + (links.length + 1))).replace(/[:：]\s*$/, '').trim(), url: line, kind };
+                    const metadataSource = this._metadataProvider(line);
+                    const link = {
+                        label: (pendingLabel || (metadataSource ? metadataSource.label : ('Enlace ' + (links.length + 1)))).replace(/[:：]\s*$/, '').trim(),
+                        url: line, kind, metadataSource, metadataOnly: !!metadataSource
+                    };
                     const tme = this._parseTme(line);
                     if (tme) { link.kind = 'tg'; link.channel = tme.channel; link.msgId = tme.msgId; }
                     links.push(link);
@@ -240,7 +246,9 @@
                     if (j < allLines.length && isUrl(allLines[j])) pendingLabel = line;
                 }
             }
-            links.forEach(l => Object.assign(l, this._linkPlayable(l)));
+            links.forEach(l => {
+                if (!l.metadataOnly) Object.assign(l, this._linkPlayable(l));
+            });
 
             const meta = {};
             const mg = text.match(/g[eé]neros?\s*:\s*([^\n]+)/i); if (mg) meta.genres = mg[1].trim();
@@ -257,9 +265,9 @@
                 if (after && after.trim()) parts.push(after.trim());
                 for (let i = sinIdx + 1; i < allLines.length; i++) {
                     const line = allLines[i]; if (!line) continue;
-                    if (isUrl(line)) break;
+                    if (isUrl(line) || isLocalVideoRef(line)) break;
                     let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
-                    if (j < allLines.length && isUrl(allLines[j])) break;
+                    if (j < allLines.length && (isUrl(allLines[j]) || isLocalVideoRef(allLines[j]))) break;
                     if (/^[]|g[eé]neros|temporadas|episodios|puntuaci|estreno/i.test(line)) continue;
                     parts.push(line);
                 }
@@ -268,9 +276,9 @@
             if (!description) {
                 const parts = [];
                 for (let i = firstIdx + 1; i < allLines.length; i++) {
-                    const line = allLines[i]; if (!line || isUrl(line)) continue;
+                    const line = allLines[i]; if (!line || isUrl(line) || isLocalVideoRef(line)) continue;
                     let j = i + 1; while (j < allLines.length && !allLines[j]) j++;
-                    if (j < allLines.length && isUrl(allLines[j])) continue;
+                    if (j < allLines.length && (isUrl(allLines[j]) || isLocalVideoRef(allLines[j]))) continue;
                     if (/^[]|g[eé]neros|temporadas|episodios|puntuaci|estreno|sinopsis|en emisi/i.test(line)) continue;
                     parts.push(line);
                 }
@@ -294,20 +302,21 @@
 
             const firstAce = links.find(l => l.kind === 'ace');
             const firstTvgram = links.find(l => l.kind === 'tvgram');
-            const firstHttp = links.find(l => l.kind === 'http' || l.kind === 'tg');
+            const firstHttp = links.find(l => !l.metadataOnly && (l.kind === 'http' || l.kind === 'tg'));
 
             const item = {
                 id: message.id,
                 topicId: topic.id,
                 uid: doc && doc.id ? String(doc.id) : '',
                 title, description, year, meta,
+                metadataLinks: links.filter(l => l.metadataSource),
                 date: Number(message.date) || 0,
                 duration: isVideo ? this._duration(doc) : '',
                 size: doc ? this._bytes(doc.size) : '',
                 isVideo,
                 ext: (ext || '').toLowerCase(),
                 playableInBrowser,
-                links,
+                links: links.filter(l => !l.metadataOnly),
                 aceUrl: firstAce ? firstAce.url : '',
                 tvgramUrl: firstTvgram ? firstTvgram.url : '',
                 externalUrl: firstHttp ? firstHttp.url : '',
@@ -323,14 +332,9 @@
                 if (embed.year) item.year = String(embed.year);
                 if (embed.cover) item.cover = embed.cover;       // poster (URL)
                 if (embed.backdrop) item.backdrop = embed.backdrop;
-                if (embed.logo) item.tmdbLogo = embed.logo;
                 if (embed.trailer) item.trailer = embed.trailer;
                 if (embed.rating) item.meta = Object.assign({}, item.meta, { rating: String(embed.rating) });
                 if (embed.genres) item.meta = Object.assign({}, item.meta, { genres: embed.genres });
-                if (embed.tmdb) {
-                    const tp = String(embed.tmdb).split('/');
-                    item.tmdbType = tp[0] || ''; item.tmdbId = tp[1] || tp[0] || '';
-                }
                 // Enlace de vídeo embebido "dentro de la carátula"
                 if (embed.video) {
                     const v = String(embed.video);
@@ -353,6 +357,17 @@
             return item;
         }
 
+        _metadataProvider(rawUrl) {
+            let url;
+            try { url = new URL(rawUrl); } catch (e) { return null; }
+            if (url.protocol !== 'https:') return null;
+            const host = url.hostname.toLowerCase().replace(/^(?:www|m)\./, '');
+            if (host === 'filmaffinity.com' && /^\/[a-z]{2}\/film\d+\.html$/i.test(url.pathname)) {
+                return { kind: 'filmaffinity', label: 'FilmAffinity' };
+            }
+            return null;
+        }
+
         _parseTme(url) {
             let m = url.match(/t\.me\/c\/(\d+)\/(?:\d+\/)?(\d+)/i);
             if (m) return { channel: '-100' + m[1], msgId: Number(m[2]) };
@@ -362,6 +377,12 @@
         }
 
         _linkPlayable(link) {
+            if (link.kind === 'tg-local') return {
+                streamUrl: `tgstream/${link.topicId}/${link.msgId}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}`,
+                externalUrl: '',
+                thumbUrl: `tgthumb/${link.topicId}/${link.msgId}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}`,
+                playableInBrowser: true
+            };
             if (link.kind === 'tg') return {
                 streamUrl: `tgstreamlink/${encodeURIComponent(link.channel)}/${link.msgId}?group=${encodeURIComponent(String(this.cfg.groupId || ''))}`,
                 externalUrl: link.url,
@@ -377,6 +398,7 @@
 
         _movieKey(title) {
             let t = String(title || '').toLowerCase();
+            t = t.replace(/^\s*\d{2,}\s*[-_.:]\s*/, ' ');
             t = t.replace(/\b(2160p|1080p|720p|480p|4k|uhd|fhd|hdr|hd|bluray|brrip|bdrip|webrip|web-?dl|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|latino|castellano|espa[ñn]ol|spanish|english|vose|vos|sub(?:s|titulad[oa])?)\b/ig, ' ');
             t = t.replace(/[\[\(].*?[\]\)]/g, ' ');
             t = t.replace(/\b(19|20)\d{2}\b/g, ' ');
@@ -399,6 +421,7 @@
                     externalUrl: l.externalUrl || '',
                     aceUrl: l.kind === 'ace' ? l.url : (l.aceUrl || ''),
                     tvgramUrl: l.kind === 'tvgram' ? l.url : (l.tvgramUrl || ''),
+                    telegramMessageId: l.kind === 'tg-local' ? String(l.msgId) : undefined,
                     thumbUrl: l.thumbUrl || it.thumbUrl || '',
                     ext: l.ext || '',
                     playableInBrowser: l.playableInBrowser === true
@@ -447,212 +470,19 @@
                     const msgs = await this.getTopicMessages(topic.id, perTopic);
                     items = this._buildTopicItems(msgs, topic);
                 } catch (e) { console.warn(`Tema ${topic.name} fallo:`, e.message); }
-                if ((this.cfg.tmdbKey || this.cfg.tmdbToken) && typeof fetch === 'function' && (topic.type === 'movie' || topic.type === 'series')) {
-                    const isTv = topic.type === 'series';
-                    await Promise.all(items.map(it => this.tmdbEnrich(it, isTv).catch(() => {})));
-                }
                 categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
             }
+            const linkedVideoIds = new Set();
+            categories.forEach(category => category.items.forEach(item => {
+                (item.links || []).forEach(link => {
+                    const id = link.telegramMessageId || (link.kind === 'tg-local' ? link.msgId : '');
+                    if (id) linkedVideoIds.add(String(id));
+                });
+            }));
+            categories.forEach(category => {
+                category.items = category.items.filter(item => !linkedVideoIds.has(String(item.id)));
+            });
             return { categories, partial: !!opts.limit };
-        }
-
-        _tmdbHeaders() {
-            return this.cfg.tmdbToken ? { 'Authorization': 'Bearer ' + this.cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' };
-        }
-        _tmdbAuthQuery() { return this.cfg.tmdbToken ? '' : ('&api_key=' + (this.cfg.tmdbKey || '')); }
-
-        async _tmdbGenres() {
-            if (this._genres) return this._genres;
-            this._genres = {};
-            try {
-                for (const t of ['movie', 'tv']) {
-                    const r = await fetch(`https://api.themoviedb.org/3/genre/${t}/list?language=es-ES${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
-                    const d = await r.json();
-                    (d.genres || []).forEach(g => { this._genres[g.id] = g.name; });
-                }
-            } catch {}
-            return this._genres;
-        }
-
-        async tmdbEnrich(item, isTv) {
-            if (typeof fetch !== 'function' || !item.title) return;
-            if (!this.cfg.tmdbKey && !this.cfg.tmdbToken) return;
-            if (!this._tmdbCache) this._tmdbCache = new Map();
-            const ck = (isTv ? 'tv' : 'movie') + ':' + item.title.toLowerCase() + ':' + (item.year || '');
-            let info = this._tmdbCache.get(ck);
-            if (info === undefined) {
-                info = null;
-                try {
-                    const gmap = await this._tmdbGenres();
-                    const type = isTv ? 'tv' : 'movie';
-                    const cleanTitle = String(item.title)
-                        .replace(/\b(1080p|720p|480p|2160p|4k|hd|hdr|bluray|brrip|webrip|dvdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|latino|castellano|espa[ñn]ol|spanish|english|sub|subs|temporada\s*\d+|t\d+|s\d+|cap[ií]tulo\s*\d+|cap\s*\d+|ep\.?\s*\d+|episodio\s*\d+)\b/ig, ' ')
-                        .replace(/[\[\(].*?[\]\)]/g, ' ')
-                        .replace(/[._-]+/g, ' ')
-                        .replace(/\s{2,}/g, ' ').trim();
-                    const attempts = [];
-                    if (item.year) attempts.push({ q: item.title, lang: 'es-ES', year: item.year });
-                    if (item.year) attempts.push({ q: item.title, lang: 'en-US', year: item.year });
-                    attempts.push({ q: item.title, lang: 'es-ES' });
-                    attempts.push({ q: item.title, lang: 'en-US' });
-                    if (cleanTitle && cleanTitle !== item.title) {
-                        attempts.push({ q: cleanTitle, lang: 'es-ES' });
-                        attempts.push({ q: cleanTitle, lang: 'en-US' });
-                    }
-                    let hit = null;
-                    for (const a of attempts) {
-                        const url = `https://api.themoviedb.org/3/search/${type}?language=${a.lang}&include_adult=false&query=${encodeURIComponent(a.q)}` + (a.year ? `&year=${a.year}` : '') + this._tmdbAuthQuery();
-                        try {
-                            const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 5000);
-                            const r = await fetch(url, { signal: ctrl.signal, headers: this._tmdbHeaders() }); clearTimeout(tm);
-                            const d = await r.json();
-                            if (d.results && d.results.length) { hit = d.results[0]; break; }
-                        } catch {}
-                    }
-                    if (hit) {
-                        let det = hit; let trailerKey = ''; let logoUrl = '';
-                        try {
-                            const r2 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}?language=es-ES&append_to_response=videos,images&include_image_language=es,en,null${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
-                            const d2 = await r2.json(); if (d2 && d2.id) det = d2;
-                            const pickTrailer = (videos) => {
-                                if (!videos || !videos.results) return '';
-                                const r = videos.results;
-                                const t = r.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
-                                         r.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
-                                         r.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
-                                         r.find(v => v.site === 'YouTube');
-                                return t ? t.key : '';
-                            };
-                            trailerKey = pickTrailer(det.videos);
-                            if (!trailerKey) {
-                                try {
-                                    const r3 = await fetch(`https://api.themoviedb.org/3/${type}/${hit.id}/videos?language=en-US${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
-                                    const d3 = await r3.json();
-                                    trailerKey = pickTrailer(d3);
-                                } catch {}
-                            }
-                            if (det.images && det.images.logos && det.images.logos.length) {
-                                const order = ['es', 'en', null];
-                                for (const lang of order) {
-                                    const found = det.images.logos.find(l => l.iso_639_1 === lang);
-                                    if (found) { logoUrl = 'https://image.tmdb.org/t/p/w500' + found.file_path; break; }
-                                }
-                                if (!logoUrl) logoUrl = 'https://image.tmdb.org/t/p/w500' + det.images.logos[0].file_path;
-                            }
-                        } catch {}
-                        const date = det.release_date || det.first_air_date || hit.release_date || hit.first_air_date || '';
-                        info = {
-                            tmdbId: det.id || hit.id,
-                            type,
-                            overview: det.overview || hit.overview || '',
-                            year: (String(date).match(/^(\d{4})/) || [])[1] || '',
-                            rating: (det.vote_average || hit.vote_average) ? String(Math.round((det.vote_average || hit.vote_average) * 10) / 10) : '',
-                            genres: ((det.genres && det.genres.map(g => g.name)) || (hit.genre_ids || []).map(id => gmap[id])).filter(Boolean).join(', '),
-                            poster: (det.poster_path || hit.poster_path) ? ('https://image.tmdb.org/t/p/w500' + (det.poster_path || hit.poster_path)) : '',
-                            backdrop: (det.backdrop_path || hit.backdrop_path) ? ('https://image.tmdb.org/t/p/w1280' + (det.backdrop_path || hit.backdrop_path)) : '',
-                            trailerKey,
-                            logo: logoUrl,
-                            runtime: det.runtime || (det.episode_run_time && det.episode_run_time[0]) || 0,
-                            budget: det.budget || 0,
-                            revenue: det.revenue || 0
-                        };
-                    }
-                } catch {}
-                this._tmdbCache.set(ck, info);
-            }
-            if (!info) return;
-            if (info.overview) item.description = info.overview;
-            if (info.year) item.year = info.year;
-            item.meta = item.meta || {};
-            if (info.rating) item.meta.rating = info.rating;
-            if (info.genres) item.meta.genres = info.genres;
-            if (info.poster) { item.thumbUrl = info.poster; item.tmdbPoster = info.poster; }
-            if (info.backdrop) item.backdropUrl = info.backdrop;
-            if (info.trailerKey) item.trailerKey = info.trailerKey;
-            if (info.tmdbId) { item.tmdbId = info.tmdbId; item.tmdbType = info.type; }
-            if (info.logo) item.tmdbLogo = info.logo;
-            if (info.runtime) item.tmdbRuntime = info.runtime;
-            if (info.budget) item.tmdbBudget = info.budget;
-            if (info.revenue) item.tmdbRevenue = info.revenue;
-        }
-
-        async tmdbSearch(query, type) {
-            if ((!this.cfg.tmdbKey && !this.cfg.tmdbToken) || typeof fetch !== 'function' || !query) return [];
-            const gmap = await this._tmdbGenres();
-            const types = type === 'tv' ? ['tv'] : type === 'movie' ? ['movie'] : ['movie', 'tv'];
-            const out = [];
-            for (const t of types) {
-                const url = `https://api.themoviedb.org/3/search/${t}?language=es-ES&include_adult=false&query=${encodeURIComponent(query)}${this._tmdbAuthQuery()}`;
-                try {
-                    const r = await fetch(url, { headers: this._tmdbHeaders() });
-                    const d = await r.json();
-                    (d.results || []).slice(0, 12).forEach(x => {
-                        const date = x.release_date || x.first_air_date || '';
-                        out.push({
-                            id: x.id, type: t,
-                            title: x.title || x.name || '',
-                            year: (String(date).match(/^(\d{4})/) || [])[1] || '',
-                            overview: x.overview || '',
-                            poster: x.poster_path ? ('https://image.tmdb.org/t/p/w300' + x.poster_path) : '',
-                            backdrop: x.backdrop_path ? ('https://image.tmdb.org/t/p/w780' + x.backdrop_path) : '',
-                            rating: x.vote_average ? String(Math.round(x.vote_average * 10) / 10) : '',
-                            genres: (x.genre_ids || []).map(id => gmap[id]).filter(Boolean).join(', '),
-                            popularity: x.popularity || 0
-                        });
-                    });
-                } catch {}
-            }
-            out.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-            return out.slice(0, 16);
-        }
-
-        async tmdbDetails(type, id) {
-            if ((!this.cfg.tmdbKey && !this.cfg.tmdbToken) || typeof fetch !== 'function') return null;
-            type = type === 'tv' ? 'tv' : 'movie';
-            let det = null;
-            try {
-                const r = await fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-ES&append_to_response=videos,images&include_image_language=es,en,null${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
-                det = await r.json();
-            } catch {}
-            if (!det || !det.id) return null;
-            const pickTrailer = (videos) => {
-                if (!videos || !videos.results) return '';
-                const r = videos.results;
-                const t = r.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
-                         r.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
-                         r.find(v => v.site === 'YouTube' && v.type === 'Teaser') ||
-                         r.find(v => v.site === 'YouTube');
-                return t ? t.key : '';
-            };
-            let trailerKey = pickTrailer(det.videos);
-            if (!trailerKey) {
-                try {
-                    const r3 = await fetch(`https://api.themoviedb.org/3/${type}/${id}/videos?language=en-US${this._tmdbAuthQuery()}`, { headers: this._tmdbHeaders() });
-                    trailerKey = pickTrailer(await r3.json());
-                } catch {}
-            }
-            let logoUrl = '';
-            if (det.images && det.images.logos && det.images.logos.length) {
-                for (const lang of ['es', 'en', null]) {
-                    const found = det.images.logos.find(l => l.iso_639_1 === lang);
-                    if (found) { logoUrl = 'https://image.tmdb.org/t/p/w500' + found.file_path; break; }
-                }
-                if (!logoUrl) logoUrl = 'https://image.tmdb.org/t/p/w500' + det.images.logos[0].file_path;
-            }
-            const date = det.release_date || det.first_air_date || '';
-            return {
-                tmdbId: det.id, type,
-                title: det.title || det.name || '',
-                overview: det.overview || '',
-                year: (String(date).match(/^(\d{4})/) || [])[1] || '',
-                rating: det.vote_average ? String(Math.round(det.vote_average * 10) / 10) : '',
-                genres: (det.genres || []).map(g => g.name).filter(Boolean).join(', '),
-                poster: det.poster_path ? ('https://image.tmdb.org/t/p/w500' + det.poster_path) : '',
-                backdrop: det.backdrop_path ? ('https://image.tmdb.org/t/p/w1280' + det.backdrop_path) : '',
-                trailerKey, logo: logoUrl,
-                runtime: det.runtime || (det.episode_run_time && det.episode_run_time[0]) || 0,
-                budget: det.budget || 0, revenue: det.revenue || 0
-            };
         }
 
         _buildTopicItems(msgs, topic) {
@@ -667,6 +497,25 @@
                     return false;
                 })
                 .map(m => this.buildItem(m, topic));
+
+            const videosById = new Map();
+            const videosByCode = new Map();
+            raw.forEach(item => {
+                if (!item.isVideo) return;
+                videosById.set(String(item.id), item);
+                const code = String(item.title || '').match(/^\s*(\d+)\s*[-_.:]\s*/);
+                if (code) videosByCode.set(String(Number(code[1])), item);
+            });
+            raw.forEach(item => {
+                (item.links || []).forEach(link => {
+                    if (link.kind !== 'tg-local') return;
+                    const target = videosById.get(String(link.msgId)) || videosByCode.get(String(link.msgId));
+                    if (!target) return;
+                    link.msgId = target.id;
+                    link.topicId = target.topicId;
+                    Object.assign(link, this._linkPlayable(link));
+                });
+            });
 
             const seriesHint = (it) => /\btemporada\s*\d+|\bs\d{1,2}\s*e\d{1,3}\b|\b\d{1,2}\s*x\s*\d{1,3}\b|cap[ií]tulo|episodio|\bt\s*[-_.]?\s*\d{1,2}\b/i.test(it.title || '');
             const promoteToSeries = topic.type !== 'series' && raw.some(seriesHint);
@@ -683,7 +532,7 @@
                 const out = [];
                 for (const key of order) {
                     const items = groups.get(key);
-                    const base = items.find(x => x.hasThumb) || items[0];
+                    const base = items.find(x => !x.isVideo && x.hasThumb) || items.find(x => x.hasThumb) || items[0];
                     const sources = [];
                     const seenSig = new Set();
                     const seenUid = new Set();
@@ -867,43 +716,7 @@
             });
         }
 
-        // Escribe en el mensaje del grupo, de forma VISIBLE y limpia (sin enlaces,
-        // sin nada oculto): pone el título correcto y la sinopsis como texto. Así
-        // todos los usuarios ven la sinopsis (va en el propio mensaje) y la
-        // carátula sale sola por la auto-búsqueda de TMDB con ese título.
-        async embedMeta(msgId, patch) {
-            const id = Number(msgId);
-            const msg = await this.getMessageById(id);
-            const cur = (msg && msg.message) || '';
-            patch = patch || {};
-            // Limpiar: metadatos antiguos (#tvplus) y bloque de sinopsis previo (📖)
-            let lines = cur.replace(/\n?#tvplus:\{[\s\S]*?\}\s*$/im, '').split('\n');
-            const synIdx = lines.findIndex(l => /^\s*📖/.test(l));
-            if (synIdx >= 0) lines = lines.slice(0, synIdx);
-            // Quitar líneas que sean solo una URL (no queremos enlaces visibles)
-            const urlLineRe = /^\s*(https?:\/\/|tvgram:\/\/|acestream:\/\/|magnet:)\S+\s*$/i;
-            lines = lines.filter(l => !urlLineRe.test(l));
-            // Cambiar el título (primera línea con texto) si se indica
-            if (patch.title) {
-                const i = lines.findIndex(l => l.trim() !== '');
-                if (i >= 0) lines[i] = patch.title; else lines = [String(patch.title)];
-            }
-            let body = lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
-            const desc = (patch.desc || '').trim();
-            let newText = body;
-            if (desc) newText = (body ? body + '\n\n' : '') + '📖 ' + desc;
-            if (!newText.trim()) return { ok: true, skipped: true };
-            const entity = await this.resolveGroup();
-            await this.client.editMessage(entity, { message: id, text: newText, linkPreview: false });
-            this._msgCache.delete(id);
-            return { ok: true };
-        }
-        // ================== HERRAMIENTAS DE ADMIN GENERICO ==================
-        // (cualquier grupo donde el usuario tenga permisos, no solo el del config)
-
-        // Lista TODOS los dialogos del usuario (privados, grupos, canales, bots),
-        // ya categorizados al estilo Telegram. Para cada uno calcula el rol
-        // (admin/dueno) y datos para mostrar avatar.
+        // Lista los diálogos de Telegram disponibles para seleccionar un catálogo.
         async getMisGrupos() {
             const out = [];
             try {
@@ -924,7 +737,6 @@
                             if (ent.broadcast) { isChannel = true; category = 'channels'; }
                             else { isGroup = true; category = 'groups'; }
                         }
-                        const isAdmin = !!(ent.creator || (ent.adminRights && Object.values(ent.adminRights).some(v => v === true)));
                         // peerId: -100<id> para canales/supergrupos, -<id> para chat clasico, <id> para usuario
                         let peerId = String(ent.id);
                         if (cn === 'Channel' || cn === 'ChannelForbidden') peerId = '-100' + String(ent.id);
@@ -940,7 +752,6 @@
                             category,
                             isChannel, isGroup, isBot, isPrivate, isForum,
                             isMega: !!ent.megagroup,
-                            isAdmin, isCreator: !!ent.creator,
                             verified: !!ent.verified,
                             premium: !!ent.premium,
                             scam: !!ent.scam,
@@ -954,8 +765,7 @@
                     } catch (e) { /* saltar */ }
                 }
             } catch (e) { console.warn('[tg] getMisGrupos fallo:', e.message); }
-            // Orden: admin primero, luego no leidos, luego alfabetico
-            out.sort((a, b) => (b.isAdmin - a.isAdmin) || (b.unread - a.unread) || a.title.localeCompare(b.title));
+            out.sort((a, b) => (b.unread - a.unread) || a.title.localeCompare(b.title));
             return out;
         }
 

@@ -10,7 +10,7 @@ const { SessionStore } = require('./store');
 /**
  * Gestiona una sesión de Telegram POR usuario.
  *  - logins:  flujos de login en curso (loginId -> cliente temporal)
- *  - users:   sesiones activas (token -> { service, client, isAdmin, name })
+ * - users: sesiones activas (token -> { service, client, name })
  *  - persist: token -> cadena de sesión, guardado en disco para sobrevivir reinicios
  */
 class SessionManager {
@@ -92,14 +92,13 @@ class SessionManager {
         const session = l.client.session.save();
         const token = crypto.randomBytes(24).toString('hex');
         const service = new TelegramService(l.client, this.cfg);
-        let isAdmin = false, name = '', inGroup = false;
+        let name = '', inGroup = false;
         try { await service.resolveGroup(); inGroup = true; } catch {}
-        try { isAdmin = await service.isGroupAdmin(); } catch {}
         try { const me = await l.client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
-        this.users.set(token, { service, client: l.client, isAdmin, name, inGroup, lastUsed: Date.now() });
+        this.users.set(token, { service, client: l.client, name, inGroup, lastUsed: Date.now() });
         this.persisted[token] = session; this._save();
         this.logins.delete(loginId);
-        return { token, isAdmin, name };
+        return { token, name };
     }
 
     async getByToken(token) {
@@ -122,11 +121,10 @@ class SessionManager {
             return null;
         }
         const service = new TelegramService(client, this.cfg);
-        let isAdmin = false, name = '', inGroup = false;
+        let name = '', inGroup = false;
         try { await service.resolveGroup(); inGroup = true; } catch (e) { console.warn('[sessions] resolveGroup falló:', e.message); }
-        try { isAdmin = await service.isGroupAdmin(); } catch {}
         try { const me = await client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch (e) { console.warn('[sessions] getMe falló:', e.message); }
-        const u = { service, client, isAdmin, name, inGroup, lastUsed: Date.now() };
+        const u = { service, client, name, inGroup, lastUsed: Date.now() };
         this.users.set(token, u);
         return u;
     }

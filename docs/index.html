@@ -31,16 +31,10 @@
             <ul class="nav-links" id="nav-links"></ul>
         </div>
         <div class="navbar-right">
-            <button class="icon-btn" id="admin-panel-btn" aria-label="Panel de administración" hidden>
-                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
-            </button>
-            <button class="icon-btn" id="admin-refresh" aria-label="Actualizar catálogo" hidden>
-                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M17.65 6.35A8 8 0 1 0 19.73 14h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-            </button>
             <button class="icon-btn groups-tab-btn" id="groups-tab-btn" aria-label="Grupos" title="Grupos" hidden>
                 <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16 11a3 3 0 1 0-2.83-4H16v4zM8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.67 0-8 1.34-8 4v2h12v-2c0-1.08.45-2.02 1.2-2.77A16.2 16.2 0 0 0 8 13zm8 .02c-.31 0-.65.02-1 .05 1.21.88 2 2.13 2 3.93v2h7v-2c0-2.66-5.33-3.98-8-3.98z"/></svg>
             </button>
-            <button class="icon-btn" id="admin-lock" aria-label="Administración">
+            <button class="icon-btn" id="logout-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
                 <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm3 8H9V6a3 3 0 0 1 6 0v3z"/></svg>
             </button>
             <button class="search-btn" aria-label="Buscar">
@@ -113,19 +107,6 @@
                     </div>
                 </div>
                 <div class="player-status" id="player-status" hidden></div>
-                <!-- Menu admin flotante (solo dueño): cambiar carátula/enlace, buscar TMDB -->
-                <div class="admin-fab" id="admin-fab" hidden>
-                    <button class="admin-fab-btn focusable" id="admin-fab-toggle" aria-label="Opciones de admin" title="Opciones de admin">
-                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                    </button>
-                    <div class="admin-fab-menu" id="admin-fab-menu" hidden>
-                        <button class="admin-fab-item focusable" id="cover-tmdb-btn">🔍 Buscar carátula + sinopsis (TMDB)</button>
-                        <button class="admin-fab-item focusable" id="title-btn">✏ Cambiar título</button>
-                        <button class="admin-fab-item focusable" id="synopsis-btn">📝 Cambiar sinopsis (manual)</button>
-                        <button class="admin-fab-item focusable" id="cover-btn">🖼 Cambiar carátula (URL)</button>
-                        <button class="admin-fab-item focusable" id="video-link-btn">🔗 Cambiar enlace del vídeo</button>
-                    </div>
-                </div>
             </div>
             <div class="modal-details">
                 <div class="detail-body">
@@ -138,7 +119,6 @@
                             <span class="quality">HD</span>
                         </div>
                         <div class="detail-genres" id="detail-genres"></div>
-                        <div class="detail-financials" id="detail-financials" hidden></div>
                         <p class="modal-description" id="modal-description"></p>
                     </div>
                 </div>
@@ -150,10 +130,6 @@
                 <div class="episodes" id="episode-list" hidden>
                     <h3 class="episodes-title">Episodios</h3>
                     <div class="episodes-track" id="episodes-track"></div>
-                </div>
-                <div class="reco" id="reco-row" hidden>
-                    <h3 class="reco-title">Títulos similares</h3>
-                    <div class="reco-track" id="reco-track"></div>
                 </div>
             </div>
         </div>
@@ -181,48 +157,6 @@
     </div>
 
     <!-- ===== LOGIN POR USUARIO ===== -->
-    <!-- Modal: buscar carátula en TMDB -->
-    <div class="modal" id="cover-tmdb-modal" hidden>
-        <div class="modal-overlay" data-cover-close></div>
-        <div class="modal-content cover-tmdb-card">
-            <button class="modal-close" data-cover-close aria-label="Cerrar">
-                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            </button>
-            <h2 class="modal-title">🔍 Buscar carátula en TMDB</h2>
-            <div class="cover-search-row">
-                <input id="cover-q" class="admin-input" type="text" placeholder="Título a buscar...">
-                <select id="cover-type" class="admin-input cover-type-sel">
-                    <option value="">Auto</option>
-                    <option value="movie">Película</option>
-                    <option value="tv">Serie</option>
-                </select>
-                <button class="btn btn-play" id="cover-search-go">Buscar</button>
-            </div>
-            <div class="cover-results" id="cover-results"></div>
-        </div>
-    </div>
-
-    <!-- Modal: buscar sinopsis en TMDB -->
-    <div class="modal" id="synopsis-tmdb-modal" hidden>
-        <div class="modal-overlay" data-syn-close></div>
-        <div class="modal-content cover-tmdb-card">
-            <button class="modal-close" data-syn-close aria-label="Cerrar">
-                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            </button>
-            <h2 class="modal-title">🔎 Buscar sinopsis en TMDB</h2>
-            <div class="cover-search-row">
-                <input id="syn-q" class="admin-input" type="text" placeholder="Título a buscar...">
-                <select id="syn-type" class="admin-input cover-type-sel">
-                    <option value="">Auto</option>
-                    <option value="movie">Película</option>
-                    <option value="tv">Serie</option>
-                </select>
-                <button class="btn btn-play" id="syn-search-go">Buscar</button>
-            </div>
-            <div class="cover-results syn-results" id="syn-results"></div>
-        </div>
-    </div>
-
     <div class="modal" id="login-modal" hidden>
         <div class="modal-overlay"></div>
         <div class="modal-content login-box">
@@ -256,74 +190,6 @@
         </div>
     </div>
 
-    <!-- ===== PANEL DE ADMINISTRACIÓN ===== -->
-    <div class="modal admin-modal" id="admin-panel" hidden>
-        <div class="modal-overlay" data-admin-close></div>
-        <div class="admin-card">
-            <header class="admin-header">
-                <h2 class="admin-title">Panel de administración</h2>
-                <button class="modal-close admin-close-btn" data-admin-close aria-label="Cerrar">
-                    <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                </button>
-            </header>
-            <nav class="admin-tabs">
-                <button class="admin-tab active focusable" data-tab="overview" tabindex="0">📊 Resumen</button>
-                <button class="admin-tab focusable" data-tab="audit" tabindex="0">🔍 Auditoría</button>
-                <button class="admin-tab focusable" data-tab="tools" tabindex="0">🛠 Herramientas</button>
-            </nav>
-            <div class="admin-body">
-                <section class="admin-pane" data-pane="overview">
-                    <div class="admin-stats" id="admin-stats"></div>
-                </section>
-                <section class="admin-pane" data-pane="audit" hidden>
-                    <div class="admin-filters" id="admin-filters"></div>
-                    <div class="admin-list" id="admin-list"></div>
-                </section>
-                <section class="admin-pane" data-pane="tools" hidden>
-                    <div class="admin-tools" id="admin-tools"></div>
-                </section>
-            </div>
-        </div>
-        <!-- Editor de ficha (sobre el panel) -->
-        <div class="admin-editor" id="admin-editor" hidden>
-            <div class="admin-editor-card">
-                <header class="admin-editor-head">
-                    <h3 id="admin-editor-title">Editar ficha</h3>
-                    <button class="modal-close" id="admin-editor-close" aria-label="Cerrar">
-                        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                    </button>
-                </header>
-                <div class="admin-editor-body">
-                    <div class="tmdb-search-box">
-                        <div class="tmdb-search-row">
-                            <input id="tmdb-query" class="admin-input" type="text" placeholder="Nombre a buscar en TMDB">
-                            <select id="tmdb-type" class="admin-input tmdb-type-sel">
-                                <option value="">Auto</option>
-                                <option value="movie">Película</option>
-                                <option value="tv">Serie</option>
-                            </select>
-                            <button class="btn btn-play tmdb-search-btn" id="tmdb-search">🔎 Buscar en TMDB</button>
-                        </div>
-                        <div class="tmdb-results" id="tmdb-results"></div>
-                    </div>
-                    <label class="admin-field"><span>Título</span><input id="edit-title" class="admin-input" type="text"></label>
-                    <label class="admin-field"><span>Sinopsis</span><textarea id="edit-desc" class="admin-input" rows="4"></textarea></label>
-                    <label class="admin-field"><span>Carátula (URL del póster)</span><input id="edit-cover" class="admin-input" type="url" placeholder="https://..."></label>
-                    <label class="admin-field"><span>Enlace del vídeo (URL directa, t.me/c/.../msgId, acestream://, magnet:...)</span><input id="edit-video" class="admin-input" type="text" placeholder="https://... · acestream://... · t.me/c/.../123"></label>
-                    <label class="admin-field"><span>Fondo / backdrop (URL)</span><input id="edit-backdrop" class="admin-input" type="url" placeholder="https://..."></label>
-                    <label class="admin-field"><span>Tráiler de YouTube (ID o URL)</span><input id="edit-trailer" class="admin-input" type="text" placeholder="dQw4w9WgXcQ"></label>
-                    <div class="admin-editor-preview" id="edit-preview"></div>
-                </div>
-                <footer class="admin-editor-foot">
-                    <button class="btn btn-play" id="edit-save">Guardar</button>
-                    <button class="btn btn-fav" id="edit-hide">Ocultar</button>
-                    <button class="btn btn-fav" id="edit-reset">Restablecer</button>
-                    <button class="btn btn-fav" id="edit-open">Ver ficha</button>
-                </footer>
-            </div>
-        </div>
-    </div>
-
     <!-- ===== LOADING ===== -->
     <div class="loading-screen" id="loading-screen">
         <div class="loading-inner">
@@ -343,8 +209,6 @@
     </script>
     <!-- Motor Telegram (GramJS) + dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/big-integer@1.6.52/BigInteger.min.js"></script>
-    <!-- Polyfill de Buffer (Node) para el navegador, ANTES de cargar GramJS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/buffer/6.0.3/buffer.min.js" crossorigin="anonymous"></script>
     <!-- QR para el login alternativo -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script>
@@ -353,23 +217,12 @@
         if (!window.process) window.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
         (function () {
-            // Varios CDN que compilan GramJS para navegador. Algunos tienen bugs de
-            // inicializacion (circular deps) que rompen connect(); por eso PROBAMOS cada
-            // uno conectando de verdad y nos quedamos con el primero que funcione.
-            var ESM = [
-                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&external=crypto,node:crypto',
-                'https://esm.sh/telegram@2.26.22?target=es2022&external=crypto,node:crypto',
-                'https://esm.sh/telegram@2.26.22?bundle&target=es2022',
-                'https://esm.sh/telegram@2.26.22?bundle-deps',
-                'https://esm.sh/telegram@2.26.22?target=esnext',
-                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&node-compat=true',
-                'https://esm.sh/telegram@2.26.22'
-            ];
+            // Usa primero el bundle local; conecta con Telegram solo cuando el usuario inicia sesión.
             async function polyfills() {
                 if (!globalThis.global) globalThis.global = globalThis;
                 if (!globalThis.process) globalThis.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
                 if (!globalThis.Buffer) {
-                    var SRC = ['https://esm.sh/buffer@6.0.3', 'https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm'];
+                    var SRC = ['https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm', 'https://esm.sh/buffer@6.0.3'];
                     for (var i = 0; i < SRC.length; i++) {
                         try {
                             var m = await import(SRC[i]);
@@ -378,31 +231,6 @@
                         } catch (e) { }
                     }
                     if (!globalThis.Buffer) console.warn('[tg-loader] no se pudo cargar el polyfill de Buffer');
-                }
-            }
-            function pick(tg) {
-                var T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
-                var Api = tg.Api || (tg.default && tg.default.Api);
-                var SS = (tg.sessions && tg.sessions.StringSession) || tg.StringSession
-                    || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
-                return (T && Api && SS) ? { TelegramClient: T, Api: Api, sessions: { StringSession: SS } } : null;
-            }
-            function tmo(ms) { return new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); }); }
-            async function connects(lib) {
-                var c;
-                try {
-                    var cfg = window.TVP_CONFIG || {};
-                    c = new lib.TelegramClient(new lib.sessions.StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 1, useWSS: true });
-                    await Promise.race([c.connect(), tmo(15000)]);
-                    // PRUEBA REAL: una llamada que obliga al handshake + crypto (createHash).
-                    // Si crypto esta roto (unenv), falla aqui; si va, devuelve la config.
-                    await Promise.race([c.invoke(new lib.Api.help.GetConfig()), tmo(15000)]);
-                    try { await c.disconnect(); } catch (e) { }
-                    return true;
-                } catch (e) {
-                    console.warn('[tg-loader] prueba de conexion fallo:', e && e.message);
-                    try { if (c) await c.disconnect(); } catch (e2) { }
-                    return false;
                 }
             }
             var UMD = [
@@ -420,7 +248,7 @@
             }
             // Carga un bundle local via fetch + eval. Mas fiable que <script> con 304/MIME.
             async function loadLocalUmd(src) {
-                var r = await fetch(src, { cache: 'no-store' });
+                var r = await fetch(src);
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 var code = await r.text();
                 if (code.length < 1000) throw new Error('archivo demasiado pequeño (' + code.length + ' bytes)');
@@ -469,10 +297,6 @@
             }
             (async function () {
                 await polyfills();
-                // Guardamos como "plan B" el bundle local si carga aunque el test
-                // de conexion previo falle (p.ej. corte de red puntual). Asi la app
-                // NO se queda bloqueada: la conexion real se intenta al iniciar sesion.
-                var localFallback = null;
                 // 1) UMD clasico (dist/index.js): expondria window.telegram con crypto nativo del navegador
                 for (var u = 0; u < UMD.length; u++) {
                     var src = UMD[u];
@@ -483,46 +307,10 @@
                     }
                     catch (e) { console.warn('[tg-loader] UMD no carga', src, e && e.message); continue; }
                     if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', src); continue; }
-                    // El bundle expone TelegramClient -> lo recordamos como plan B
-                    if (isLocal && !localFallback && window.telegram && window.telegram.TelegramClient) {
-                        localFallback = window.telegram;
-                    }
-                    console.log('[tg-loader] UMD importado:', src, '— probando conexion...');
-                    if (await connects(window.telegram)) {
-                        console.log('[tg-loader] ✅ GramJS FUNCIONA (UMD) via', src);
-                        return window.__tgResolve(window.telegram);
-                    }
-                    console.warn('[tg-loader] UMD importó pero no conecta:', src);
-                }
-                // 2) Fallback ESM (esm.sh) — puede traer crypto roto (unenv)
-                for (var i = 0; i < ESM.length; i++) {
-                    var url = ESM[i];
-                    try {
-                        var tg = await import(url);
-                        var lib = pick(tg);
-                        if (!lib) { console.warn('[tg-loader] sin exports utiles:', url); continue; }
-                        if (!localFallback) localFallback = lib; // otro plan B
-                        console.log('[tg-loader] importado:', url, '— probando conexion...');
-                        if (await connects(lib)) {
-                            window.telegram = lib;
-                            try { var b = await import('https://esm.sh/big-integer@1.6.52'); window.bigInt = window.bigInt || b.default || b; } catch (e) { }
-                            console.log('[tg-loader] ✅ GramJS FUNCIONA via', url);
-                            return window.__tgResolve(window.telegram);
-                        }
-                        console.warn('[tg-loader] importó pero no conecta:', url);
-                    } catch (e) {
-                        console.warn('[tg-loader] FALLO import', url, e && e.message);
-                    }
-                }
-                // 3) Plan B: el bundle cargó pero la prueba de conexión no pasó.
-                //    No bloqueamos la app: seguimos con el bundle y dejamos que la
-                //    conexión real se haga al iniciar sesión (el QR/login reintenta).
-                if (localFallback && localFallback.TelegramClient) {
-                    window.telegram = localFallback;
-                    console.warn('[tg-loader] ⚠️ La prueba de conexión previa falló (posible corte de red), pero GramJS cargó bien. Continúo: la conexión se intentará al iniciar sesión.');
+                    console.log('[tg-loader] GramJS cargado (UMD) via', src, '; la conexión se hará al iniciar sesión.');
                     return window.__tgResolve(window.telegram);
                 }
-                console.error('[tg-loader] Ningun metodo de GramJS funciono para conectar');
+                console.error('[tg-loader] No se pudo cargar GramJS desde las fuentes UMD');
                 window.__tgReject(new Error('No se pudo cargar GramJS'));
             })();
         })();

@@ -207,11 +207,10 @@
         _client = _loginClient;
         _loginClient = null;
         _service = new window.TelegramService(_client, cfg);
-        let isAdmin = false, name = '';
+        let name = '';
         try { await _service.resolveGroup(); } catch {}
-        try { isAdmin = await _service.isGroupAdmin(); } catch {}
         try { const me = await _client.getMe(); name = (me && (me.firstName || me.username)) || ''; } catch {}
-        return json({ ok: true, isAdmin, name, token: 'local' });
+        return json({ ok: true, name, token: 'local' });
     }
     async function loginSignIn(body) {
         const Api = window.telegram.Api;
@@ -245,26 +244,15 @@
         const c = await ensureClient();
         if (!c) return json({ loggedIn: false });
         const svc = await ensureService();
-        let inGroup = false, isAdmin = false, name = '', userId = '', username = '';
+        let inGroup = false, name = '';
         try { await svc.resolveGroup(); inGroup = true; } catch {}
-        try { isAdmin = await svc.isGroupAdmin(); } catch {}
         try {
             const me = await c.getMe();
             if (me) {
                 name = me.firstName || me.username || '';
-                userId = String(me.id || '');
-                username = (me.username || '').toLowerCase();
             }
         } catch {}
-        // ¿Es el propietario de la app? Si esta configurado ownerId/ownerUsername,
-        // solo entonces; si esta vacio, devolvemos true para "modo configuracion".
-        const ownerId = String(cfg.ownerId || '');
-        const ownerUsername = String(cfg.ownerUsername || '').replace(/^@/, '').toLowerCase();
-        const ownerConfigured = !!(ownerId || ownerUsername);
-        const isOwner = !ownerConfigured ||
-            (ownerId && userId === ownerId) ||
-            (ownerUsername && username === ownerUsername);
-        return json({ loggedIn: true, isAdmin, isOwner, ownerConfigured, name, userId, username, inGroup });
+        return json({ loggedIn: true, name, inGroup });
     }
 
     async function requireServiceForGroup(groupId) {
@@ -273,8 +261,7 @@
         try { await svc.resolveGroup(); }
         catch (e) {
             // Tolerancia: si el unico problema son constructores TL desconocidos,
-            // intentamos seguir adelante asumiendo que SI tenemos acceso (el usuario
-            // es admin/dueno). Asi no bloqueamos por culpa de GramJS desactualizada.
+            // intentamos seguir adelante para no bloquear por una version de GramJS desactualizada.
             const m = (e && e.message) || '';
             const isTL = /Could not find a matching Constructor|Missing MTProto Entity/i.test(m);
             if (!isTL) {
@@ -287,31 +274,19 @@
     async function requireService() {
         return requireServiceForGroup(cfg.groupId);
     }
-    async function requireAdminForGroup(groupId) {
-        const r = await requireServiceForGroup(groupId);
-        if (r.err) return r;
-        let isAdmin = false;
-        try { isAdmin = await r.svc.isGroupAdmin(); } catch {}
-        if (!isAdmin) return { err: json({ error: 'Solo para administradores del grupo.' }, 403) };
-        return r;
-    }
-    async function requireAdmin() {
-        return requireAdminForGroup(cfg.groupId);
-    }
-
     async function handleCatalog(u) {
         const groupId = String(u.searchParams.get('group') || cfg.groupId);
         const r = await requireServiceForGroup(groupId);
         if (r.err) return r.err;
         const fresh = u.searchParams.get('refresh') === '1';
-        const fast = u.searchParams.get('fast') === '1'; // carga rapida (300 por tema)
+        const fast = u.searchParams.get('fast') === '1'; // carga rapida (100 por tema)
         const cacheKey = groupId.trim();
         const fullCache = _catalogs.get(cacheKey);
         if (fast && !fresh) {
             if (fullCache && Date.now() - fullCache.time <= 60000) return json(fullCache.data);
             const fastCache = _fastCatalogs.get(cacheKey);
             if (!fastCache || Date.now() - fastCache.time > 60000) {
-                _fastCatalogs.set(cacheKey, { data: await r.svc.getCatalog({ limit: 300 }), time: Date.now() });
+                _fastCatalogs.set(cacheKey, { data: await r.svc.getCatalog({ limit: 100 }), time: Date.now() });
             }
             return json(_fastCatalogs.get(cacheKey).data);
         }
@@ -321,9 +296,6 @@
         }
         return json(_catalogs.get(cacheKey).data);
     }
-
-    function tmdbHeaders() { return cfg.tmdbToken ? { 'Authorization': 'Bearer ' + cfg.tmdbToken, 'accept': 'application/json' } : { 'accept': 'application/json' }; }
-    function tmdbAuthQuery() { return cfg.tmdbToken ? '' : ('&api_key=' + (cfg.tmdbKey || '')); }
 
     // Decode URI seguro: si la cadena es invalida (caracter % suelto, etc.),
     // devuelve la cadena original en lugar de lanzar 'URI malformed'.
@@ -335,10 +307,8 @@
     async function handleApi(pathname, init, fullUrl) {
         const u = new URL(fullUrl, location.href);
         const rest = pathname.replace(/^.*\/api\//, '');
-        const method = (init && init.method ? init.method : 'GET').toUpperCase();
         let body = {};
         try { if (init && init.body) body = JSON.parse(init.body); } catch {}
-        const parts = rest.split('/');
 
         try {
             // Publicos
@@ -361,66 +331,11 @@
             // Catalogo
             if (rest === 'catalog') return handleCatalog(u);
 
-            // TMDB publicos (requieren sesion)
-            if (parts[0] === 'tmdb' && parts[1] === 'recommendations') {
-                const r = await requireService(); if (r.err) return r.err;
-                const t = parts[2] === 'tv' ? 'tv' : 'movie';
-                const url = `https://api.themoviedb.org/3/${t}/${parts[3]}/recommendations?language=es-ES` + tmdbAuthQuery();
-                const rr = await fetch(url, { headers: tmdbHeaders() }); const d = await rr.json();
-                return json({ results: (d.results || []).slice(0, 12).map(x => ({
-                    id: x.id, type: t, title: x.title || x.name,
-                    year: ((x.release_date || x.first_air_date || '').match(/^(\d{4})/) || [])[1] || '',
-                    poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
-                    rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
-                })) });
-            }
-            if (rest === 'tmdb/upcoming') {
-                const r = await requireService(); if (r.err) return r.err;
-                const url = `https://api.themoviedb.org/3/movie/upcoming?language=es-ES&region=ES&page=1` + tmdbAuthQuery();
-                const rr = await fetch(url, { headers: tmdbHeaders() }); const d = await rr.json();
-                return json({ results: (d.results || []).slice(0, 14).map(x => ({
-                    id: 'up-' + x.id, type: 'movie', title: x.title,
-                    year: ((x.release_date || '').match(/^(\d{4})/) || [])[1] || '',
-                    date: x.release_date || '',
-                    poster: x.poster_path ? 'https://image.tmdb.org/t/p/w500' + x.poster_path : '',
-                    backdrop: x.backdrop_path ? 'https://image.tmdb.org/t/p/w780' + x.backdrop_path : '',
-                    description: x.overview || '',
-                    rating: x.vote_average ? Math.round(x.vote_average * 10) / 10 : ''
-                })) });
-            }
-
-            // Admin
-            if (rest === 'admin/refresh') {
-                const groupId = String(u.searchParams.get('group') || cfg.groupId);
-                const r = await requireAdminForGroup(groupId); if (r.err) return r.err;
-                _catalogs.delete(groupId.trim()); _fastCatalogs.delete(groupId.trim());
-                return json({ ok: true });
-            }
-            if (rest === 'admin/tmdb/search') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                return json({ results: await r.svc.tmdbSearch(String(u.searchParams.get('q') || '').trim(), u.searchParams.get('type')) });
-            }
-            if (parts[0] === 'admin' && parts[1] === 'tmdb' && parts[2] === 'details') {
-                const r = await requireAdmin(); if (r.err) return r.err;
-                return json({ info: await r.svc.tmdbDetails(parts[3], parts[4]) });
-            }
-
             // Lista de grupos disponibles para seleccionar un origen.
-            if (rest === 'admin/groups') {
+            if (rest === 'groups') {
                 const svc = await ensureService();
                 if (!svc) return json({ needLogin: true }, 401);
                 return json({ groups: await svc.getMisGrupos() });
-            }
-            // Incrustar metadatos del admin en el mensaje del grupo:
-            // { msgId, patch: {cover?, backdrop?, title?, desc?, video?, tmdb?, year?, rating?, ...} }
-            if (rest === 'admin/embed' && method === 'POST') {
-                const groupId = String(u.searchParams.get('group') || cfg.groupId);
-                const r = await requireServiceForGroup(groupId); if (r.err) return r.err;
-                try {
-                    const res = await r.svc.embedMeta(body.msgId, body.patch || {});
-                    _catalogs.delete(groupId.trim()); _fastCatalogs.delete(groupId.trim());
-                    return json(res);
-                } catch (e) { return json({ ok: false, error: e.message }); }
             }
             return json({ error: 'Ruta no encontrada: ' + rest }, 404);
         } catch (e) {
