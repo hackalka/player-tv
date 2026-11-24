@@ -70,7 +70,7 @@ const Store = {
         const p = this.progress;
         p[playable.id] = {
             id: playable.id, title: (parent && parent.title) || playable.title || 'Video',
-            epTitle: playable.title || '', thumbUrl: playable.thumbUrl || (parent && parent.thumbUrl) || '',
+            epTitle: playable.title || '', thumbUrl: (parent && (parent.cover || parent.thumbUrl)) || playable.thumbUrl || '',
             streamUrl: playable.streamUrl || '', externalUrl: playable.externalUrl || '',
             aceUrl: playable.aceUrl || '', ext: playable.ext || '', playableInBrowser: playable.playableInBrowser !== false,
             parentId: (parent && parent.id) || playable.id, time, duration: duration || 0, updated: Date.now()
@@ -353,7 +353,14 @@ const Netflix = {
             cats.map(c => `<li><a href="#" data-cat="${escapeHtml(c.name)}">${escapeHtml(c.name)}</a></li>`).join('');
 
         // Filas dinámicas: Continuar viendo + Mi lista + categorías
-        const cont = Store.continueList();
+        const cont = Store.continueList().map(record => {
+            const parent = state.itemsById[record.parentId];
+            const poster = parent && (parent.cover || parent.thumbUrl);
+            return poster ? Object.assign({}, record, {
+                cover: parent.cover || record.cover || '',
+                thumbUrl: poster
+            }) : record;
+        });
         if (cont.length) el.rowsContainer.appendChild(this.row('▶ Continuar viendo', cont, 'continue'));
         const favs = this._vis(Store.favList());
         if (favs.length) el.rowsContainer.appendChild(this.row('❤ Mi lista', favs));

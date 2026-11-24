@@ -28,6 +28,7 @@ test('links a numbered Telegram video to its poster without showing a duplicate 
 
     assert.equal(items.length, 1);
     assert.equal(items[0].title, 'Shutter Island');
+    assert.equal(items[0].thumbUrl, 'tgthumb/2/92?group=-1001');
     assert.doesNotMatch(items[0].description, /url\s*=\s*091/i);
     assert.equal(items[0].description, 'Teddy Daniels investiga la desaparición de una paciente en una isla remota.');
     assert.equal(items[0].metadataLinks[0].metadataSource.label, 'FilmAffinity');

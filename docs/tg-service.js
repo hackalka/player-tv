@@ -596,7 +596,9 @@
                         if (sources.length > 1) {
                             merged.aceUrl = ''; merged.streamUrl = ''; merged.externalUrl = '';
                         } else {
+                            const poster = merged.cover || merged.thumbUrl;
                             Object.assign(merged, sources[0]);
+                            if (poster) merged.thumbUrl = poster;
                         }
                     }
                     out.push(merged);
