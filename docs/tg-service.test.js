@@ -36,6 +36,31 @@ test('links a numbered Telegram video to its poster without showing a duplicate 
     assert.equal(items[0].links[0].streamUrl, 'tgstream/2/451?group=-1001');
 });
 
+test('uses Telegram webpage preview photos as catalog thumbnails', async () => {
+    const previewPhoto = { id: 'preview-photo' };
+    const message = {
+        id: 93,
+        message: 'Shutter Island\nhttps://m.filmaffinity.com/es/film173696.html',
+        media: { webpage: { photo: previewPhoto } }
+    };
+    let downloadedMedia;
+    const thumbnail = new Uint8Array([1, 2, 3]);
+    const service = new window.TelegramService({
+        async downloadMedia(media) {
+            downloadedMedia = media;
+            return thumbnail;
+        }
+    }, { groupId: '-1001' });
+    service._msgCache.set(message.id, message);
+
+    const item = service.buildItem(message, { id: 2, name: 'Películas', type: 'movie' });
+
+    assert.equal(item.hasThumb, true);
+    assert.equal(item.thumbUrl, 'tgthumb/2/93?group=-1001');
+    assert.equal(await service.downloadThumb(null, message.id), thumbnail);
+    assert.equal(downloadedMedia, previewPhoto);
+});
+
 test('deduplicates equivalent Telegram links and hides linked video cards', async () => {
     const service = new window.TelegramService({}, {
         groupId: '-1003924237464', messagesPerTopic: 20

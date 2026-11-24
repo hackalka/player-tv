@@ -306,7 +306,8 @@
             const year = (text.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
             const doc = message.media && message.media.document;
             const isVideo = !!(doc && /video|mp4|matroska|x-msvideo|quicktime/.test(doc.mimeType || ''));
-            const hasThumb = !!(message.media && (message.media.photo || (doc && doc.thumbs && doc.thumbs.length)));
+            const webpagePhoto = message.media && message.media.webpage && message.media.webpage.photo;
+            const hasThumb = !!(message.media && (message.media.photo || webpagePhoto || (doc && doc.thumbs && doc.thumbs.length)));
 
             let filename = '';
             if (doc) {
@@ -722,23 +723,24 @@
                 .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
         }
 
-        async downloadThumb(topicId, msgId) {
-            const message = await this.getMessageById(msgId);
+        async _downloadThumb(message) {
             if (!message || !message.media) return null;
             const media = message.media;
             if (media.photo) return await this.client.downloadMedia(message, {});
+            if (media.webpage && media.webpage.photo) {
+                return await this.client.downloadMedia(media.webpage.photo, {});
+            }
             const doc = media.document;
             if (doc && doc.thumbs && doc.thumbs.length) return await this.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
             return null;
         }
 
+        async downloadThumb(topicId, msgId) {
+            return await this._downloadThumb(await this.getMessageById(msgId));
+        }
+
         async downloadThumbByRef(channel, msgId) {
-            const message = await this.getMessageByRef(channel, msgId);
-            if (!message || !message.media) return null;
-            const doc = message.media.document;
-            if (message.media.photo) return await this.client.downloadMedia(message, {});
-            if (doc && doc.thumbs && doc.thumbs.length) return await this.client.downloadMedia(message, { thumb: doc.thumbs.length - 1 });
-            return null;
+            return await this._downloadThumb(await this.getMessageByRef(channel, msgId));
         }
 
         docInfo(message) {
