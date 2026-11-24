@@ -12,7 +12,7 @@ test('links a numbered Telegram video to its poster without showing a duplicate 
     const items = service._buildTopicItems([
         {
             id: 92,
-            message: 'Shutter Island\nhttps://m.filmaffinity.com/es/film173696.html\nurl=091',
+            message: 'Shutter Island\nhttps://m.filmaffinity.com/es/film173696.html\nSinopsis: Teddy Daniels investiga la desaparición de una paciente en una isla remota.\nurl=091',
             media: { photo: {} }
         },
         {
@@ -29,6 +29,7 @@ test('links a numbered Telegram video to its poster without showing a duplicate 
     assert.equal(items.length, 1);
     assert.equal(items[0].title, 'Shutter Island');
     assert.doesNotMatch(items[0].description, /url\s*=\s*091/i);
+    assert.equal(items[0].description, 'Teddy Daniels investiga la desaparición de una paciente en una isla remota.');
     assert.equal(items[0].metadataLinks[0].metadataSource.label, 'FilmAffinity');
     assert.equal(items[0].links.some(link => /filmaffinity/i.test(link.url)), false);
     assert.equal(items[0].links[0].streamUrl, 'tgstream/2/451?group=-1001');
