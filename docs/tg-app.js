@@ -350,6 +350,9 @@
         try {
             const url = (typeof input === 'string') ? input : (input && input.url) || '';
             const pathname = new URL(url, location.href).pathname;
+            if (pathname === '/api/metadata/filmaffinity') {
+                return origFetch ? origFetch(input, init) : Promise.reject(new Error('fetch no disponible'));
+            }
             if (/\/api\//.test(pathname)) return handleApi(pathname, init || (typeof input === 'object' ? input : {}), url);
         } catch {}
         return origFetch ? origFetch(input, init) : Promise.reject(new Error('fetch no disponible'));

@@ -114,6 +114,56 @@ test('discovers tvgram:auto folders with the same labels across groups', async (
     assert.deepEqual(catalogs[1], catalogs[0]);
 });
 
+test('only lists forum groups that contain a configured auto-tag topic', async () => {
+    const originalApi = global.window.telegram.Api;
+    global.window.telegram.Api = {
+        channels: {
+            GetForumTopics: class {
+                constructor(params) { this.params = params; }
+            }
+        }
+    };
+    const entities = [
+        { id: 101, className: 'Channel', title: 'Tagged group', forum: true, megagroup: true },
+        { id: 202, className: 'Channel', title: 'Untagged group', forum: true, megagroup: true },
+        { id: 303, className: 'Chat', title: 'Legacy group' }
+    ];
+    const checkedGroups = [];
+    const client = {
+        async *iterDialogs() {
+            for (const entity of entities) yield { entity };
+        },
+        async getEntity(id) {
+            const entity = entities.find(candidate =>
+                String(candidate.id) === String(id).replace(/^-100/, '')
+            );
+            if (!entity) throw new Error('Entity not found');
+            return entity;
+        },
+        async invoke(request) {
+            const entityId = Number(request.params.channel.id);
+            checkedGroups.push(entityId);
+            return {
+                count: 1,
+                topics: [{
+                    id: 1,
+                    title: entityId === 101 ? 'Películas tvgram:auto' : 'General'
+                }]
+            };
+        }
+    };
+    try {
+        const service = new window.TelegramService(client, {
+            autoTags: ['tvgram:auto']
+        });
+        const groups = await service.getMisGrupos();
+        assert.deepEqual(groups.map(group => group.title), ['Tagged group']);
+        assert.deepEqual(checkedGroups.sort(), [101, 202]);
+    } finally {
+        global.window.telegram.Api = originalApi;
+    }
+});
+
 test('loads forum topic pages beyond the first 100 folders', async () => {
     const originalApi = global.window.telegram.Api;
     global.window.telegram.Api = {

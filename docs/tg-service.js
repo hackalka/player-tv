@@ -95,7 +95,9 @@
             return m;
         }
 
-        async getForumTopics() {
+        async getForumTopics(options) {
+            options = options || {};
+            const tags = options.stopAfterAutoTag ? this._autoTags() : [];
             const entity = await this.resolveGroup();
             try {
                 const topics = [], seen = new Set();
@@ -113,6 +115,9 @@
                         topics.push({ id: topic.id, title: topic.title || ('Tema ' + topic.id) });
                         added++;
                     });
+                    if (tags.length && pageTopics.some(topic =>
+                        tags.some(tag => String(topic.title || '').toLowerCase().includes(tag))
+                    )) return topics;
                     if (!added || pageTopics.length < 100 || (res.count && topics.length >= res.count)) break;
 
                     const last = pageTopics[pageTopics.length - 1];
@@ -130,8 +135,23 @@
             }
         }
 
+        _autoTags() {
+            return (this.cfg.autoTags || [])
+                .map(tag => String(tag || '').trim().toLowerCase())
+                .filter(Boolean);
+        }
+
+        async hasAutoTopics() {
+            const tags = this._autoTags();
+            if (!tags.length) return false;
+            const topics = await this.getForumTopics({ stopAfterAutoTag: true });
+            return topics.some(topic =>
+                tags.some(tag => String(topic.title || '').toLowerCase().includes(tag))
+            );
+        }
+
         async getAutoTopics() {
-            const tags = (this.cfg.autoTags || []).map(t => t.toLowerCase()).filter(Boolean);
+            const tags = this._autoTags();
             const all = await this.getForumTopics();
             const matched = all.filter(t => {
                 const low = (t.title || '').toLowerCase();
@@ -791,8 +811,26 @@
                     } catch (e) { /* saltar */ }
                 }
             } catch (e) { console.warn('[tg] getMisGrupos fallo:', e.message); }
-            out.sort((a, b) => (b.unread - a.unread) || a.title.localeCompare(b.title));
-            return out;
+            const candidates = out.filter(group => group.isForum && (group.isGroup || group.isChannel));
+            const eligible = new Set();
+            let index = 0;
+            const workers = Array.from({ length: Math.min(4, candidates.length) }, async () => {
+                while (index < candidates.length) {
+                    const group = candidates[index++];
+                    const service = new TelegramService(
+                        this.client, Object.assign({}, this.cfg, { groupId: group.peerId })
+                    );
+                    try {
+                        if (await service.hasAutoTopics()) eligible.add(group.peerId);
+                    } catch (e) {
+                        console.warn(`[tg] No se pudieron comprobar los temas de ${group.title}:`, e.message);
+                    }
+                }
+            });
+            await Promise.all(workers);
+            const filtered = out.filter(group => eligible.has(group.peerId));
+            filtered.sort((a, b) => (b.unread - a.unread) || a.title.localeCompare(b.title));
+            return filtered;
         }
 
     }

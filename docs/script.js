@@ -437,6 +437,7 @@ const Netflix = {
     card(item, kind) {
         const card = document.createElement('div');
         card.className = 'card focusable' + (Store.isWatched(item.id) ? ' watched' : '');
+        card.dataset.id = String(item.id);
         card.tabIndex = 0;
         const title = item.title || item.epTitle || '';
         const year = item.year || '';
@@ -547,6 +548,7 @@ const Detail = {
         }
         this.primary = primary;
         ExternalPlayers.render(primary);
+        this._loadFilmAffinityMetadata(item);
         el.detailPlay.onclick = () => Player.play(Detail.primary, item);
         el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); CloudStore.saveFavs(); };
         if (el.watchedBtn) {
@@ -556,6 +558,57 @@ const Detail = {
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
         setTimeout(() => el.detailPlay.focus(), 50);
+    },
+
+    _loadFilmAffinityMetadata(item) {
+        const link = (item.metadataLinks || []).find(candidate =>
+            candidate.metadataSource && candidate.metadataSource.kind === 'filmaffinity'
+        );
+        if (!link || (item.description && item.cover) || item._metadataRequest) return;
+
+        const request = fetch('/api/metadata/filmaffinity?url=' + encodeURIComponent(link.url), {
+            headers: { Accept: 'application/json' }
+        }).then(async response => {
+            if (!response.ok) throw new Error('FilmAffinity respondió con HTTP ' + response.status);
+            const metadata = await response.json();
+            if (!item.description && metadata.description) item.description = String(metadata.description);
+            if (!item.cover && metadata.poster) item.cover = String(metadata.poster);
+            if (!item.backdrop && item.cover) item.backdrop = item.cover;
+            if (!item.year && metadata.year) item.year = String(metadata.year);
+            if (this.current === item && !el.playerModal.hidden) this._updateFilmAffinityView(item);
+        }).catch(error => {
+            console.warn('[metadata] FilmAffinity no se pudo cargar:', error.message);
+        }).finally(() => {
+            if (item._metadataRequest === request) delete item._metadataRequest;
+        });
+        item._metadataRequest = request;
+    },
+
+    _updateFilmAffinityView(item) {
+        el.modalYear.innerText = item.year || '';
+        if (!el.modalDescription.hidden) {
+            el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
+        }
+        if (item.cover) {
+            if (el.detailPoster) el.detailPoster.src = item.cover;
+            el.detailBackdrop.src = item.backdrop || item.cover;
+            $$('.card, .search-card').forEach(card => {
+                if (card.dataset.id !== String(item.id)) return;
+                const image = $('img', card);
+                if (image) image.src = item.cover;
+            });
+        }
+        if (item.description) {
+            $$('.source-btn', el.sourcesTrack).forEach(button => {
+                let synopsis = $('.source-description', button);
+                if (!synopsis) {
+                    synopsis = document.createElement('span');
+                    synopsis.className = 'source-description';
+                    button.appendChild(synopsis);
+                }
+                synopsis.textContent = '📜 ' + item.description;
+            });
+        }
     },
 
     // Lista de fuentes reproducibles. Cada una con un boton "▶ Play" (etiqueta limpia).
@@ -1556,10 +1609,6 @@ function setCatalogGroups(groups, me) {
         peerId: String(group.peerId),
         title: String(group.title || 'Sin nombre')
     }));
-    if (!choices.length && me.inGroup && configuredId) {
-        choices.push({ peerId: configuredId, title: 'Grupo configurado', isGroup: true });
-    }
-
     state.account = me;
     state.groupPreferenceKey = groupPreferenceKey(me, 'selected');
     state.groups = choices;
@@ -1610,13 +1659,11 @@ async function boot() {
         try {
             groupList = await api('/api/groups');
         } catch (e) {
-            if (!me.inGroup) throw e;
-            console.warn('No se pudo listar los grupos; se usará el grupo configurado:', e.message);
-            groupList = { groups: [] };
+            throw new Error('No se pudieron comprobar los grupos con la etiqueta configurada: ' + e.message);
         }
         const selectedGroup = setCatalogGroups(groupList.groups, me);
         if (!selectedGroup) {
-            el.rowsContainer.innerHTML = `<div class="empty-state">No se encontraron grupos o canales de Telegram disponibles para <b>${escapeHtml(me.name || '')}</b>.</div>`;
+            el.rowsContainer.innerHTML = `<div class="empty-state">No se encontraron grupos o canales con temas que contengan la etiqueta configurada para <b>${escapeHtml(me.name || '')}</b>.</div>`;
             return;
         }
 

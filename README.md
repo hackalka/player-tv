@@ -56,8 +56,9 @@ etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
 - **Carátula y vídeo separados**: publica el enlace de ficha y `url=091` en la carátula; el número
   identifica el prefijo del mensaje de vídeo (`091-Título`) o su ID de mensaje de Telegram. El
   vídeo queda asociado a la carátula y no aparece como otra película.
-- Enlaces de FilmAffinity son solo de ficha, no se abren como fuentes de vídeo. No se consultan
-  servicios externos de metadatos: la sinopsis y la carátula deben venir del mensaje de Telegram.
+- Enlaces de FilmAffinity son solo de ficha, no se abren como fuentes de vídeo. Al abrir la ficha,
+  una Cloudflare Pages Function consulta de forma segura su sinopsis y carátula; los resultados se
+  almacenan en caché durante 24 horas. No se utiliza TMDB.
 - **Varios enlaces en un post** (deportes/multicanal): "Enlace DAZN 1/2/3", AceStream, `.mp4`, etc.
 - **Serie en un solo post**: título + metadatos + sinopsis + episodios como enlaces `t.me`
   (se reproducen aunque estén en otro canal público al que el usuario tenga acceso).
@@ -70,6 +71,9 @@ etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
 - **Novedades** y **buscador con filtros** por género/año.
 - Reproductores externos (VLC / AceStream) y copiar enlace.
 - No incluye panel, edición de fichas ni funciones administrativas.
+- El selector de grupos solo muestra grupos y canales con temas que incluyen una etiqueta configurada.
+- La consulta de FilmAffinity requiere desplegar el directorio raíz `functions/` como Cloudflare Pages
+  Functions y `docs/` como salida estática.
 - Navegación con **mando de TV Box** (flechas / OK / atrás).
 - Caché de miniaturas, streaming con reintentos y cabeceras de seguridad básicas.
 
