@@ -353,8 +353,16 @@ const Netflix = {
             cats.map(c => `<li><a href="#" data-cat="${escapeHtml(c.name)}">${escapeHtml(c.name)}</a></li>`).join('');
 
         // Filas dinámicas: Continuar viendo + Mi lista + categorías
+        const parentByStream = new Map();
+        state.allItems.forEach(item => {
+            (item.links || []).forEach(link => {
+                const stream = String(link.streamUrl || '').split('?')[0];
+                if (stream) parentByStream.set(stream, item);
+            });
+        });
         const cont = Store.continueList().map(record => {
-            const parent = state.itemsById[record.parentId];
+            const stream = String(record.streamUrl || '').split('?')[0];
+            const parent = state.itemsById[record.parentId] || parentByStream.get(stream);
             const poster = parent && (parent.cover || parent.thumbUrl);
             return poster ? Object.assign({}, record, {
                 cover: parent.cover || record.cover || '',
