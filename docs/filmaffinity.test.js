@@ -16,36 +16,34 @@ async function loadFunction() {
     return functionModule;
 }
 
-test('parses FilmAffinity synopsis, poster and year from the page', async () => {
-    const { parseFilmAffinityPage } = await loadFunction();
-    const metadata = parseFilmAffinityPage(`
-        <html><head>
-            <title>Shutter Island (2010) - FilmAffinity</title>
-            <meta property="og:title" content="Shutter Island (2010)">
-            <meta property="og:image" content="https://pics.filmaffinity.com/shutter_island.jpg">
-            <meta name="description" content="Sinopsis: Texto abreviado... Puedes ver la película">
-        </head><body>
-            <dl><dt>Sinopsis</dt><dd itemprop="description">En el verano de 1954, los agentes &quot;Teddy&quot; y Chuck investigan.</dd></dl>
-        </body></html>
+test('parses FilmAffinity synopsis, poster and year from Jina Reader text', async () => {
+    const { parseFilmAffinityReaderPage } = await loadFunction();
+    const metadata = parseFilmAffinityReaderPage(`
+Title: Shutter Island  (2010)
+URL Source: https://m.filmaffinity.com/es/film173696.html
+
+# Shutter Island
+[![Image 24: Shutter Island ](https://pics.filmaffinity.com/shutter_island-982808260-mmed.jpg)](https://pics.filmaffinity.com/shutter_island-982808260-large.jpg "Shutter Island ")
+Sinopsis En el verano de 1954, los agentes judiciales Teddy Daniels investigan la desaparición de una peligrosa asesina. (FILMAFFINITY)
     `);
 
     assert.deepEqual(metadata, {
         source: 'FilmAffinity',
         title: 'Shutter Island (2010)',
-        description: 'En el verano de 1954, los agentes "Teddy" y Chuck investigan.',
+        description: 'En el verano de 1954, los agentes judiciales Teddy Daniels investigan la desaparición de una peligrosa asesina.',
         year: '2010',
-        poster: 'https://pics.filmaffinity.com/shutter_island.jpg'
+        poster: 'https://pics.filmaffinity.com/shutter_island-982808260-mmed.jpg'
     });
 });
 
-test('proxies only validated FilmAffinity film pages', async () => {
+test('proxies only validated FilmAffinity film pages through Jina Reader', async () => {
     const { onRequest } = await loadFunction();
     const originalFetch = global.fetch;
     const requests = [];
     global.fetch = async (url, options) => {
         requests.push({ url: String(url), options });
-        return new Response('<html><meta name="description" content="Sinopsis: Una historia."></html>', {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        return new Response('Title: Película (2024)\nSinopsis Una historia. (FILMAFFINITY)', {
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
     };
     try {
@@ -58,7 +56,8 @@ test('proxies only validated FilmAffinity film pages', async () => {
         assert.equal(response.headers.get('cache-control'), 'public, max-age=86400, s-maxage=86400');
         assert.equal((await response.json()).description, 'Una historia.');
         assert.equal(requests.length, 1);
-        assert.equal(requests[0].url, 'https://www.filmaffinity.com/es/film173696.html');
+        assert.equal(requests[0].url, 'https://r.jina.ai/https://www.filmaffinity.com/es/film173696.html');
+        assert.equal(requests[0].options.headers.Accept, 'text/plain');
     } finally {
         global.fetch = originalFetch;
     }
@@ -70,6 +69,25 @@ test('proxies only validated FilmAffinity film pages', async () => {
     const invalidResponse = await onRequest({ request: invalidRequest });
     assert.equal(invalidResponse.status, 400);
     assert.equal(requests.length, 1);
+});
+
+test('rejects reader responses without a synopsis instead of caching empty metadata', async () => {
+    const { onRequest } = await loadFunction();
+    const originalFetch = global.fetch;
+    global.fetch = async () => new Response('No readable synopsis', {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
+    try {
+        const target = 'https://www.filmaffinity.com/es/film173696.html';
+        const request = new Request(
+            'https://player-tv.pages.dev/api/metadata/filmaffinity?url=' + encodeURIComponent(target)
+        );
+        const response = await onRequest({ request });
+        assert.equal(response.status, 502);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+    } finally {
+        global.fetch = originalFetch;
+    }
 });
 
 test('rejects non-GET metadata requests', async () => {

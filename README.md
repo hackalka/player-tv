@@ -57,8 +57,9 @@ etiqueta: un tema "Películas playertv:auto" se ve como "Películas".
   identifica el prefijo del mensaje de vídeo (`091-Título`) o su ID de mensaje de Telegram. El
   vídeo queda asociado a la carátula y no aparece como otra película.
 - Enlaces de FilmAffinity son solo de ficha, no se abren como fuentes de vídeo. Al abrir la ficha,
-  una Cloudflare Pages Function consulta de forma segura su sinopsis y carátula; los resultados se
-  almacenan en caché durante 24 horas. No se utiliza TMDB.
+  una Cloudflare Pages Function consulta su sinopsis y carátula mediante Jina Reader; la URL pública
+  de la ficha se envía a ese servicio externo y los resultados se almacenan en caché durante 24 horas.
+  No se utiliza TMDB.
 - **Varios enlaces en un post** (deportes/multicanal): "Enlace DAZN 1/2/3", AceStream, `.mp4`, etc.
 - **Serie en un solo post**: título + metadatos + sinopsis + episodios como enlaces `t.me`
   (se reproducen aunque estén en otro canal público al que el usuario tenga acceso).

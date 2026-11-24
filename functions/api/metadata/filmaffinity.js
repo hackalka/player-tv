@@ -4,9 +4,9 @@ const FILMAFFINITY_HOSTS = new Set([
     'm.filmaffinity.com'
 ]);
 const FILM_PATH = /^\/[a-z]{2}\/film\d+\.html$/i;
-const MAX_HTML_BYTES = 1024 * 1024;
+const MAX_RESPONSE_BYTES = 1024 * 1024;
 const UPSTREAM_HEADERS = {
-    Accept: 'text/html,application/xhtml+xml',
+    Accept: 'text/plain',
     'Accept-Language': 'es-ES,es;q=0.9',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
         'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36'
@@ -33,10 +33,10 @@ function validFilmPage(rawUrl) {
     return new URL(url.pathname, 'https://www.filmaffinity.com');
 }
 
-async function readHtml(response) {
+async function readResponseText(response) {
     const declaredLength = Number(response.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_HTML_BYTES) {
-        throw new Error('FilmAffinity respondió con una página demasiado grande');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+        throw new Error('La respuesta de metadatos es demasiado grande');
     }
     if (!response.body) return '';
 
@@ -47,9 +47,9 @@ async function readHtml(response) {
         const { done, value } = await reader.read();
         if (done) break;
         length += value.byteLength;
-        if (length > MAX_HTML_BYTES) {
+        if (length > MAX_RESPONSE_BYTES) {
             await reader.cancel();
-            throw new Error('FilmAffinity respondió con una página demasiado grande');
+            throw new Error('La respuesta de metadatos es demasiado grande');
         }
         chunks.push(value);
     }
@@ -89,39 +89,17 @@ function plainText(value) {
         .trim();
 }
 
-function getMetaContent(html, key, expectedValue) {
-    const tags = html.match(/<meta\b[^>]*>/gi) || [];
-    for (const tag of tags) {
-        const attributes = {};
-        const attributePattern = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
-        let match;
-        while ((match = attributePattern.exec(tag))) {
-            attributes[match[1].toLowerCase()] = match[2] || match[3] || match[4] || '';
-        }
-        if (String(attributes[key] || '').toLowerCase() === expectedValue) {
-            return decodeHtml(attributes.content || '');
-        }
-    }
-    return '';
-}
-
-function synopsisFromMeta(value) {
-    const match = String(value || '').match(/sinopsis\s*:\s*([\s\S]*)/i);
-    if (!match) return '';
-    return plainText(match[1]
-        .replace(/(?:\.{3}|…)\s*(?:puedes ver|disponible en)[\s\S]*$/i, '')
-        .replace(/(?:\.{3}|…)\s*$/i, ''));
-}
-
-export function parseFilmAffinityPage(html) {
-    const source = String(html || '');
-    const description = getMetaContent(source, 'name', 'description')
-        || getMetaContent(source, 'property', 'og:description');
-    const synopsisTag = source.match(/<dd\b(?=[^>]*\bitemprop\s*=\s*(?:"description"|'description'|description))[^>]*>([\s\S]*?)<\/dd>/i);
-    const titleTag = source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-    const title = plainText(getMetaContent(source, 'property', 'og:title')
-        || (titleTag && titleTag[1])).replace(/\s*-\s*FilmAffinity\s*$/i, '');
-    const image = getMetaContent(source, 'property', 'og:image');
+export function parseFilmAffinityReaderPage(text) {
+    const source = String(text || '');
+    const titleMatch = source.match(/^Title:\s*(.+)$/mi)
+        || source.match(/^#\s+(.+)$/m);
+    const title = plainText(titleMatch && titleMatch[1]);
+    const synopsisMatch = source.match(/\bSinopsis\s+([\s\S]*?)\s*\(FILMAFFINITY\)/i);
+    const synopsis = plainText((synopsisMatch && synopsisMatch[1] || '')
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'));
+    const imageMatch = source.match(/!\[[^\]]*\]\((https:\/\/pics\.filmaffinity\.com\/[^)\s]+)(?:\s+"[^"]*")?\)/i);
+    const image = imageMatch && imageMatch[1];
     let poster = '';
     try {
         const imageUrl = new URL(image);
@@ -129,8 +107,7 @@ export function parseFilmAffinityPage(html) {
             poster = imageUrl.href;
         }
     } catch { }
-    const synopsis = (synopsisTag && plainText(synopsisTag[1])) || synopsisFromMeta(description);
-    const year = ((title + ' ' + description).match(/\b(?:19|20)\d{2}\b/) || [])[0] || '';
+    const year = (title.match(/\b(?:19|20)\d{2}\b/) || [])[0] || '';
     return { source: 'FilmAffinity', title, description: synopsis, year, poster };
 }
 
@@ -145,25 +122,29 @@ export async function onRequest({ request }) {
 
     let response;
     try {
-        response = await fetch(upstreamUrl, {
+        response = await fetch(`https://r.jina.ai/${upstreamUrl.href}`, {
             headers: UPSTREAM_HEADERS,
-            redirect: 'manual',
             cf: { cacheTtl: 86400 }
         });
     } catch (error) {
-        console.warn('[metadata] FilmAffinity no responde:', error.message);
-        return json({ error: 'No se pudo consultar FilmAffinity' }, 502, 'no-store');
+        console.warn('[metadata] Jina Reader no responde:', error.message);
+        return json({ error: 'No se pudo consultar la ficha de FilmAffinity' }, 502, 'no-store');
     }
     if (!response.ok) {
-        console.warn('[metadata] FilmAffinity respondió:', response.status);
-        return json({ error: 'FilmAffinity respondió con un error', status: response.status }, 502, 'no-store');
+        console.warn('[metadata] Jina Reader respondió:', response.status);
+        return json({ error: 'El intermediario no pudo consultar FilmAffinity', status: response.status }, 502, 'no-store');
     }
 
-    let html;
-    try { html = await readHtml(response); }
+    let text;
+    try { text = await readResponseText(response); }
     catch (error) {
-        console.warn('[metadata] No se pudo leer la ficha de FilmAffinity:', error.message);
+        console.warn('[metadata] No se pudo leer la respuesta de Jina Reader:', error.message);
         return json({ error: 'La ficha de FilmAffinity no se pudo leer' }, 502, 'no-store');
     }
-    return json(parseFilmAffinityPage(html), 200, 'public, max-age=86400, s-maxage=86400');
+    const metadata = parseFilmAffinityReaderPage(text);
+    if (!metadata.description) {
+        console.warn('[metadata] Jina Reader no devolvió una sinopsis de FilmAffinity');
+        return json({ error: 'No se encontró la sinopsis de FilmAffinity' }, 502, 'no-store');
+    }
+    return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
 }
