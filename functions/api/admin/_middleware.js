@@ -23,7 +23,7 @@ export async function onRequest({ request, env, next }) {
     return json({ error: "Origen no autorizado." }, 403);
   }
 
-  const session = await readSession(request, env.ADMIN_SESSION_SECRET);
+  const session = await readSession(request, env.ADMIN_SESSION_SECRET, env);
   if (!session) return json({ authenticated: false, error: "Se requiere iniciar sesión como administrador." }, 401);
 
   return next();
