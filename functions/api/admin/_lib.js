@@ -52,7 +52,7 @@ export async function createSessionToken(secret) {
   return payload + "." + toBase64Url(new Uint8Array(signature));
 }
 
-export async function readSession(request, secret) {
+export async function readSession(request, secret, env) {
   const cookie = request.headers.get("Cookie") || "";
   const match = cookie.match(new RegExp("(?:^|;\\s*)" + COOKIE + "=([^;]+)"));
   if (!match) return null;
@@ -64,7 +64,11 @@ export async function readSession(request, secret) {
     if (!valid) return null;
     const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(parts[0])));
     if (!Number.isFinite(payload.exp) || payload.exp <= Date.now() || !payload.nonce) return null;
-    return { issuedAt: payload.iat, expiresAt: payload.exp };
+    if (env?.ADMIN_DB) {
+      const active = await env.ADMIN_DB.prepare("SELECT nonce FROM admin_sessions WHERE nonce = ? AND expires_at > ?").bind(payload.nonce, Date.now()).first();
+      if (!active) return null;
+    }
+    return { nonce: payload.nonce, issuedAt: payload.iat, expiresAt: payload.exp };
   } catch {
     return null;
   }
