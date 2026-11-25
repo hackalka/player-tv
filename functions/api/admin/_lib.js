@@ -49,7 +49,7 @@ export async function createSessionToken(secret) {
   })));
   const key = await signingKey(secret);
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
-  return { token: payload + "." + toBase64Url(new Uint8Array(signature)), nonce: JSON.parse(new TextDecoder().decode(encoder.encode(JSON.stringify({ nonce: "unused" })))) && JSON.parse(new TextDecoder().decode(fromBase64Url(payload))).nonce, expiresAt: Date.now() + SESSION_SECONDS * 1000 };
+  return { token: payload + "." + toBase64Url(new Uint8Array(signature)), nonce: JSON.parse(new TextDecoder().decode(fromBase64Url(payload))).nonce, expiresAt: Date.now() + SESSION_SECONDS * 1000 };
 }
 
 export async function readSession(request, secret, env) {
