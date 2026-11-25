@@ -16,8 +16,9 @@ export async function onRequestGet({ env }) {
     ok: database,
     platform: "Cloudflare Pages Functions",
     database,
-    githubIntegration: !!env.GITHUB_TOKEN,
-    repositoryConfigured: !!(env.GITHUB_OWNER && env.GITHUB_REPO && env.GITHUB_BRANCH),
+    githubIntegration: false,
+    repositoryConfigured: false,
+    githubNote: "La integración GitHub para explorar y modificar archivos todavía no está implementada.",
     adminSecretsConfigured: !!(env.ADMIN_PASSWORD && env.ADMIN_SESSION_SECRET),
     databaseError
   });
