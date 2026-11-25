@@ -16,7 +16,7 @@ function safeEqual(a, b) {
 }
 function cookieValue(req) {
     const raw = req.headers.cookie || '';
-    const match = raw.match(new RegExp('(?:^|;\\\\s*)' + COOKIE + '=([^;]+)'));
+    const match = raw.match(new RegExp('(?:^|;\\s*)' + COOKIE + '=([^;]+)'));
     return match ? decodeURIComponent(match[1]) : '';
 }
 function sign(nonce, secret) {
