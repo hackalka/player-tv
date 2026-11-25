@@ -35,5 +35,10 @@ module.exports = {
     // (Opcional) Postgres para persistir las sesiones de usuario entre redeploys.
     // Recomendado en Koyeb/Render free (disco efímero). Si está vacío, se usa
     // el fichero sessions.json dentro de DATA_DIR.
-    databaseUrl: process.env.DATABASE_URL || ''
+    databaseUrl: process.env.DATABASE_URL || '',
+
+    // Acceso independiente para el panel administrativo (nunca compartir con Telegram)
+    adminPassword: process.env.ADMIN_PASSWORD || '',
+    adminOrigin: process.env.ADMIN_ORIGIN || '',
+    adminSessionSecret: process.env.ADMIN_SESSION_SECRET || ''
 };
