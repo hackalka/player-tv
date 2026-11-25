@@ -29,7 +29,9 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Contraseña incorrecta." }, 401);
   }
 
-  const token = await createSessionToken(env.ADMIN_SESSION_SECRET);
+  const session = await createSessionToken(env.ADMIN_SESSION_SECRET);
+  await env.ADMIN_DB.prepare("INSERT INTO admin_sessions (nonce, created_at, expires_at) VALUES (?, ?, ?)")
+    .bind(session.nonce, now, session.expiresAt).run();
   await audit(env, request, "admin.login.success");
-  return json({ authenticated: true }, 200, { "Set-Cookie": sessionCookie(token) });
+  return json({ authenticated: true }, 200, { "Set-Cookie": sessionCookie(session.token) });
 }
