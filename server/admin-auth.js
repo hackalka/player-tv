@@ -16,8 +16,17 @@ function safeEqual(a, b) {
 }
 function cookieValue(req) {
     const raw = req.headers.cookie || '';
-    const match = raw.match(new RegExp('(?:^|;\\s*)' + COOKIE + '=([^;]+)'));
+    const match = raw.match(new RegExp('(?:^|;\\\\s*)' + COOKIE + '=([^;]+)'));
     return match ? decodeURIComponent(match[1]) : '';
+}
+function sign(nonce, secret) {
+    return crypto.createHmac('sha256', secret).update(nonce).digest('base64url');
+}
+function readSession(req, secret) {
+    const parts = cookieValue(req).split('.');
+    if (parts.length !== 2 || !parts[0] || !safeEqual(parts[1], sign(parts[0], secret))) return null;
+    const record = sessions.get(parts[0]);
+    return record ? { nonce: parts[0], record } : null;
 }
 function originAllowed(req, expected) {
     return !!expected && req.get('origin') === expected;
@@ -38,10 +47,10 @@ function createAdminAuth(cfg) {
     function requireAdmin(req, res, next) {
         if (!enabled) return res.status(503).json({ error: 'Administración no configurada en el servidor.' });
         if (!originAllowed(req, origin)) return res.status(403).json({ error: 'Origen no autorizado.' });
-        const token = cookieValue(req);
-        const record = sessions.get(token);
+        const session = readSession(req, cfg.adminSessionSecret);
+        const record = session && session.record;
         if (!record || record.expiresAt < Date.now()) {
-            if (token) sessions.delete(token);
+            if (session) sessions.delete(session.nonce);
             return res.status(401).json({ authenticated: false });
         }
         record.expiresAt = Date.now() + SESSION_TTL_MS;
@@ -64,10 +73,10 @@ function createAdminAuth(cfg) {
         },
         status(req, res) {
             if (!enabled) return res.json({ configured: false, authenticated: false });
-            const token = cookieValue(req);
-            const record = sessions.get(token);
+            const session = readSession(req, cfg.adminSessionSecret);
+            const record = session && session.record;
             const authenticated = !!record && record.expiresAt >= Date.now();
-            if (!authenticated && token) sessions.delete(token);
+            if (!authenticated && session) sessions.delete(session.nonce);
             res.json({ configured: true, authenticated });
         },
         login(req, res) {
@@ -86,14 +95,15 @@ function createAdminAuth(cfg) {
             const supplied = typeof req.body.password === 'string' ? req.body.password : '';
             if (!safeEqual(supplied, password)) return res.status(401).json({ error: 'Credenciales incorrectas.' });
             attempts.delete(ip);
-            const token = crypto.randomBytes(32).toString('base64url');
-            sessions.set(token, { expiresAt: now + SESSION_TTL_MS });
-            setCookie(res, token);
+            const nonce = crypto.randomBytes(32).toString('base64url');
+            sessions.set(nonce, { expiresAt: now + SESSION_TTL_MS });
+            setCookie(res, nonce + '.' + sign(nonce, cfg.adminSessionSecret));
             res.set('Cache-Control', 'no-store').json({ authenticated: true });
         },
         logout(req, res) {
             if (!originAllowed(req, origin)) return res.status(403).json({ error: 'Origen no autorizado.' });
-            sessions.delete(cookieValue(req));
+            const session = readSession(req, cfg.adminSessionSecret);
+            if (session) sessions.delete(session.nonce);
             clearCookie(res);
             res.set('Cache-Control', 'no-store').json({ authenticated: false });
         },
