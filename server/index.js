@@ -6,6 +6,7 @@ const fsp = require('fs/promises');
 const express = require('express');
 const cfg = require('./config');
 const { SessionManager } = require('./sessions');
+const { createAdminAuth } = require('./admin-auth');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -18,6 +19,8 @@ app.use((req, res, next) => {
 });
 
 const sessions = new SessionManager(cfg);
+const adminAuth = createAdminAuth(cfg);
+app.use(adminAuth.cors);
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const ALIGN = 4096;
 
@@ -75,6 +78,23 @@ async function serveThumb(res, key, downloader) {
     res.set('Content-Type', 'image/jpeg'); res.set('Cache-Control', 'public, max-age=604800');
     res.send(b);
 }
+
+/* ===================== ADMINISTRACIÓN (sesión independiente) ===================== */
+app.get('/api/admin/status', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    adminAuth.status(req, res);
+});
+app.post('/api/admin/login', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    adminAuth.login(req, res);
+});
+app.post('/api/admin/logout', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    adminAuth.logout(req, res);
+});
+app.get('/api/admin/session', adminAuth.requireAdmin, (req, res) => {
+    res.set('Cache-Control', 'no-store').json({ authenticated: true });
+});
 
 /* ===================== PÚBLICO ===================== */
 app.get('/api/app', (req, res) => res.json({ appName: cfg.appName }));
