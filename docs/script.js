@@ -73,10 +73,10 @@ async function loadAdminRuntime(groupId) {
             const bg = TVP_ADMIN_CONFIG['ui.backgroundColor'];
             const radius = TVP_ADMIN_CONFIG['ui.cardRadius'];
             const font = TVP_ADMIN_CONFIG['ui.fontFamily'];
-            if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) root.style.setProperty('--accent', color);
-            if (typeof bg === 'string' && /^#[0-9a-f]{6}$/i.test(bg)) root.style.setProperty('--bg', bg);
-            if (Number.isFinite(Number(radius)) && Number(radius) >= 0 && Number(radius) <= 32) root.style.setProperty('--card-radius', Number(radius) + 'px');
-            if (typeof font === 'string' && /^[a-zA-Z ,'-]{1,60}$/.test(font)) root.style.setProperty('--app-font', font);
+            if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) root.style.setProperty('--netflix-red', color); root.style.setProperty('--netflix-red-hover', color);
+            if (typeof bg === 'string' && /^#[0-9a-f]{6}$/i.test(bg)) root.style.setProperty('--netflix-black', bg);
+            if (Number.isFinite(Number(radius)) && Number(radius) >= 0 && Number(radius) <= 32) root.style.setProperty('--tvp-card-radius', Number(radius) + 'px');
+            if (typeof font === 'string' && /^[a-zA-Z ,'-]{1,60}$/.test(font)) root.style.setProperty('--font-primary', font);
         }
         if (catalogRes.ok) {
             const data = await catalogRes.json();
