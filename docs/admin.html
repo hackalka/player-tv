@@ -107,7 +107,7 @@
  const titles={overview:'Resumen general',audit:'Auditoría del repositorio',code:'Archivos y código',content:'Gestión de contenidos',player:'Configuración del reproductor',design:'Personalización visual',components:'Gestión de componentes',server:'Servidor y base de datos',logs:'Registros y errores',backup:'Copias de seguridad y seguridad'};
  const login=document.getElementById('admin-login'),form=document.getElementById('admin-login-form'),error=document.getElementById('admin-login-error'),submit=document.getElementById('admin-login-submit');
  const buttons=[...document.querySelectorAll('[data-page]')];
- buttons.forEach(btn=>btn.addEventListener('click',()=>{buttons.forEach(b=>b.classList.toggle('active',b===btn));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='page-'+btn.dataset.page));document.getElementById('page-heading').textContent=titles[btn.dataset.page];if(btn.dataset.page==='server')loadHealth();if(btn.dataset.page==='logs'||btn.dataset.page==='audit')loadAudit();}));
+ buttons.forEach(btn=>btn.addEventListener('click',()=>{buttons.forEach(b=>b.classList.toggle('active',b===btn));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='page-'+btn.dataset.page));document.getElementById('page-heading').textContent=titles[btn.dataset.page];if(btn.dataset.page==='server')loadHealth();if(btn.dataset.page==='logs')loadAudit();if(btn.dataset.page==='audit')runRepositoryAudit();if(btn.dataset.page==='components')runComponentInventory();}));
  async function api(path,options={}){const res=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,headers:{Accept:'application/json',...(options.headers||{})}});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error(data.error||('HTTP '+res.status));return data;}
  async function checkSession(){
   try{const state=await api('/api/admin/status');if(!state.configured){error.textContent='El panel aún no está configurado. Añade ADMIN_DB, ADMIN_PASSWORD y ADMIN_SESSION_SECRET en Cloudflare.';return;}
@@ -119,6 +119,44 @@
   catch(e){error.textContent=e.message;}finally{submit.disabled=false;submit.textContent='Entrar al panel';}
  });
  document.getElementById('admin-logout').addEventListener('click',async()=>{try{await api('/api/admin/logout',{method:'POST'});}catch{}login.hidden=false;});
+ async function runRepositoryAudit(){
+  const status=document.getElementById('audit-status'),summary=document.getElementById('audit-summary'),results=document.getElementById('audit-results');
+  status.textContent='Inspeccionando archivos de la rama Preview…';summary.replaceChildren();results.replaceChildren();
+  const button=document.getElementById('run-audit');button.disabled=true;
+  try{
+   const d=await api('/api/admin/inspect?mode=audit');
+   status.textContent='Inspección terminada · '+d.files.length+' archivos · rama '+d.ref;
+   const counts=d.counts||{};
+   summary.textContent='Altos: '+(counts.high||0)+' · Medios: '+(counts.medium||0)+' · Informativos: '+(counts.info||0);
+   if(!d.findings.length){results.textContent='No se encontraron patrones incluidos en esta revisión.';return;}
+   d.findings.forEach(item=>{
+    const row=document.createElement('div');row.className='rowline';
+    const detail=document.createElement('span');detail.textContent='['+item.severity.toUpperCase()+'] '+item.path+':'+item.line+' — '+item.message;
+    row.append(detail);results.append(row);
+   });
+   const note=document.createElement('p');note.className='muted';note.textContent=d.note||'Análisis estático orientativo.';results.append(note);
+  }catch(e){status.textContent='No se pudo ejecutar: '+e.message;}
+  finally{button.disabled=false;}
+ }
+ async function runComponentInventory(){
+  const status=document.getElementById('components-status'),summary=document.getElementById('components-summary'),results=document.getElementById('components-results');
+  status.textContent='Leyendo archivos reales…';summary.replaceChildren();results.replaceChildren();
+  const button=document.getElementById('run-components');button.disabled=true;
+  try{
+   const d=await api('/api/admin/inspect?mode=components');
+   status.textContent='Inventario generado · '+d.files.length+' archivos · rama '+d.ref;
+   summary.textContent=d.total+' elementos detectados';
+   d.components.forEach(item=>{
+    const row=document.createElement('div');row.className='rowline';
+    const detail=document.createElement('span');detail.textContent=item.type+' · '+item.name+' — '+item.file;
+    row.append(detail);results.append(row);
+   });
+   if(!d.components.length)results.textContent='No se encontraron elementos de los tipos inspeccionados.';
+  }catch(e){status.textContent='No se pudo generar: '+e.message;}
+  finally{button.disabled=false;}
+ }
+ document.getElementById('run-audit').addEventListener('click',runRepositoryAudit);
+ document.getElementById('run-components').addEventListener('click',runComponentInventory);
  async function loadHealth(){
   const badge=document.getElementById('health-badge'),dot=document.getElementById('health-dot'),title=document.getElementById('health-title'),sub=document.getElementById('health-sub'),report=document.getElementById('server-report');
   badge.textContent='Consultando…';title.textContent='Comprobando Cloudflare';
