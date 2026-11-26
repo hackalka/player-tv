@@ -72,8 +72,8 @@
  </section>
  <section class="section" id="page-audit"><h2 class="page-title">Auditoría del repositorio</h2><p class="intro">La auditoría debe ejecutarse sobre el código real de la rama activa y devolver archivo, línea, gravedad, explicación y propuesta de solución.</p><div class="notice">La exploración automática todavía no está conectada. No se mostrarán incidencias inventadas ni resultados de ejemplo.</div><div class="placeholder"><b>Motor de auditoría no conectado</b>Se habilitará al integrar un servicio de análisis con acceso de solo lectura al repositorio.</div></section>
  <section class="section" id="page-code">
-  <h2 class="page-title">Explorador de archivos · solo lectura</h2>
-  <p class="intro">Consulta archivos reales de la rama <span class="code">feature/cloudflare-admin</span>. Este módulo no permite editar, crear, borrar ni guardar cambios.</p>
+  <h2 class="page-title">Explorador y editor protegido</h2>
+  <p class="intro">Consulta y edita archivos permitidos de <span class="code">docs/</span> en <span class="code">feature/cloudflare-admin</span>. No se permite modificar index.html ni los archivos del panel.</p>
   <div class="card">
    <div class="card-head"><h3 id="files-location">Repositorio /</h3><span class="status ok">Solo lectura</span></div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
@@ -82,8 +82,12 @@
    <div id="files-message" class="muted" role="status" style="margin-bottom:10px">Cargando estructura del repositorio…</div>
    <div id="files-list" style="display:grid;gap:7px"></div>
    <div id="files-view" hidden style="margin-top:18px">
-    <div class="card-head"><h3 id="files-view-title">Archivo</h3><span class="status">Vista previa</span></div>
-    <pre id="files-content" style="white-space:pre;overflow:auto;max-height:65vh;background:#080e18;border:1px solid var(--line);border-radius:9px;padding:14px;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace"></pre>
+    <div class="card-head"><h3 id="files-view-title">Archivo</h3><span class="status warn">Edición limitada</span></div>
+    <textarea id="files-content" spellcheck="false" style="width:100%;min-height:360px;resize:vertical;background:#080e18;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:14px;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace"></textarea>
+    <label for="files-commit-message" class="muted" style="display:block;margin:12px 0 5px">Descripción del cambio</label>
+    <input id="files-commit-message" maxlength="120" placeholder="Describe brevemente el cambio" style="width:100%;padding:10px;background:#0a111d;color:var(--text);border:1px solid var(--line);border-radius:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" id="files-save" type="button">Guardar en rama Preview</button><button class="btn" id="files-reload" type="button">Descartar y recargar</button></div>
+    <p id="files-save-message" class="muted" role="status"></p>
    </div>
   </div>
  </section>
@@ -135,7 +139,7 @@
  }
  document.getElementById('refresh-health').addEventListener('click',loadHealth);
  const filesList=document.getElementById('files-list'), filesMessage=document.getElementById('files-message'), filesView=document.getElementById('files-view');
- let currentFilesPath='';
+ let currentFilesPath=''; let currentFileSha=''; let currentFilePath='';
  function safeText(value){return String(value??'');}
  async function loadFiles(path=''){
   currentFilesPath=path;document.getElementById('files-location').textContent='Repositorio / '+(path||'');
@@ -158,13 +162,34 @@
   try{
    const d=await api('/api/admin/files?file=1&path='+encodeURIComponent(path));
    document.getElementById('files-view-title').textContent=d.path+' · '+d.size.toLocaleString()+' bytes';
-   document.getElementById('files-content').textContent=d.content;
-   filesView.hidden=false;filesMessage.textContent='Archivo cargado desde '+d.ref+'. Vista de solo lectura.';
+   document.getElementById('files-content').value=d.content;
+   currentFileSha=d.sha;currentFilePath=d.path;
+   document.getElementById('files-commit-message').value='';
+   document.getElementById('files-save-message').textContent='';
+   const canEdit=d.path.startsWith('docs/')&&!['docs/index.html','docs/admin.html','docs/admin-workspace.html'].includes(d.path);
+   document.getElementById('files-content').readOnly=!canEdit;
+   document.getElementById('files-save').disabled=!canEdit;
+   filesView.hidden=false;filesMessage.textContent='Archivo cargado desde '+d.ref+'. '+(canEdit?'Edición habilitada con control de versión.':'Este archivo está protegido contra escritura.');
   }catch(e){filesMessage.textContent='No se pudo abrir el archivo: '+e.message;}
  }
  document.getElementById('files-root').addEventListener('click',()=>loadFiles(''));
  document.getElementById('files-up').addEventListener('click',()=>loadFiles(currentFilesPath.includes('/')?currentFilesPath.slice(0,currentFilesPath.lastIndexOf('/')):''));
  document.getElementById('files-refresh').addEventListener('click',()=>loadFiles(currentFilesPath));
+ document.getElementById('files-reload').addEventListener('click',()=>{if(currentFilePath)loadFile(currentFilePath);});
+ document.getElementById('files-save').addEventListener('click',async()=>{
+  const save=document.getElementById('files-save'),msg=document.getElementById('files-save-message');
+  if(!currentFilePath||!currentFileSha){msg.textContent='Abre de nuevo el archivo antes de guardar.';return;}
+  if(!confirm('Se guardará un commit en feature/cloudflare-admin. No se modificará main ni Production. ¿Continuar?'))return;
+  save.disabled=true;msg.textContent='Guardando en GitHub…';
+  try{
+   const result=await api('/api/admin/write-file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:currentFilePath,content:document.getElementById('files-content').value,expectedSha:currentFileSha,message:document.getElementById('files-commit-message').value})});
+   const success='Guardado en '+result.branch+'. Commit: '+(result.commit||'creado')+'.';
+   await loadFile(currentFilePath);
+   document.getElementById('files-save-message').textContent=success;
+   await loadFiles(currentFilesPath);
+  }catch(e){msg.textContent=e.message;}
+  finally{save.disabled=false;}
+ });
  const codeNav=document.querySelector('[data-page="code"]');codeNav.addEventListener('click',()=>loadFiles(currentFilesPath));
 
  checkSession();
