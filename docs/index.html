@@ -235,6 +235,36 @@
                     || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
                 return (T && Api && SS) ? { TelegramClient: T, Api: Api, sessions: { StringSession: SS } } : null;
             }
+            // Mantener la tolerancia TL que ya tenía el cargador anterior.
+            function applyTLTolerance() {
+                try {
+                    var BR = window.telegram && ((window.telegram.extensions && window.telegram.extensions.BinaryReader) || window.telegram.BinaryReader);
+                    if (!BR || !BR.prototype || !BR.prototype.tgReadObject) {
+                        console.warn('[tg-patch] BinaryReader no expuesto, no puedo aplicar patch TL');
+                        return;
+                    }
+                    if (BR.prototype.__tvpPatched) return;
+                    var orig = BR.prototype.tgReadObject;
+                    BR.prototype.tgReadObject = function () {
+                        try { return orig.apply(this, arguments); }
+                        catch (e) {
+                            var msg = (e && e.message) || '';
+                            if (/Could not find a matching Constructor|Missing MTProto Entity/i.test(msg)) {
+                                var m = msg.match(/ID\s+(\d+)/);
+                                console.warn('[tg-patch] constructor desconocido', m ? m[1] : '?', '— ignorando paquete');
+                                try { if (typeof this.stream !== 'undefined' && this.stream && this.stream.length != null) this.offset = this.stream.length; } catch (e2) { }
+                                try { if (this._buffer && this._buffer.length != null) this.offset = this._buffer.length; } catch (e2) { }
+                                return null;
+                            }
+                            throw e;
+                        }
+                    };
+                    BR.prototype.__tvpPatched = true;
+                    console.log('[tg-patch] BinaryReader parcheado: tolera constructores TL desconocidos');
+                } catch (e) {
+                    console.warn('[tg-patch] no se pudo parchear BinaryReader:', e && e.message);
+                }
+            }
             async function connects(lib) {
                 var c;
                 try {
@@ -264,6 +294,7 @@
                         console.log('[tg-loader] importado:', url, '— probando conexion...');
                         if (await connects(lib)) {
                             window.telegram = lib;
+                            applyTLTolerance();
                             try {
                                 var b = await import('https://esm.sh/big-integer@1.6.52');
                                 window.bigInt = window.bigInt || b.default || b;
