@@ -331,7 +331,7 @@ body {
     flex-shrink: 0;
     width: var(--card-width);
     aspect-ratio: var(--card-ratio);
-    border-radius: 4px;
+    border-radius: var(--tvp-card-radius, 4px);
     overflow: hidden;
     cursor: pointer;
     position: relative;
