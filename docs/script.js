@@ -55,6 +55,51 @@ async function api(path, opts = {}) {
     return data;
 }
 
+
+// Ajustes públicos permitidos por el administrador (sin exponer endpoints privados).
+let TVP_ADMIN_CONFIG = {};
+let TVP_ADMIN_OVERRIDES = new Map();
+async function loadAdminRuntime(groupId) {
+    try {
+        const [configRes, catalogRes] = await Promise.all([
+            fetch('/api/public-config', { credentials: 'same-origin', cache: 'no-store' }),
+            fetch('/api/catalog-overrides?group=' + encodeURIComponent(groupId), { credentials: 'same-origin', cache: 'no-store' })
+        ]);
+        if (configRes.ok) {
+            const data = await configRes.json();
+            TVP_ADMIN_CONFIG = data.settings || {};
+            const root = document.documentElement;
+            const color = TVP_ADMIN_CONFIG['ui.accentColor'];
+            const bg = TVP_ADMIN_CONFIG['ui.backgroundColor'];
+            const radius = TVP_ADMIN_CONFIG['ui.cardRadius'];
+            const font = TVP_ADMIN_CONFIG['ui.fontFamily'];
+            if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) root.style.setProperty('--accent', color);
+            if (typeof bg === 'string' && /^#[0-9a-f]{6}$/i.test(bg)) root.style.setProperty('--bg', bg);
+            if (Number.isFinite(Number(radius)) && Number(radius) >= 0 && Number(radius) <= 32) root.style.setProperty('--card-radius', Number(radius) + 'px');
+            if (typeof font === 'string' && /^[a-zA-Z ,'-]{1,60}$/.test(font)) root.style.setProperty('--app-font', font);
+        }
+        if (catalogRes.ok) {
+            const data = await catalogRes.json();
+            TVP_ADMIN_OVERRIDES = new Map((data.items || []).map(x => [String(x.topicId) + ':' + String(x.messageId), x]));
+        } else TVP_ADMIN_OVERRIDES = new Map();
+    } catch (error) {
+        console.warn('[admin-config] No se pudieron cargar ajustes administrativos:', error.message);
+        TVP_ADMIN_OVERRIDES = new Map();
+    }
+}
+function applyAdminItemOverride(item, groupId, topicId) {
+    if (!item) return null;
+    const override = TVP_ADMIN_OVERRIDES.get(String(topicId || item.topicId || '') + ':' + String(item.id));
+    if (!override) return item;
+    if (override.title) item.title = override.title;
+    if (override.description) item.description = override.description;
+    if (override.posterUrl) { item.cover = override.posterUrl; item.thumbUrl = override.posterUrl; item.backdrop = override.posterUrl; }
+    if (override.genres && override.genres.length) {
+        item.meta = Object.assign({}, item.meta || {}, { genres: override.genres.join(', ') });
+    }
+    return item;
+}
+
 /* ===== Almacenamiento local (progreso / favoritos) ===== */
 const Store = {
     _get(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } },
@@ -1099,7 +1144,13 @@ const Player = {
             const ok = window.ArtBridge.load(url, {
                 title: (parent && parent.title) || playable.title || '',
                 poster: (parent && parent.poster) || playable.poster || '',
-                volume: Store.volume,
+                volume: Number.isFinite(Number(TVP_ADMIN_CONFIG['player.volume'])) ? Math.max(0, Math.min(1, Number(TVP_ADMIN_CONFIG['player.volume']))) : Store.volume,
+                theme: typeof TVP_ADMIN_CONFIG['player.theme'] === 'string' ? TVP_ADMIN_CONFIG['player.theme'] : undefined,
+                autoplay: TVP_ADMIN_CONFIG['player.autoplay'] !== false,
+                pip: TVP_ADMIN_CONFIG['player.pip'] !== false,
+                screenshot: TVP_ADMIN_CONFIG['player.screenshot'] !== false,
+                playbackRate: TVP_ADMIN_CONFIG['player.playbackRate'] !== false,
+                aspectRatio: TVP_ADMIN_CONFIG['player.aspectRatio'] !== false,
                 resume
             });
             if (ok) {
@@ -1502,6 +1553,8 @@ function applyCatalog(catalog, groupId) {
     state.allItems = [];
     state.itemsById = {};
     (state.catalog.categories || []).forEach(category => (category.items || []).forEach(item => {
+        applyAdminItemOverride(item, groupId, item.topicId || category.id);
+        (item.episodes || []).forEach(episode => applyAdminItemOverride(episode, groupId, episode.topicId || item.topicId || category.id));
         item.category = category.name;
         state.allItems.push(item);
         state.itemsById[item.id] = item;
@@ -1520,6 +1573,7 @@ async function loadGroupCatalog(groupId, useCache) {
     if (!selectedGroup) throw new Error('Selecciona un grupo de Telegram.');
     const requestId = ++groupLoadVersion;
     state.activeGroup = selectedGroup;
+    await loadAdminRuntime(selectedGroup);
     try { localStorage.setItem(state.groupPreferenceKey, selectedGroup); } catch {}
 
     const endpoint = '/api/catalog?group=' + encodeURIComponent(selectedGroup);
