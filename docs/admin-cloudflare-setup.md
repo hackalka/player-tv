@@ -37,3 +37,14 @@ No introduzcas tokens de GitHub, credenciales de Telegram ni secretos de producc
 ## Rollback
 
 Como los cambios están en `feature/cloudflare-admin`, basta con no fusionar ni promover esta rama. La rama `main` y el contenido publicado no se han editado desde esta rama.
+
+
+## Segunda migración: espacio administrativo
+
+La rama `feature/cloudflare-admin` añade `migrations/0002_admin_workspace.sql`. Aplícala también a la misma base D1 vinculada como `ADMIN_DB` en Preview antes de usar `admin-workspace.html`:
+
+```bash
+npx wrangler d1 execute NOMBRE_DE_TU_BASE --remote --file=migrations/0002_admin_workspace.sql
+```
+
+Esta migración crea las tablas de copias de seguridad del espacio administrativo y metadatos de catálogo separados de los mensajes originales de Telegram. Las copias actuales incluyen ajustes y metadatos de D1; no son copias de los archivos del repositorio ni de los datos alojados en Telegram.
