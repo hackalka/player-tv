@@ -186,7 +186,6 @@
    const success='Guardado en '+result.branch+'. Commit: '+(result.commit||'creado')+'.';
    await loadFile(currentFilePath);
    document.getElementById('files-save-message').textContent=success;
-   await loadFiles(currentFilesPath);
   }catch(e){msg.textContent=e.message;}
   finally{save.disabled=false;}
  });
