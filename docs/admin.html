@@ -70,7 +70,22 @@
   </div>
  </section>
  <section class="section" id="page-audit"><h2 class="page-title">Auditoría del repositorio</h2><p class="intro">La auditoría debe ejecutarse sobre el código real de la rama activa y devolver archivo, línea, gravedad, explicación y propuesta de solución.</p><div class="notice">La exploración automática todavía no está conectada. No se mostrarán incidencias inventadas ni resultados de ejemplo.</div><div class="placeholder"><b>Motor de auditoría no conectado</b>Se habilitará al integrar un servicio de análisis con acceso de solo lectura al repositorio.</div></section>
- <section class="section" id="page-code"><h2 class="page-title">Archivos y código</h2><p class="intro">Explorador y editor versionado con vista de diferencias, confirmación explícita, backup y rollback.</p><div class="placeholder"><b>Editor bloqueado por seguridad</b>Falta conectar GitHub con permisos mínimos y autenticación de administrador. No se guardarán cambios desde el navegador ni se expondrán credenciales.</div></section>
+ <section class="section" id="page-code">
+  <h2 class="page-title">Explorador de archivos · solo lectura</h2>
+  <p class="intro">Consulta archivos reales de la rama <span class="code">feature/cloudflare-admin</span>. Este módulo no permite editar, crear, borrar ni guardar cambios.</p>
+  <div class="card">
+   <div class="card-head"><h3 id="files-location">Repositorio /</h3><span class="status ok">Solo lectura</span></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <button class="btn" id="files-root">Raíz</button><button class="btn" id="files-up">Subir un nivel</button><button class="btn" id="files-refresh">Actualizar</button>
+   </div>
+   <div id="files-message" class="muted" role="status" style="margin-bottom:10px">Cargando estructura del repositorio…</div>
+   <div id="files-list" style="display:grid;gap:7px"></div>
+   <div id="files-view" hidden style="margin-top:18px">
+    <div class="card-head"><h3 id="files-view-title">Archivo</h3><span class="status">Vista previa</span></div>
+    <pre id="files-content" style="white-space:pre;overflow:auto;max-height:65vh;background:#080e18;border:1px solid var(--line);border-radius:9px;padding:14px;font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace"></pre>
+   </div>
+  </div>
+ </section>
  <section class="section" id="page-content"><h2 class="page-title">Gestión de contenidos</h2><p class="intro">El catálogo actual se obtiene de Telegram. La edición de títulos, sinopsis, carátulas, categorías y episodios requiere definir dónde guardar los metadatos administrativos sin alterar los mensajes originales.</p><div class="placeholder"><b>Catálogo aún no conectado</b>No se cargarán películas ficticias. Primero hay que integrar la lectura real y una capa segura para guardar metadatos.</div></section>
  <section class="section" id="page-player"><h2 class="page-title">Configuración del reproductor</h2><p class="intro">Controles de tamaño, proporción, dimensiones, posición y comportamiento responsive. El reproductor existente se conserva.</p><div class="placeholder"><b>Configuración no aplicada</b>Primero se identificará la configuración real del motor actual para evitar sobrescribir opciones o romper la reproducción.</div></section>
  <section class="section" id="page-design"><h2 class="page-title">Personalización visual</h2><p class="intro">Colores, tipografía, espaciado y apariencia de la interfaz.</p><div class="placeholder"><b>Editor visual pendiente</b>Los cambios se prepararán como propuesta y requerirán vista previa y confirmación antes de aplicarse.</div></section>
@@ -118,6 +133,39 @@
   }catch(e){target.innerHTML='<b>Auditoría no disponible</b>'+String(e.message).replace(/[&<>"]/g,'');}
  }
  document.getElementById('refresh-health').addEventListener('click',loadHealth);
+ const filesList=document.getElementById('files-list'), filesMessage=document.getElementById('files-message'), filesView=document.getElementById('files-view');
+ let currentFilesPath='';
+ function safeText(value){return String(value??'');}
+ async function loadFiles(path=''){
+  currentFilesPath=path;document.getElementById('files-location').textContent='Repositorio / '+(path||'');
+  filesList.replaceChildren();filesView.hidden=true;filesMessage.textContent='Consultando GitHub…';
+  try{
+   const d=await api('/api/admin/files?path='+encodeURIComponent(path));
+   filesMessage.textContent=d.entries.length+' elementos · rama '+d.ref+' · solo lectura';
+   for(const entry of d.entries){
+    const row=document.createElement('div');row.className='rowline';
+    const name=document.createElement('button');name.className='btn';name.style.textAlign='left';name.style.flex='1';name.textContent=(entry.type==='dir'?'📁 ':'📄 ')+entry.name;
+    name.addEventListener('click',()=>entry.type==='dir'?loadFiles(entry.path):loadFile(entry.path));
+    const meta=document.createElement('small');meta.className='muted';meta.textContent=entry.type==='dir'?'Carpeta':entry.size.toLocaleString()+' bytes';
+    row.append(name,meta);filesList.append(row);
+   }
+   if(!d.entries.length)filesMessage.textContent='Esta carpeta está vacía.';
+  }catch(e){filesMessage.textContent='No se pudo cargar: '+e.message;}
+ }
+ async function loadFile(path){
+  filesMessage.textContent='Cargando archivo…';filesView.hidden=true;
+  try{
+   const d=await api('/api/admin/files?file=1&path='+encodeURIComponent(path));
+   document.getElementById('files-view-title').textContent=d.path+' · '+d.size.toLocaleString()+' bytes';
+   document.getElementById('files-content').textContent=d.content;
+   filesView.hidden=false;filesMessage.textContent='Archivo cargado desde '+d.ref+'. Vista de solo lectura.';
+  }catch(e){filesMessage.textContent='No se pudo abrir el archivo: '+e.message;}
+ }
+ document.getElementById('files-root').addEventListener('click',()=>loadFiles(''));
+ document.getElementById('files-up').addEventListener('click',()=>loadFiles(currentFilesPath.includes('/')?currentFilesPath.slice(0,currentFilesPath.lastIndexOf('/')):''));
+ document.getElementById('files-refresh').addEventListener('click',()=>loadFiles(currentFilesPath));
+ const codeNav=document.querySelector('[data-page="code"]');codeNav.addEventListener('click',()=>loadFiles(currentFilesPath));
+
  checkSession();
 })();
 </script>
