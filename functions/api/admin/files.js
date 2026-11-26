@@ -60,7 +60,7 @@ export async function onRequestGet({ request }) {
     const binary = atob(data.content.replace(/\s/g, ""));
     const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
     const content = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-    return json({ path, name: data.name, size: data.size || bytes.length, content, ref: REF, readOnly: true });
+    return json({ path, name: data.name, size: data.size || bytes.length, content, sha: data.sha, ref: REF, readOnly: true });
   } catch (error) {
     return json({ error: error.message || "No se pudo consultar el repositorio." }, 502);
   }
