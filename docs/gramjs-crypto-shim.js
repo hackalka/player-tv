@@ -1,5 +1,7 @@
 import { sha1 } from "https://esm.sh/@noble/hashes@1.4.0/sha1?bundle";
 import { sha256 } from "https://esm.sh/@noble/hashes@1.4.0/sha256?bundle";
+import { sha512 } from "https://esm.sh/@noble/hashes@1.4.0/sha512?bundle";
+import { pbkdf2 } from "https://esm.sh/@noble/hashes@1.4.0/pbkdf2?bundle";
 
 function asBytes(value) {
   if (value instanceof Uint8Array) return value;
@@ -45,6 +47,18 @@ function createHash(algorithm) {
   };
 }
 
+function pbkdf2Sync(password, salt, iterations, keylen, digest) {
+  const name = String(digest || "sha1").toLowerCase().replace("-", "");
+  const hash = name === "sha512" ? sha512 : name === "sha256" ? sha256 : name === "sha1" ? sha1 : null;
+  if (!hash) throw new Error("Unsupported PBKDF2 digest: " + digest);
+  const result = pbkdf2(hash, asBytes(password), asBytes(salt), {
+    c: Number(iterations),
+    dkLen: Number(keylen)
+  });
+  if (!globalThis.Buffer) throw new Error("Buffer polyfill not initialized");
+  return globalThis.Buffer.from(result);
+}
+
 function randomBytes(size) {
   const bytes = new Uint8Array(size);
   globalThis.crypto.getRandomValues(bytes);
@@ -52,5 +66,5 @@ function randomBytes(size) {
   return globalThis.Buffer.from(bytes);
 }
 
-export { createHash, randomBytes };
-export default { createHash, randomBytes };
+export { createHash, randomBytes, pbkdf2Sync };
+export default { createHash, randomBytes, pbkdf2Sync };
