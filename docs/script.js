@@ -87,17 +87,20 @@ async function loadAdminRuntime(groupId) {
         TVP_ADMIN_OVERRIDES = new Map();
     }
 }
-function applyAdminItemOverride(item, groupId, topicId) {
+function getAdminItemOverride(topicId, messageId) {
+    return TVP_ADMIN_OVERRIDES.get(String(topicId || '') + ':' + String(messageId));
+}
+function applyAdminItemOverride(item, groupId, topicId, sourceMessageId) {
     if (!item) return null;
-    const override = TVP_ADMIN_OVERRIDES.get(String(topicId || item.topicId || '') + ':' + String(item.id));
-    if (!override) return item;
+    const override = getAdminItemOverride(topicId || item.topicId, sourceMessageId || item.id);
+    if (!override) return null;
     if (override.title) item.title = override.title;
     if (override.description) item.description = override.description;
     if (override.posterUrl) { item.cover = override.posterUrl; item.thumbUrl = override.posterUrl; item.backdrop = override.posterUrl; }
     if (override.genres && override.genres.length) {
         item.meta = Object.assign({}, item.meta || {}, { genres: override.genres.join(', ') });
     }
-    return item;
+    return override;
 }
 
 /* ===== Almacenamiento local (progreso / favoritos) ===== */
@@ -1553,8 +1556,21 @@ function applyCatalog(catalog, groupId) {
     state.allItems = [];
     state.itemsById = {};
     (state.catalog.categories || []).forEach(category => (category.items || []).forEach(item => {
-        applyAdminItemOverride(item, groupId, item.topicId || category.id);
-        (item.episodes || []).forEach(episode => applyAdminItemOverride(episode, groupId, episode.topicId || item.topicId || category.id));
+        const topicId = item.topicId || category.id;
+        applyAdminItemOverride(item, groupId, topicId);
+        const episodeOverrides = [];
+        (item.episodes || []).forEach(episode => {
+            const episodeId = String(episode.id);
+            const sourceId = episodeId.replace(/-l\d+$/, '');
+            const override = applyAdminItemOverride(episode, groupId, episode.topicId || topicId, sourceId);
+            if (override) episodeOverrides.push(override);
+        });
+        if (episodeOverrides.length) {
+            const first = episodeOverrides[0];
+            if (first.description) item.description = first.description;
+            if (first.posterUrl) { item.cover = first.posterUrl; item.thumbUrl = first.posterUrl; item.backdrop = first.posterUrl; }
+            if (first.genres && first.genres.length) item.meta = Object.assign({}, item.meta || {}, { genres: first.genres.join(', ') });
+        }
         item.category = category.name;
         state.allItems.push(item);
         state.itemsById[item.id] = item;
