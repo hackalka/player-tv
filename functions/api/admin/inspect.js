@@ -52,6 +52,12 @@ function inventory(path, content, out) {
     for (const m of content.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+)["']/gi)) add("Recurso", m[1], path);
     for (const m of content.matchAll(/<([a-z][a-z0-9-]*-[a-z0-9-]+)\b/gi)) add("Elemento personalizado", m[1], path);
   }
+  if (/\.css$/i.test(path)) {
+    for (const m of content.matchAll(/--([a-zA-Z0-9_-]+)\s*:/g)) add("Variable CSS", "--" + m[1], path);
+    for (const m of content.matchAll(/\.([a-zA-Z_][\w-]*)\s*(?=[,{])/g)) add("Clase CSS", "." + m[1], path);
+    for (const m of content.matchAll(/#([a-zA-Z_][\w-]*)\s*(?=[,{])/g)) add("Selector ID CSS", "#" + m[1], path);
+    for (const m of content.matchAll(/@media\s*([^{]+)/g)) add("Media query", m[1].trim(), path);
+  }
   if (/\.(?:js|mjs)$/i.test(path)) {
     for (const m of content.matchAll(/\bfunction\s+([\w$]+)\s*\(/g)) add("Función", m[1], path);
     for (const m of content.matchAll(/\bclass\s+([\w$]+)/g)) add("Clase", m[1], path);
