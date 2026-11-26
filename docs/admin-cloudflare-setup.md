@@ -48,4 +48,3 @@ npx wrangler d1 execute NOMBRE_DE_TU_BASE --remote --file=migrations/0002_admin_
 ```
 
 Esta migración crea las tablas de copias de seguridad del espacio administrativo y metadatos de catálogo separados de los mensajes originales de Telegram. Las copias actuales incluyen ajustes y metadatos de D1; no son copias de los archivos del repositorio ni de los datos alojados en Telegram.
-prueba
