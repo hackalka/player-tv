@@ -10,7 +10,7 @@ Esta rama añade la primera capa de administración al proyecto Pages existente.
 - Límite de 8 intentos fallidos por IP anonimizada durante 15 minutos.
 - Endpoints protegidos para estado, sesión, salud y registro de auditoría.
 - Migración SQL para intentos, sesiones, auditoría y ajustes.
-- El panel no habilita acciones de edición que todavía no estén implementadas.
+- Explorador y editor de documentos Markdown/texto en Preview con control SHA; ajustes de UI/reproductor persistidos en D1; metadatos de Telegram vinculados a mensajes reales; exploración del catálogo desde la sesión Telegram local del navegador; inventario estático y auditoría heurística del repositorio.
 
 ## Configuración necesaria en Cloudflare
 
@@ -28,9 +28,15 @@ Hazlo primero en el entorno Preview, nunca en Production mientras se revisa esta
 5. Comprueba que la salida de compilación de Pages siga siendo `docs` y que la carpeta `functions/` de la raíz del repositorio se detecte como Pages Functions. No cambies la configuración de producción para hacer esta comprobación.
 6. Revisa la rama `feature/cloudflare-admin` en Preview. La dirección principal `player-tv.pages.dev` no debe cambiarse ni promoverse desde esta rama.
 
-## Importante: alcance actual
+## Funciones conectadas en esta entrega
 
-Esta primera integración asegura el acceso al panel y proporciona persistencia D1 para sesiones y auditoría. **No equivale todavía a tener todos los permisos de administración de la aplicación.** La integración GitHub para explorar/editar archivos, auditoría real de código, catálogo Telegram, configuración del reproductor, backups y acciones de escritura todavía requieren sus APIs específicas, permisos mínimos, pruebas y confirmación.
+- **Catálogo Telegram:** el espacio administrativo usa la sesión `tvp_session` que ya existe en el navegador tras iniciar sesión en TV Player. Lee los temas etiquetados y los últimos 300 mensajes por tema para seleccionar el mensaje real. No envía la sesión de Telegram a Cloudflare. Los metadatos se guardan en D1 y la aplicación los combina con el catálogo al cargarlo.
+- **Reproductor:** las claves permitidas `player.theme`, `player.volume`, `player.autoplay`, `player.pip`, `player.screenshot`, `player.playbackRate` y `player.aspectRatio` se leen mediante `/api/public-config` y se aplican al iniciar Artplayer.
+- **Diseño:** `ui.accentColor`, `ui.backgroundColor`, `ui.cardRadius` y `ui.fontFamily` se aplican en la aplicación usando variables CSS. Recarga la aplicación para verlos.
+- **Inventario:** inspección estática de HTML, JavaScript y CSS en la rama Preview.
+- **Auditoría:** detecta patrones como ejecución dinámica, HTML dinámico, marcadores TODO/FIXME y peticiones HTTP de mutación. Es heurística, no un análisis de seguridad certificado.
+- **Backups:** las copias D1 incluyen ajustes y metadatos administrativos, no el repositorio completo ni mensajes de Telegram.
+- **Archivos:** el editor de GitHub sigue limitado deliberadamente a documentos `.md` y `.txt` de `docs/`. No permite modificar el código ejecutable del reproductor desde el panel.
 
 No introduzcas tokens de GitHub, credenciales de Telegram ni secretos de producción en archivos del repositorio. Los secretos van en Cloudflare, cifrados. No reutilices contraseñas de Telegram.
 
