@@ -125,7 +125,7 @@
   const button=document.getElementById('run-audit');button.disabled=true;
   try{
    const d=await api('/api/admin/inspect?mode=audit');
-   status.textContent='Inspección terminada · '+d.files.length+' archivos · rama '+d.ref;
+   status.textContent='Inspección terminada · '+d.files.length+' de '+(d.candidates||d.files.length)+' archivos · rama '+d.ref+(d.truncated?' · resultado parcial por límite de seguridad':'');
    const counts=d.counts||{};
    summary.textContent='Altos: '+(counts.high||0)+' · Medios: '+(counts.medium||0)+' · Informativos: '+(counts.info||0);
    if(!d.findings.length){results.textContent='No se encontraron patrones incluidos en esta revisión.';return;}
@@ -144,7 +144,7 @@
   const button=document.getElementById('run-components');button.disabled=true;
   try{
    const d=await api('/api/admin/inspect?mode=components');
-   status.textContent='Inventario generado · '+d.files.length+' archivos · rama '+d.ref;
+   status.textContent='Inventario generado · '+d.files.length+' de '+(d.candidates||d.files.length)+' archivos · rama '+d.ref+(d.truncated?' · resultado parcial por límite de seguridad':'');
    summary.textContent=d.total+' elementos detectados';
    d.components.forEach(item=>{
     const row=document.createElement('div');row.className='rowline';
