@@ -166,7 +166,7 @@
    currentFileSha=d.sha;currentFilePath=d.path;
    document.getElementById('files-commit-message').value='';
    document.getElementById('files-save-message').textContent='';
-   const canEdit=d.path.startsWith('docs/')&&!['docs/index.html','docs/admin.html','docs/admin-workspace.html'].includes(d.path);
+   const canEdit=/^docs\/.+\.(md|txt)$/i.test(d.path);
    document.getElementById('files-content').readOnly=!canEdit;
    document.getElementById('files-save').disabled=!canEdit;
    filesView.hidden=false;filesMessage.textContent='Archivo cargado desde '+d.ref+'. '+(canEdit?'Edición habilitada con control de versión.':'Este archivo está protegido contra escritura.');
