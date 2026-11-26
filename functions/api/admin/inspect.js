@@ -68,7 +68,9 @@ export async function onRequestGet({ request, env }) {
     const ref = await github("/git/ref/heads/" + REF, env.GITHUB_TOKEN);
     const tree = await github("/git/trees/" + ref.object.sha + "?recursive=1", env.GITHUB_TOKEN);
     if (tree.truncated) return json({ error: "El árbol del repositorio supera el límite de inspección; no se presenta un informe incompleto como completo." }, 413);
-    const files = (tree.tree || []).filter(x => x.type === "blob" && SOURCE_EXT.test(x.path) && !x.path.split("/").some(p => p.startsWith("."))).slice(0, MAX_FILES);
+    const candidates = (tree.tree || []).filter(x => x.type === "blob" && SOURCE_EXT.test(x.path) && !x.path.split("/").some(p => p.startsWith(".")));
+    const files = candidates.slice(0, MAX_FILES);
+    const truncated = candidates.length > MAX_FILES;
     const inspected = [];
     const findings = [];
     const components = [];
@@ -87,10 +89,10 @@ export async function onRequestGet({ request, env }) {
     await audit(env, request, mode === "audit" ? "github.repository.audit" : "github.repository.inventory", { files: inspected.length, findings: findings.length });
     if (mode === "components") {
       const unique = [...new Map(components.map(x => [x.type + "|" + x.name + "|" + x.file, x])).values()];
-      return json({ ok: true, ref: REF, files: inspected, total: unique.length, components: unique.slice(0, 800) });
+      return json({ ok: true, ref: REF, files: inspected, candidates: candidates.length, truncated, total: unique.length, components: unique.slice(0, 800) });
     }
     const counts = { high: findings.filter(x => x.severity === "high").length, medium: findings.filter(x => x.severity === "medium").length, info: findings.filter(x => x.severity === "info").length };
-    return json({ ok: true, ref: REF, files: inspected, counts, findings: findings.slice(0, 400), note: "Análisis estático heurístico; no sustituye pruebas, revisión manual ni análisis de dependencias." });
+    return json({ ok: true, ref: REF, files: inspected, candidates: candidates.length, truncated, counts, findings: findings.slice(0, 400), note: "Análisis estático heurístico; no sustituye pruebas, revisión manual ni análisis de dependencias." });
   } catch (error) {
     return json({ error: error.message || "No se pudo inspeccionar el repositorio." }, 502);
   }
