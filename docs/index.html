@@ -19,6 +19,15 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- GramJS usa solo randomBytes y SHA-1/SHA-256; usar Web Crypto nativo. -->
+    <script type="importmap">
+    {
+        "imports": {
+            "crypto": "./gramjs-crypto-shim.js",
+            "node:crypto": "./gramjs-crypto-shim.js"
+        }
+    }
+    </script>
 </head>
 <body>
     <!-- build: usar bundle local telegram-browser.js (deploy v2) -->
@@ -198,66 +207,44 @@
         </div>
     </div>
 
-    <!-- Import map: sustituye el 'crypto' de Node por crypto-browserify (createHash real) -->
-    <script type="importmap">
-    {
-      "imports": {
-        "crypto": "https://esm.sh/crypto-browserify@3.12.1?target=es2022",
-        "node:crypto": "https://esm.sh/crypto-browserify@3.12.1?target=es2022"
-      }
-    }
-    </script>
     <!-- Motor Telegram (GramJS) + dependencias -->
     <!-- QR para el login alternativo -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <!-- Cargar configuración antes de probar la conexión ESM -->
+    <script src="tg-config.js?v=6ea8a71"></script>
     <script>
-        try { window.Buffer = window.Buffer || (window.buffer && window.buffer.Buffer); } catch (e) { }
-        if (!window.global) window.global = window;
-        if (!window.process) window.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
         (function () {
-            // Usa primero el bundle local; conecta con Telegram solo cuando el usuario inicia sesión.
+            // GramJS ESM: evita el bundle UMD que puede resolver crypto mediante unenv.
+            var ESM = [
+                'https://esm.sh/telegram@2.26.22?bundle&target=es2022&external=node:crypto,crypto',
+                'https://esm.sh/telegram@2.26.22?bundle-deps&external=node:crypto,crypto',
+                'https://esm.sh/telegram@2.26.22?target=esnext&external=node:crypto,crypto',
+                'https://esm.sh/telegram@2.26.22?external=node:crypto,crypto'
+            ];
             async function polyfills() {
                 if (!globalThis.global) globalThis.global = globalThis;
                 if (!globalThis.process) globalThis.process = { env: {}, browser: true, version: 'v18.0.0', nextTick: function (f) { Promise.resolve().then(f); } };
                 if (!globalThis.Buffer) {
-                    var SRC = ['https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm', 'https://esm.sh/buffer@6.0.3'];
+                    var SRC = ['https://esm.sh/buffer@6.0.3', 'https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm'];
                     for (var i = 0; i < SRC.length; i++) {
                         try {
                             var m = await import(SRC[i]);
                             var B = m.Buffer || (m.default && m.default.Buffer);
                             if (B) { globalThis.Buffer = B; window.Buffer = B; console.log('[tg-loader] Buffer polyfill OK'); break; }
-                        } catch (e) { }
+                        } catch (e) { console.warn('[tg-loader] Buffer polyfill falló:', SRC[i], e && e.message); }
                     }
                     if (!globalThis.Buffer) console.warn('[tg-loader] no se pudo cargar el polyfill de Buffer');
                 }
             }
-            var UMD = [
-                'telegram-browser.js',
-                'https://cdn.jsdelivr.net/npm/telegram@2.19.10/browser/telegram.js',
-                'https://cdn.jsdelivr.net/npm/telegram@2.22.2/browser/telegram.js',
-                'https://unpkg.com/telegram@2.19.10/browser/telegram.js'
-            ];
-            function loadScript(src) {
-                return new Promise(function (res, rej) {
-                    var s = document.createElement('script'); s.src = src; s.async = false;
-                    s.onload = function () { res(); }; s.onerror = function () { rej(new Error(src)); };
-                    document.head.appendChild(s);
-                });
+            function pick(tg) {
+                var T = tg.TelegramClient || (tg.default && tg.default.TelegramClient);
+                var Api = tg.Api || (tg.default && tg.default.Api);
+                var SS = (tg.sessions && tg.sessions.StringSession) || tg.StringSession
+                    || (tg.default && tg.default.sessions && tg.default.sessions.StringSession);
+                return (T && Api && SS) ? { TelegramClient: T, Api: Api, sessions: { StringSession: SS } } : null;
             }
-            // Carga un bundle local via fetch + eval. Mas fiable que <script> con 304/MIME.
-            async function loadLocalUmd(src) {
-                var r = await fetch(src);
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                var code = await r.text();
-                if (code.length < 1000) throw new Error('archivo demasiado pequeño (' + code.length + ' bytes)');
-                // Ejecuta el UMD en el ambito global; webpack lo cuelga de window.telegram
-                (0, eval)(code);
-                applyTLTolerance();
-            }
-            // Parchea el lector binario para tolerar constructores TL desconocidos.
-            // Si Telegram envia un constructor que esta version de GramJS no conoce,
-            // en vez de lanzar y romper la conexion, descartamos ese paquete y seguimos.
+            // Mantener la tolerancia TL que ya tenía el cargador anterior.
             function applyTLTolerance() {
                 try {
                     var BR = window.telegram && ((window.telegram.extensions && window.telegram.extensions.BinaryReader) || window.telegram.BinaryReader);
@@ -274,7 +261,6 @@
                             if (/Could not find a matching Constructor|Missing MTProto Entity/i.test(msg)) {
                                 var m = msg.match(/ID\s+(\d+)/);
                                 console.warn('[tg-patch] constructor desconocido', m ? m[1] : '?', '— ignorando paquete');
-                                // Avanzar al final del buffer para no quedarnos atascados
                                 try { if (typeof this.stream !== 'undefined' && this.stream && this.stream.length != null) this.offset = this.stream.length; } catch (e2) { }
                                 try { if (this._buffer && this._buffer.length != null) this.offset = this._buffer.length; } catch (e2) { }
                                 return null;
@@ -288,34 +274,54 @@
                     console.warn('[tg-patch] no se pudo parchear BinaryReader:', e && e.message);
                 }
             }
-            function waitGlobal(ms) {
-                return new Promise(function (res) {
-                    var n = Math.ceil((ms || 5000) / 100);
-                    (function chk() { if (window.telegram && window.telegram.TelegramClient) return res(true); if (n-- <= 0) return res(false); setTimeout(chk, 100); })();
-                });
+            async function connects(lib) {
+                var c;
+                try {
+                    var cfg = window.TVP_CONFIG || {};
+                    if (!cfg.apiId || !cfg.apiHash) throw new Error('Falta la configuración apiId/apiHash de Telegram');
+                    c = new lib.TelegramClient(new lib.sessions.StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 1, useWSS: true });
+                    await Promise.race([
+                        c.connect(),
+                        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, 15000); })
+                    ]);
+                    return true;
+                } catch (e) {
+                    console.warn('[tg-loader] prueba de conexion fallo:', e && e.message);
+                    return false;
+                } finally {
+                    if (c) { try { await c.disconnect(); } catch (e) { } }
+                }
             }
             (async function () {
                 await polyfills();
-                // 1) UMD clasico (dist/index.js): expondria window.telegram con crypto nativo del navegador
-                for (var u = 0; u < UMD.length; u++) {
-                    var src = UMD[u];
-                    var isLocal = !/^https?:/i.test(src); // bundle local que servimos nosotros
+                for (var i = 0; i < ESM.length; i++) {
+                    var url = ESM[i];
                     try {
-                        if (isLocal) await loadLocalUmd(src);
-                        else await loadScript(src);
+                        var tg = await import(url);
+                        var lib = pick(tg);
+                        if (!lib) { console.warn('[tg-loader] sin exports utiles:', url); continue; }
+                        console.log('[tg-loader] importado:', url, '— probando conexion...');
+                        if (await connects(lib)) {
+                            window.telegram = lib;
+                            applyTLTolerance();
+                            try {
+                                var b = await import('https://esm.sh/big-integer@1.6.52');
+                                window.bigInt = window.bigInt || b.default || b;
+                            } catch (e) { console.warn('[tg-loader] no se pudo cargar big-integer:', e && e.message); }
+                            console.log('[tg-loader] GramJS FUNCIONA via', url);
+                            return window.__tgResolve(window.telegram);
+                        }
+                        console.warn('[tg-loader] importó pero no conecta:', url);
+                    } catch (e) {
+                        console.warn('[tg-loader] FALLO import', url, e && e.message);
                     }
-                    catch (e) { console.warn('[tg-loader] UMD no carga', src, e && e.message); continue; }
-                    if (!(await waitGlobal(4000))) { console.warn('[tg-loader] UMD cargó pero SIN window.telegram (probablemente es CommonJS):', src); continue; }
-                    console.log('[tg-loader] GramJS cargado (UMD) via', src, '; la conexión se hará al iniciar sesión.');
-                    return window.__tgResolve(window.telegram);
                 }
-                console.error('[tg-loader] No se pudo cargar GramJS desde las fuentes UMD');
+                console.error('[tg-loader] Ningun CDN de GramJS funciono para conectar');
                 window.__tgReject(new Error('No se pudo cargar GramJS'));
             })();
         })();
     </script>
     <!-- Capa cliente (reemplaza al servidor) -->
-    <script src="tg-config.js?v=6ea8a71"></script>
     <script src="tg-service.js?v=poster-fix-2"></script>
     <script src="tg-app.js?v=metadata-tags-1"></script>
     <!-- Frontend -->
