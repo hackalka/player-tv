@@ -49,8 +49,18 @@ async function loadTelegramTopic(topic){
  try{
   const messages=await tgService.getTopicMessages(topic.id,300);
   const items=tgService._buildTopicItems(messages,topic);
-  tgText(status,'Tema '+topic.name+' · '+items.length+' elementos analizados · '+messages.length+' mensajes consultados.');
+  const editable=[];
   items.forEach(item=>{
+   if(Array.isArray(item.episodes)&&item.episodes.length){
+    item.episodes.forEach(episode=>{
+     const episodeId=String(episode.id);
+     const sourceId=episodeId.replace(/-l\d+$/,'');
+     editable.push({id:sourceId,title:(item.title||'Serie')+' · '+(episode.title||'Episodio'),description:episode.description||item.description,thumbUrl:episode.thumbUrl||item.thumbUrl,meta:item.meta||episode.meta||{}});
+    });
+   }else editable.push(item);
+  });
+  tgText(status,'Tema '+topic.name+' · '+editable.length+' elementos editables · '+messages.length+' mensajes consultados.');
+  editable.forEach(item=>{
    const row=document.createElement('div');row.className='row';
    const label=document.createElement('span');label.textContent=(item.title||'Sin título')+' · mensaje '+item.id;
    const edit=document.createElement('button');edit.type='button';edit.textContent='Editar metadatos';
