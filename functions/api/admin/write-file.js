@@ -10,7 +10,7 @@ function validEditablePath(value) {
   if (parts.length < 2 || parts[0] !== "docs") return false;
   if (parts.some(part => !part || part === "." || part === ".." || part.startsWith("."))) return false;
   if (["index.html", "admin.html", "admin-workspace.html"].includes(parts.at(-1))) return false;
-  return /\.(html|css|js|json|md|txt|svg|webmanifest)$/i.test(parts.at(-1));
+  return /\.(md|txt)$/i.test(parts.at(-1));
 }
 
 function encodeBase64(value) {
