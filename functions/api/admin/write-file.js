@@ -5,7 +5,7 @@ const REF = "feature/cloudflare-admin";
 const MAX_FILE_BYTES = 150 * 1024;
 
 function validEditablePath(value) {
-  if (typeof value !== "string" || value.length > 300 || value.includes("\\\\") || value.startsWith("/")) return false;
+  if (typeof value !== "string" || value.length > 300 || value.includes("\\") || value.startsWith("/")) return false;
   const parts = value.split("/");
   if (parts.length < 2 || parts[0] !== "docs") return false;
   if (parts.some(part => !part || part === "." || part === ".." || part.startsWith("."))) return false;
