@@ -2,7 +2,7 @@ import { json } from "./admin/_lib.js";
 
 const PUBLIC_KEYS = new Set([
   "player.theme", "player.volume", "player.autoplay", "player.aspectRatio",
-  "player.pip", "player.screenshot", "player.playbackRate", "player.maxWidth",
+  "player.pip", "player.screenshot", "player.playbackRate",
   "ui.accentColor", "ui.backgroundColor", "ui.cardRadius", "ui.fontFamily"
 ]);
 
