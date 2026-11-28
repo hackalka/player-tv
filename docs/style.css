@@ -782,8 +782,9 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 .detail-modal { padding: 0; overflow: hidden; }
 .detail-hero {
     position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
-    display: flex; align-items: flex-end; overflow: hidden;
+    align-items: flex-end; overflow: hidden; display: none;
 }
+.detail-hero.playing { display: flex; }
 .detail-hero .detail-backdrop {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
 }
@@ -792,10 +793,10 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
     background: linear-gradient(0deg, #181818 0%, rgba(24,24,24,.5) 40%, rgba(24,24,24,.1) 100%);
 }
 .detail-hero-content {
-    position: relative; z-index: 2; padding: 0 40px 32px; width: 100%;
+    position: relative; z-index: 2; padding: 0; width: 100%;
 }
 .detail-title {
-    font-size: 2rem; font-weight: 800; margin: 0 0 16px; color: #fff;
+    font-size: 1.7rem; font-weight: 800; margin: 0 0 16px; color: #fff;
     text-shadow: 0 2px 10px rgba(0,0,0,.7); line-height: 1.1;
 }
 .detail-hero #player-video,
@@ -853,8 +854,7 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 }
 
 @media (max-width: 640px) {
-    .detail-title { font-size: 1.4rem; }
-    .detail-hero-content { padding: 0 18px 18px; }
+    .detail-title { font-size: 1.3rem; }
     .detail-modal .modal-details { padding: 18px; }
     .episode-thumb { width: 92px; height: 52px; }
 }
@@ -997,8 +997,8 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 }
 .detail-info { flex: 1; min-width: 0; }
 @media (max-width: 640px) {
-    .detail-body { gap: 14px; flex-direction: column; }
-    .detail-poster { width: 130px; margin-top: 0; }
+    .detail-body { gap: 14px; flex-direction: row; }
+    .detail-poster { width: 96px; margin-top: 0; }
 }
 
 

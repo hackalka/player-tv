@@ -505,6 +505,10 @@ const Detail = {
     primary: null,
     open(item, opts = {}) {
         this.current = item;
+        // La ficha (título, acciones y sinopsis) va junto al póster pequeño.
+        const detailInfo = el.modalDescription && el.modalDescription.parentElement;
+        const heroContent = el.detailHero && el.detailHero.querySelector('.detail-hero-content');
+        if (detailInfo && heroContent && heroContent.parentElement !== detailInfo) detailInfo.prepend(heroContent);
         const eps = item.episodes || [];
         const hasLinks = !!(item.links && item.links.length);
         el.modalTitle.innerText = item.title || '';
@@ -836,9 +840,13 @@ const Detail = {
         if (Detail._ytPlayer) { try { Detail._ytPlayer.destroy(); } catch {} Detail._ytPlayer = null; }
         if (el.trailerIframe) { el.trailerIframe.hidden = true; el.trailerIframe.src = 'about:blank'; }
         if (el.trailerMute) el.trailerMute.hidden = true;
+        if (el.detailHero && !el.detailHero.querySelector('#player-video:not([hidden]), #player-iframe:not([hidden]), #artplayer-mount:not([hidden])')) {
+            el.detailHero.classList.remove('playing');
+        }
     },
     _loadTrailer(key, manual) {
         if (manual) Detail._stopTrailer();
+        el.detailHero.classList.add('playing');
         // Asegurarse de que la API de YouTube está cargada
         const tryCreate = () => {
             if (!window.YT || !window.YT.Player) { setTimeout(tryCreate, 200); return; }
