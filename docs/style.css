@@ -273,7 +273,7 @@ body {
 /* ===== FILAS DE CONTENIDO ===== */
 .main-content {
     position: relative;
-    margin-top: -15vh;
+    margin-top: -8vh;
     z-index: 10;
     padding-bottom: 50px;
 }
