@@ -1049,7 +1049,6 @@ const ExternalPlayers = {
         if (!playable) { box.hidden = true; return; }
         const items = [];
         let label = 'Otros reproductores:';
-        let externalHelp = '';
 
         if (playable.aceUrl) {
             // AceStream: reproductor dedicado.
@@ -1072,9 +1071,7 @@ const ExternalPlayers = {
                 items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado</button>`);
                 const dl = absUrl(playable.streamUrl) + (absUrl(playable.streamUrl).indexOf('?') >= 0 ? '&' : '?') + 'download=1';
-                items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download>⬇ Descargar para reproductor externo</a>`);
                 label = `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Elige cómo verlo:`;
-                externalHelp = '<p class="opt-help">Descarga el archivo y ábrelo desde Descargas con VLC, MPV u otro reproductor instalado. El navegador no puede iniciar programas externos directamente.</p>';
             }
         } else if (!playable.streamUrl && playable.externalUrl) {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
@@ -1082,7 +1079,7 @@ const ExternalPlayers = {
 
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
-        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>${externalHelp}`;
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
     },
 
     // Panel cuando se intenta abrir externamente una URL concreta (acestream / stream del servidor)
@@ -1100,8 +1097,6 @@ const ExternalPlayers = {
             // sirve un Service Worker), así que VLC u otra app externa no la podrían
             // abrir directamente. La forma fiable: descargar el fichero y abrirlo
             // con el reproductor del sistema (VLC/MX Player/MPV).
-            const dl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
-            const fn = (playable && (playable.filename || (playable.title || 'video') + (playable.ext ? '.' + playable.ext : ''))) || 'video';
             // Reproductor NATIVO de la APK (ExoPlayer/libVLC) — máxima prioridad.
             const hasNative = Player._hasNative() && Player._streamRef(playable);
             if (hasNative) {
@@ -1115,16 +1110,12 @@ const ExternalPlayers = {
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
             }
             // Descargar siempre disponible.
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar para reproductor externo</a>`);
         }
         const label = isAce
             ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
             : `Formato${info && info.ext ? ' ' + info.ext.toUpperCase() : ''} no compatible con el navegador. Elige cómo verlo:`;
         box.hidden = false;
-        const externalHelp = !isAce && !Player._hasNative()
-            ? '<p class="opt-help">Descarga el archivo y ábrelo desde Descargas con VLC, MPV u otro reproductor instalado. El navegador no puede iniciar programas externos directamente.</p>'
-            : '';
-        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>${externalHelp}`;
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
     },
 
     // Tras descargar el archivo, abre el menú nativo del móvil para compartirlo
