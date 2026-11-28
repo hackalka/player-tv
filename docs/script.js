@@ -512,7 +512,7 @@ const Detail = {
         el.modalDuration.innerText = (eps.length > 1) ? `${eps.length} episodios`
             : (hasLinks ? `${item.links.length} ${item.links.length === 1 ? 'enlace' : 'enlaces'}`
             : (item.duration || (eps[0] && eps[0].duration) || item.size || ''));
-        el.modalDescription.hidden = hasLinks;
+        el.modalDescription.hidden = false;
         el.modalDescription.innerText = item.description || 'Sin descripción disponible.';
         const rating = item.meta && item.meta.rating;
         const genres = item.meta && item.meta.genres;
@@ -564,6 +564,7 @@ const Detail = {
         this.primary = primary;
         ExternalPlayers.render(primary);
         this._loadFilmAffinityMetadata(item);
+        el.detailPlay.hidden = hasLinks || !(primary && (primary.isVideo || primary.streamUrl || primary.playableInBrowser));
         el.detailPlay.onclick = () => Player.play(Detail.primary, item);
         el.favBtn.onclick = () => { Store.toggleFav(item); this.updateFav(); CloudStore.saveFavs(); };
         if (el.watchedBtn) {
@@ -572,7 +573,7 @@ const Detail = {
         }
         if (opts.autoplay) Player.play(primary, item);
         TVNav.refresh();
-        setTimeout(() => el.detailPlay.focus(), 50);
+        if (!el.detailPlay.hidden) setTimeout(() => el.detailPlay.focus(), 50);
     },
 
     _loadFilmAffinityMetadata(item) {
@@ -613,17 +614,6 @@ const Detail = {
                 if (image) image.src = item.cover;
             });
         }
-        if (item.description) {
-            $$('.source-btn', el.sourcesTrack).forEach(button => {
-                let synopsis = $('.source-description', button);
-                if (!synopsis) {
-                    synopsis = document.createElement('span');
-                    synopsis.className = 'source-description';
-                    button.appendChild(synopsis);
-                }
-                synopsis.textContent = '📜 ' + item.description;
-            });
-        }
     },
 
     // Lista de fuentes reproducibles. Cada una con un boton "▶ Play" (etiqueta limpia).
@@ -642,8 +632,7 @@ const Detail = {
             const sub = isGeneric ? '' : raw;
             const main = `▶ Play ${playables.length > 1 ? (i + 1) : ''}`.trim();
             const ico = pl.aceUrl ? '📡' : pl.tvgramUrl ? '📺' : '▶';
-            const synopsis = item.description ? `<span class="source-description">📜 ${escapeHtml(item.description)}</span>` : '';
-            const label = `<span class="source-ico">${ico}</span><span class="source-main">${escapeHtml(main)}</span>${sub ? `<span class="source-sub">${escapeHtml(sub)}</span>` : ''}${tag ? `<span class="source-tag">${escapeHtml(tag)}</span>` : ''}${synopsis}`;
+            const label = `<span class="source-ico">${ico}</span><span class="source-main">${escapeHtml(main)}</span>${sub ? `<span class="source-sub">${escapeHtml(sub)}</span>` : ''}${tag ? `<span class="source-tag">${escapeHtml(tag)}</span>` : ''}`;
             let node;
             if (pl.aceUrl) {
                 node = document.createElement('a');

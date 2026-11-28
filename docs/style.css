@@ -927,12 +927,6 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 .source-btn.tvgram .source-ico { color: #3ee65c; }
 .source-btn.tvgram .source-tag { color: #3ee65c; background: rgba(62, 230, 92, 0.14); }
 .source-ico { font-size: 1rem; line-height: 1; }
-.source-description {
-    flex-basis: 100%; color: rgba(255,255,255,.78); font-size: .82rem;
-    font-weight: 400; line-height: 1.4; white-space: normal; text-align: left;
-}
-
-
 /* Metadatos de la ficha en su propia línea */
 .modal-description { white-space: pre-line; }
 
