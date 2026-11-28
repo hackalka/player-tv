@@ -218,9 +218,9 @@ body {
 }
 .hero-content {
     position: absolute;
-    bottom: 35%;
+    bottom: clamp(48px, 12vh, 120px);
     left: 4%;
-    max-width: 40%;
+    max-width: min(60%, 720px);
     z-index: 10;
 }
 .hero-title {
@@ -711,7 +711,7 @@ body {
 
     .hero-content {
         max-width: 80%;
-        bottom: 25%;
+        bottom: clamp(24px, 8vh, 56px);
     }
 
     .hero-description {
