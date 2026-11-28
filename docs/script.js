@@ -1496,7 +1496,7 @@ function applyCatalog(catalog, groupId) {
         state.itemsById[item.id] = item;
     }));
     try {
-        sessionStorage.setItem('tvp_catalog:' + encodeURIComponent(groupId), JSON.stringify({
+        sessionStorage.setItem('tvp_catalog:v2:' + encodeURIComponent(groupId), JSON.stringify({
             ts: Date.now(), data: state.catalog
         }));
     } catch {}
@@ -1512,7 +1512,7 @@ async function loadGroupCatalog(groupId, useCache) {
     try { localStorage.setItem(state.groupPreferenceKey, selectedGroup); } catch {}
 
     const endpoint = '/api/catalog?group=' + encodeURIComponent(selectedGroup);
-    const cacheKey = 'tvp_catalog:' + encodeURIComponent(selectedGroup);
+    const cacheKey = 'tvp_catalog:v2:' + encodeURIComponent(selectedGroup);
     let cached = null;
     if (useCache) {
         try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch {}

@@ -592,6 +592,24 @@
                         });
                     }
                     const merged = Object.assign({}, base);
+                    const metadataLinks = items.flatMap(x => x.metadataLinks || []);
+                    if (metadataLinks.length) {
+                        const seenMetadata = new Set();
+                        merged.metadataLinks = metadataLinks.filter(link => {
+                            const url = String(link.url || '').trim();
+                            if (!url || seenMetadata.has(url)) return false;
+                            seenMetadata.add(url);
+                            return true;
+                        });
+                    }
+                    if (!merged.description) {
+                        const describedItem = items.find(x => x.description);
+                        if (describedItem) merged.description = describedItem.description;
+                    }
+                    if (!merged.year) {
+                        const datedItem = items.find(x => x.year);
+                        if (datedItem) merged.year = datedItem.year;
+                    }
                     if (sources.length) {
                         merged.links = sources;
                         if (sources.length > 1) {
