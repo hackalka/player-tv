@@ -1049,6 +1049,7 @@ const ExternalPlayers = {
         if (!playable) { box.hidden = true; return; }
         const items = [];
         let label = 'Otros reproductores:';
+        let externalHelp = '';
 
         if (playable.aceUrl) {
             // AceStream: reproductor dedicado.
@@ -1071,8 +1072,9 @@ const ExternalPlayers = {
                 items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado</button>`);
                 const dl = absUrl(playable.streamUrl) + (absUrl(playable.streamUrl).indexOf('?') >= 0 ? '&' : '?') + 'download=1';
-                items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download>⬇ Descargar</a>`);
+                items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download>⬇ Descargar para reproductor externo</a>`);
                 label = `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Elige cómo verlo:`;
+                externalHelp = '<p class="opt-help">Descarga el archivo y ábrelo desde Descargas con VLC, MPV u otro reproductor instalado. El navegador no puede iniciar programas externos directamente.</p>';
             }
         } else if (!playable.streamUrl && playable.externalUrl) {
             items.push(`<a class="opt-btn focusable" tabindex="0" href="${escapeHtml(playable.externalUrl)}" target="_blank" rel="noopener">Abrir enlace</a>`);
@@ -1080,7 +1082,7 @@ const ExternalPlayers = {
 
         if (!items.length) { box.hidden = true; return; }
         box.hidden = false;
-        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>${externalHelp}`;
     },
 
     // Panel cuando se intenta abrir externamente una URL concreta (acestream / stream del servidor)
@@ -1113,13 +1115,16 @@ const ExternalPlayers = {
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
             }
             // Descargar siempre disponible.
-            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar</a>`);
+            items.push(`<a class="opt-btn external focusable" tabindex="0" href="${escapeHtml(dl)}" download="${escapeHtml(fn)}">⬇ Descargar para reproductor externo</a>`);
         }
         const label = isAce
             ? 'Si tu reproductor AceStream no se ha abierto solo, pulsa una opción:'
             : `Formato${info && info.ext ? ' ' + info.ext.toUpperCase() : ''} no compatible con el navegador. Elige cómo verlo:`;
         box.hidden = false;
-        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>`;
+        const externalHelp = !isAce && !Player._hasNative()
+            ? '<p class="opt-help">Descarga el archivo y ábrelo desde Descargas con VLC, MPV u otro reproductor instalado. El navegador no puede iniciar programas externos directamente.</p>'
+            : '';
+        box.innerHTML = `<div class="opt-label">${escapeHtml(label)}</div><div class="opt-row">${items.join('')}</div>${externalHelp}`;
     },
 
     // Tras descargar el archivo, abre el menú nativo del móvil para compartirlo

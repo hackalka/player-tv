@@ -883,6 +883,7 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 .player-options { margin: 18px 0 4px; }
 .opt-label { color: var(--netflix-light-gray); font-size: .9rem; margin-bottom: 10px; }
 .opt-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.opt-help { color: var(--netflix-light-gray); font-size: .82rem; margin: 8px 0 0; }
 .opt-btn {
     display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 6px;
     background: #2a2a2a; color: #fff; border: 1px solid #3a3a3a; cursor: pointer;
