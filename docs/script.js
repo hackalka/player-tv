@@ -582,11 +582,40 @@ const Detail = {
         );
         if (!link || (item.description && item.cover) || item._metadataRequest) return;
 
-        const request = fetch('/api/metadata/filmaffinity?url=' + encodeURIComponent(link.url), {
-            headers: { Accept: 'application/json' }
-        }).then(async response => {
-            if (!response.ok) throw new Error('FilmAffinity respondió con HTTP ' + response.status);
-            const metadata = await response.json();
+        const readFromBrowser = async () => {
+            const target = new URL(link.url);
+            if (target.protocol !== 'https:' || !/(^|\.)filmaffinity\.com$/i.test(target.hostname)
+                || !/^\/[a-z]{2}\/film\d+\.html$/i.test(target.pathname)) {
+                throw new Error('Enlace de FilmAffinity no valido');
+            }
+            const response = await fetch('https://r.jina.ai/' + target.href, {
+                headers: { Accept: 'text/plain' }
+            });
+            if (!response.ok) throw new Error('Jina Reader HTTP ' + response.status);
+            const text = await response.text();
+            const synopsis = text.match(/\bSinopsis\s*:?\s*([\s\S]*?)\s*\(FILMAFFINITY\)/i);
+            if (!synopsis || !synopsis[1].trim()) throw new Error('Jina Reader no devolvio una sinopsis');
+            const titleMatch = text.match(/^Title:\s*(.+)$/mi);
+            const posterMatch = text.match(/https:\/\/pics\.filmaffinity\.com\/[^)\s"<>]+/i);
+            return {
+                title: titleMatch ? titleMatch[1].trim() : '',
+                description: synopsis[1].replace(/\s+/g, ' ').trim(),
+                year: ((titleMatch && titleMatch[1].match(/\b(?:19|20)\d{2}\b/)) || [])[0] || '',
+                poster: posterMatch ? posterMatch[0] : ''
+            };
+        };
+        const readFromServer = async () => {
+            const response = await fetch('/api/metadata/filmaffinity?url=' + encodeURIComponent(link.url), {
+                headers: { Accept: 'application/json' }
+            });
+            if (!response.ok) throw new Error('Servidor de FilmAffinity HTTP ' + response.status);
+            return response.json();
+        };
+
+        const request = readFromBrowser().catch(error => {
+            console.warn('[metadata] Jina desde el navegador fallo; probando servidor:', error.message);
+            return readFromServer();
+        }).then(metadata => {
             if (!item.description && metadata.description) item.description = String(metadata.description);
             if (!item.cover && metadata.poster) item.cover = String(metadata.poster);
             if (!item.backdrop && item.cover) item.backdrop = item.cover;
