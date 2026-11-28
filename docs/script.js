@@ -1259,6 +1259,20 @@ const Player = {
             this._autoAdvanced = false;
             if (window.MkvPlayer) { try { window.MkvPlayer.play(playable); return; } catch (e) {} }
         }
+        // Las rutas tgstream son virtuales: las sirve el Service Worker de esta
+        // pestaña y no se pueden abrir como URL externa en otra pestaña.
+        if (playable && /^tgstream(?:link)?\//.test(String(playable.streamUrl || ''))) {
+            el.detailHero.classList.remove('playing');
+            if (window.ArtBridge && !window.ArtBridge.hidden) { try { window.ArtBridge.destroy(); } catch {} }
+            try { el.playerVideo.pause(); } catch {}
+            el.playerVideo.hidden = true; el.playerVideo.removeAttribute('src');
+            el.playerIframe.hidden = true; el.playerIframe.src = '';
+            el.detailBackdrop.hidden = false;
+            el.playerStatus.hidden = false;
+            el.playerStatus.innerText = 'No se pudo iniciar el vídeo en el navegador. El enlace de Telegram solo funciona dentro de este reproductor.';
+            ExternalPlayers.renderForUrl(absUrl(playable.streamUrl), playable, { isAce: false, isTg: false, ext: (playable.ext || '').toUpperCase() });
+            return;
+        }
         this._openExternal(absUrl(playable.streamUrl), playable);
     },
 
