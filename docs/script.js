@@ -1566,6 +1566,54 @@ document.addEventListener('keydown', (e) => {
 let groupLoadVersion = 0;
 let groupChoicesPromise = null;
 
+function canonicalFilmAffinityUrl(rawUrl) {
+    try {
+        const url = new URL(rawUrl);
+        const host = url.hostname.toLowerCase().replace(/^(?:www|m)\./, '');
+        if (url.protocol !== 'https:' || host !== 'filmaffinity.com') return '';
+        const film = url.pathname.match(/^\/([a-z]{2})\/film(\d+)\.html$/i);
+        const reviews = url.pathname.match(/^\/([a-z]{2})\/pro-reviews\.php$/i);
+        const movieId = reviews && url.searchParams.get('movie-id');
+        if (film) return `https://www.filmaffinity.com/${film[1].toLowerCase()}/film${film[2]}.html`;
+        if (reviews && /^\d+$/.test(movieId || '')) {
+            return `https://www.filmaffinity.com/${reviews[1].toLowerCase()}/film${movieId}.html`;
+        }
+    } catch {}
+    return '';
+}
+
+function normalizeFilmAffinityCatalog(catalog) {
+    (catalog && catalog.categories || []).forEach(category => (category.items || []).forEach(item => {
+        const metadataLinks = Array.isArray(item.metadataLinks) ? item.metadataLinks.slice() : [];
+        item.links = (item.links || []).filter(link => {
+            const canonicalUrl = canonicalFilmAffinityUrl(link.url || link.externalUrl);
+            if (!canonicalUrl) return true;
+            metadataLinks.push(Object.assign({}, link, {
+                url: canonicalUrl,
+                metadataOnly: true,
+                metadataSource: { kind: 'filmaffinity', label: 'FilmAffinity' }
+            }));
+            return false;
+        });
+        const seen = new Set();
+        item.metadataLinks = metadataLinks.map(link => {
+            const canonicalUrl = canonicalFilmAffinityUrl(link.url);
+            return canonicalUrl ? Object.assign({}, link, {
+                url: canonicalUrl,
+                metadataOnly: true,
+                metadataSource: { kind: 'filmaffinity', label: 'FilmAffinity' }
+            }) : link;
+        }).filter(link => {
+            const url = String(link.url || '');
+            if (!url || seen.has(url)) return false;
+            seen.add(url);
+            return true;
+        });
+        if (canonicalFilmAffinityUrl(item.externalUrl)) item.externalUrl = '';
+    }));
+    return catalog;
+}
+
 function mergeCatalogs(previous, latest) {
     if (!previous || !previous.categories) return latest;
     if (!latest || !latest.categories) return previous;
@@ -1593,6 +1641,7 @@ function mergeCatalogs(previous, latest) {
 }
 
 function applyCatalog(catalog, groupId) {
+    normalizeFilmAffinityCatalog(catalog);
     state.catalog = catalog || { categories: [] };
     state.allItems = [];
     state.itemsById = {};

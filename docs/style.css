@@ -1246,7 +1246,7 @@ html.tv-mode a:focus {
 .detail-hero.playing #player-video,
 .detail-hero.playing #player-iframe {
     aspect-ratio: auto;
-    min-height: 56vw; max-height: 78vh;
+    min-height: 0; max-height: 100%;
 }
 
 

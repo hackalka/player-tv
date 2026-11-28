@@ -260,7 +260,7 @@
                     const metadataSource = this._metadataProvider(line);
                     const link = {
                         label: (pendingLabel || (metadataSource ? metadataSource.label : ('Enlace ' + (links.length + 1)))).replace(/[:：]\s*$/, '').trim(),
-                        url: line, kind, metadataSource, metadataOnly: !!metadataSource
+                        url: (metadataSource && metadataSource.url) || line, kind, metadataSource, metadataOnly: !!metadataSource
                     };
                     const tme = this._parseTme(line);
                     if (tme) { link.kind = 'tg'; link.channel = tme.channel; link.msgId = tme.msgId; }
@@ -388,8 +388,16 @@
             try { url = new URL(rawUrl); } catch (e) { return null; }
             if (url.protocol !== 'https:') return null;
             const host = url.hostname.toLowerCase().replace(/^(?:www|m)\./, '');
-            if (host === 'filmaffinity.com' && /^\/[a-z]{2}\/film\d+\.html$/i.test(url.pathname)) {
-                return { kind: 'filmaffinity', label: 'FilmAffinity' };
+            if (host === 'filmaffinity.com') {
+                const film = url.pathname.match(/^\/([a-z]{2})\/film(\d+)\.html$/i);
+                const reviews = url.pathname.match(/^\/([a-z]{2})\/pro-reviews\.php$/i);
+                const movieId = reviews && url.searchParams.get('movie-id');
+                const canonicalUrl = film
+                    ? `https://www.filmaffinity.com/${film[1].toLowerCase()}/film${film[2]}.html`
+                    : (reviews && /^\d+$/.test(movieId || '')
+                        ? `https://www.filmaffinity.com/${reviews[1].toLowerCase()}/film${movieId}.html`
+                        : '');
+                if (canonicalUrl) return { kind: 'filmaffinity', label: 'FilmAffinity', url: canonicalUrl };
             }
             return null;
         }
