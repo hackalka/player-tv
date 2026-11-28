@@ -15,8 +15,6 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23E50914' width='100' height='100' rx='18'/><text x='50' y='70' font-size='52' font-weight='bold' text-anchor='middle' fill='%23fff'>TV</text></svg>">
     <link rel="stylesheet" href="style.css?v=synopsis-layout-2">
     <!-- Firebase (Firestore para favoritos/continuar viendo sincronizados) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- GramJS usa solo randomBytes y SHA-1/SHA-256; usar Web Crypto nativo. -->
@@ -209,9 +207,9 @@
 
     <!-- Motor Telegram (GramJS) + dependencias -->
     <!-- QR para el login alternativo -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" async></script>
     <!-- Cargar configuración antes de probar la conexión ESM -->
-    <script src="tg-config.js?v=6ea8a71"></script>
+    <script src="tg-config.js?v=performance-1"></script>
     <script>
         window.__tgReady = new Promise(function (res, rej) { window.__tgResolve = res; window.__tgReject = rej; });
         (function () {
@@ -274,24 +272,6 @@
                     console.warn('[tg-patch] no se pudo parchear BinaryReader:', e && e.message);
                 }
             }
-            async function connects(lib) {
-                var c;
-                try {
-                    var cfg = window.TVP_CONFIG || {};
-                    if (!cfg.apiId || !cfg.apiHash) throw new Error('Falta la configuración apiId/apiHash de Telegram');
-                    c = new lib.TelegramClient(new lib.sessions.StringSession(''), cfg.apiId, cfg.apiHash, { connectionRetries: 1, useWSS: true });
-                    await Promise.race([
-                        c.connect(),
-                        new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, 15000); })
-                    ]);
-                    return true;
-                } catch (e) {
-                    console.warn('[tg-loader] prueba de conexion fallo:', e && e.message);
-                    return false;
-                } finally {
-                    if (c) { try { await c.disconnect(); } catch (e) { } }
-                }
-            }
             (async function () {
                 await polyfills();
                 for (var i = 0; i < ESM.length; i++) {
@@ -300,37 +280,35 @@
                         var tg = await import(url);
                         var lib = pick(tg);
                         if (!lib) { console.warn('[tg-loader] sin exports utiles:', url); continue; }
-                        console.log('[tg-loader] importado:', url, '— probando conexion...');
-                        if (await connects(lib)) {
-                            window.telegram = lib;
-                            applyTLTolerance();
-                            try {
-                                var b = await import('https://esm.sh/big-integer@1.6.52');
-                                window.bigInt = window.bigInt || b.default || b;
-                            } catch (e) { console.warn('[tg-loader] no se pudo cargar big-integer:', e && e.message); }
-                            console.log('[tg-loader] GramJS FUNCIONA via', url);
-                            return window.__tgResolve(window.telegram);
-                        }
-                        console.warn('[tg-loader] importó pero no conecta:', url);
+                        console.log('[tg-loader] importado:', url);
+                        window.telegram = lib;
+                        applyTLTolerance();
+                        window.__tgResolve(window.telegram);
+                        try {
+                            var b = await import('https://esm.sh/big-integer@1.6.52');
+                            window.bigInt = window.bigInt || b.default || b;
+                        } catch (e) { console.warn('[tg-loader] no se pudo cargar big-integer:', e && e.message); }
+                        console.log('[tg-loader] GramJS listo via', url);
+                        return;
                     } catch (e) {
                         console.warn('[tg-loader] FALLO import', url, e && e.message);
                     }
                 }
-                console.error('[tg-loader] Ningun CDN de GramJS funciono para conectar');
+                console.error('[tg-loader] Ningun CDN de GramJS funciono');
                 window.__tgReject(new Error('No se pudo cargar GramJS'));
             })();
         })();
     </script>
     <!-- Capa cliente (reemplaza al servidor) -->
-    <script src="tg-service.js?v=synopsis-detail-1"></script>
-    <script src="tg-app.js?v=metadata-tags-1"></script>
+    <script src="tg-service.js?v=performance-1"></script>
+    <script src="tg-app.js?v=performance-1"></script>
     <!-- Frontend -->
-    <script src="script.js?v=synopsis-layout-2"></script>
+    <script src="script.js?v=performance-1"></script>
     <!-- Reproductor avanzado MKV/AVI (FFmpeg.wasm, lazy load) -->
     <script src="mkv-player.js"></script>
     <!-- Reproductor Artplayer (UI) + hls.js, inspirado en iptvnator (MIT) -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/artplayer@5.3.0/dist/artplayer.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js" async></script>
+    <script src="https://cdn.jsdelivr.net/npm/artplayer@5.3.0/dist/artplayer.js" async></script>
     <script src="artplayer-bridge.js" defer></script>
     <!-- Teclado virtual on-screen (TV-box / mando DPad) -->
     <script src="tv-keyboard.js"></script>

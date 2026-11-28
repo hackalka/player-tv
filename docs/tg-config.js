@@ -20,9 +20,9 @@ window.TVP_CONFIG = {
     // muestre el selector de apps que soportan el esquema tvgram://.
     tvgramPackage: 'com.network.tvgramplayer.playstore',
 
-    // Mensajes a traer por tema. 50000 cubre cualquier grupo real (Telegram
-    // pagina internamente, pero la carga inicial es proporcional al numero).
-    messagesPerTopic: 50000,
+    // Limite para las cargas completas solicitadas manualmente. El arranque
+    // usa 100 y amplÃ­a a 500 por tema solo cuando el usuario estÃ¡ inactivo.
+    messagesPerTopic: 1200,
 
     // Etiqueta(s) que debe tener el TITULO de un tema para mostrarse
     autoTags: ['playertv:auto', 'tvplayer:auto', 'tvgram:auto'],

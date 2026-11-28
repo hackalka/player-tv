@@ -59,10 +59,10 @@
         if (_client) return _client;
         if (_clientPromise) return _clientPromise;
         _clientPromise = (async () => {
-            await whenReady();
             let str = '';
             try { str = localStorage.getItem(SS_KEY) || ''; } catch {}
             if (!str) return null;
+            await whenReady();
             const client = newClient(str);
             await client.connect();
             if (!(await client.checkAuthorization())) {
@@ -244,14 +244,11 @@
         const c = await ensureClient();
         if (!c) return json({ loggedIn: false });
         const svc = await ensureService();
-        let inGroup = false, name = '';
-        try { await svc.resolveGroup(); inGroup = true; } catch {}
-        try {
-            const me = await c.getMe();
-            if (me) {
-                name = me.firstName || me.username || '';
-            }
-        } catch {}
+        const [inGroup, me] = await Promise.all([
+            svc.resolveGroup().then(() => true).catch(() => false),
+            c.getMe().catch(() => null)
+        ]);
+        const name = me ? (me.firstName || me.username || '') : '';
         return json({ loggedIn: true, name, inGroup });
     }
 
@@ -282,13 +279,14 @@
         const fast = u.searchParams.get('fast') === '1'; // carga rapida (100 por tema)
         const cacheKey = groupId.trim();
         const fullCache = _catalogs.get(cacheKey);
-        if (fast && !fresh) {
-            if (fullCache && Date.now() - fullCache.time <= 60000) return json(fullCache.data);
+        if (fast) {
+            if (!fresh && fullCache && Date.now() - fullCache.time <= 60000) return json(fullCache.data);
             const fastCache = _fastCatalogs.get(cacheKey);
-            if (!fastCache || Date.now() - fastCache.time > 60000) {
-                _fastCatalogs.set(cacheKey, { data: await r.svc.getCatalog({ limit: 100 }), time: Date.now() });
-            }
-            return json(_fastCatalogs.get(cacheKey).data);
+            if (!fresh && fastCache && Date.now() - fastCache.time <= 60000) return json(fastCache.data);
+            const requestedLimit = Number(u.searchParams.get('limit')) || 100;
+            const data = await r.svc.getCatalog({ limit: Math.max(1, Math.min(1000, requestedLimit)) });
+            _fastCatalogs.set(cacheKey, { data, time: Date.now() });
+            return json(data);
         }
         if (!fullCache || fresh || Date.now() - fullCache.time > 60000) {
             _catalogs.set(cacheKey, { data: await r.svc.getCatalog(), time: Date.now() });
@@ -360,12 +358,6 @@
 
     /* ---------------- PUENTE SERVICE WORKER (streaming/miniaturas) ---------------- */
     const ALIGN = 4096;
-    function concatChunks(parts, total) {
-        const out = new Uint8Array(total);
-        let off = 0;
-        for (const p of parts) { out.set(p, off); off += p.length; }
-        return out;
-    }
     async function resolveMessage(svc, kind, a, b) {
         if (kind === 'tgstream' || kind === 'tgthumb') return svc.getMessageById(b);
         return svc.getMessageByRef(safeDecode(a), b); // tgstreamlink / tgthumblink
@@ -397,17 +389,19 @@
         const msg = await resolveMessage(svc, kind, a, b);
         const info = svc.docInfo(msg); if (!info) return null;
         const alignedStart = Math.floor(start / ALIGN) * ALIGN;
-        const need = (start - alignedStart) + length;
+        const skip = start - alignedStart;
+        const need = skip + length;
         const limit = Math.ceil(need / ALIGN) * ALIGN;
-        const parts = []; let got = 0;
+        const output = new Uint8Array(need); let written = 0;
         for await (const chunk of svc.streamRange(info, alignedStart, limit)) {
             const u = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
-            parts.push(u); got += u.length;
-            if (got >= need) break;
+            const take = Math.min(u.length, need - written);
+            output.set(u.subarray(0, take), written);
+            written += take;
+            if (written >= need) break;
         }
-        const full = concatChunks(parts, got);
-        const slice = full.subarray(start - alignedStart, start - alignedStart + length);
-        return new Uint8Array(slice); // copia con buffer propio
+        if (written < need) return output.slice(skip, skip + written);
+        return output.slice(skip, skip + length);
     }
     async function swThumb(kind, a, b, group) {
         const svc = await serviceForGroup(group); if (!svc) return null;
@@ -444,9 +438,7 @@
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', onSwMessage);
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('stream-sw.js').catch(e => console.warn('SW register:', e.message));
-        });
+        navigator.serviceWorker.register('stream-sw.js').catch(e => console.warn('SW register:', e.message));
     }
 
     // =========================================================================

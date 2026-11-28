@@ -101,25 +101,44 @@ const Store = {
 
 /* ===== Firebase Firestore (favoritos + continuar viendo en la nube) ===== */
 const CloudStore = {
-    db: null, uid: null,
+    db: null, uid: null, ready: Promise.resolve(),
+    _loadScript(id, src) {
+        return new Promise((resolve, reject) => {
+            const existing = document.getElementById(id);
+            if (existing) {
+                if (existing.dataset.loaded === '1') return resolve();
+                existing.addEventListener('load', resolve, { once: true });
+                existing.addEventListener('error', reject, { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.id = id;
+            script.src = src;
+            script.onload = () => { script.dataset.loaded = '1'; resolve(); };
+            script.onerror = () => reject(new Error('No se pudo cargar Firebase'));
+            document.head.appendChild(script);
+        });
+    },
     init(userId) {
         try {
-            if (!window.firebase || !window.firebase.firestore) return;
             // Usar la config REAL de tg-config.js si tiene apiKey; si no, no conecta.
             const fb = (window.TVP_CONFIG && window.TVP_CONFIG.firebase) || {};
             if (!fb.apiKey || !fb.projectId) {
                 console.warn('[firebase] sin claves reales en tg-config.js -> sin sincronizacion en la nube');
                 return;
             }
-            if (!firebase.apps.length) {
-                firebase.initializeApp(fb);
-            }
-            this.db = firebase.firestore();
             this.uid = String(userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '');
-            console.log('[firebase] conectado a', fb.projectId);
+            this.ready = (async () => {
+                await this._loadScript('firebase-app-compat', 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+                await this._loadScript('firebase-firestore-compat', 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js');
+                if (!firebase.apps.length) firebase.initializeApp(fb);
+                this.db = firebase.firestore();
+                console.log('[firebase] conectado a', fb.projectId);
+            })().catch(e => console.warn('Firebase init:', e.message));
         } catch (e) { console.warn('Firebase init:', e.message); }
     },
     async syncFavs() {
+        await this.ready;
         if (!this.db || !this.uid) return;
         try {
             const doc = await this.db.collection('users').doc(this.uid).get();
@@ -127,8 +146,9 @@ const CloudStore = {
             await this.db.collection('users').doc(this.uid).set({ favs: Store.favs }, { merge: true });
         } catch (e) { console.warn('syncFavs:', e.message); }
     },
-    async saveFavs() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ favs: Store.favs }, { merge: true }); } catch {} },
+    async saveFavs() { await this.ready; if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ favs: Store.favs }, { merge: true }); } catch {} },
     async syncProgress() {
+        await this.ready;
         if (!this.db || !this.uid) return;
         try {
             const doc = await this.db.collection('users').doc(this.uid).get();
@@ -143,8 +163,9 @@ const CloudStore = {
             await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true });
         } catch (e) { console.warn('syncProgress:', e.message); }
     },
-    async saveProgress() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true }); } catch {} },
+    async saveProgress() { await this.ready; if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ progress: Store.progress }, { merge: true }); } catch {} },
     async syncWatched() {
+        await this.ready;
         if (!this.db || !this.uid) return;
         try {
             const doc = await this.db.collection('users').doc(this.uid).get();
@@ -152,7 +173,7 @@ const CloudStore = {
             await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true });
         } catch {}
     },
-    async saveWatched() { if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} },
+    async saveWatched() { await this.ready; if (!this.db || !this.uid) return; try { await this.db.collection('users').doc(this.uid).set({ watched: Store.watched }, { merge: true }); } catch {} },
 };
 
 const state = {
@@ -820,6 +841,7 @@ const Detail = {
         el.playerVideo.removeAttribute('src'); el.playerVideo.load();
         // Destruir Artplayer + hls.js si estuvieran montados
         if (window.ArtBridge) { try { window.ArtBridge.destroy(); } catch {} }
+        if (typeof Player !== 'undefined') Player._clearArtListeners();
         el.playerIframe.hidden = true; el.playerIframe.src = '';
         el.detailBackdrop.hidden = false;
         el.detailHero.classList.remove('playing');
@@ -1071,6 +1093,11 @@ const ExternalPlayers = {
 /* ===== Reproductor ===== */
 const Player = {
     current: null,
+    _artListeners: [],
+    _clearArtListeners() {
+        if (window.ArtBridge) this._artListeners.forEach(([event, handler]) => window.ArtBridge.off(event, handler));
+        this._artListeners = [];
+    },
     play(playable, parent) {
         if (!playable) return;
         Detail._stopTrailer();
@@ -1131,6 +1158,7 @@ const Player = {
 
         // Preferir Artplayer (mejor UX, gestos, DPad). Fallback a <video> nativo.
         if (window.ArtBridge && typeof Artplayer !== 'undefined') {
+            this._clearArtListeners();
             el.playerVideo.hidden = true;
             const ok = window.ArtBridge.load(url, {
                 title: (parent && parent.title) || playable.title || '',
@@ -1142,10 +1170,14 @@ const Player = {
                 // Hooks: timeupdate guarda progreso, ended pasa al siguiente,
                 // error -> _onInsideError (salta a motor avanzado si procede),
                 // volumechange persiste volumen.
-                window.ArtBridge.on('timeupdate', () => this._tickArt());
-                window.ArtBridge.on('ended', () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); });
-                window.ArtBridge.on('error', () => this._onInsideError(playable, parent));
-                window.ArtBridge.on('volumechange', () => { try { Store.volume = window.ArtBridge.volume; } catch {} });
+                const listeners = [
+                    ['timeupdate', () => this._tickArt()],
+                    ['ended', () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); }],
+                    ['error', () => this._onInsideError(playable, parent)],
+                    ['volumechange', () => { try { Store.volume = window.ArtBridge.volume; } catch {} }]
+                ];
+                listeners.forEach(([event, handler]) => window.ArtBridge.on(event, handler));
+                this._artListeners = listeners;
                 return;
             }
         }
@@ -1532,6 +1564,33 @@ document.addEventListener('keydown', (e) => {
 }, { capture: true });
 
 let groupLoadVersion = 0;
+let groupChoicesPromise = null;
+
+function mergeCatalogs(previous, latest) {
+    if (!previous || !previous.categories) return latest;
+    if (!latest || !latest.categories) return previous;
+    const merged = previous.categories.map(category => Object.assign({}, category, { items: (category.items || []).slice() }));
+    const indexes = new Map(merged.map((category, index) => [String(category.id || category.name), index]));
+    for (const category of latest.categories) {
+        const key = String(category.id || category.name);
+        const index = indexes.get(key);
+        if (index === undefined) {
+            indexes.set(key, merged.length);
+            merged.push(category);
+            continue;
+        }
+        const existing = merged[index];
+        const seen = new Set((category.items || []).map(item => String(item.id || item.uid || item.title)));
+        existing.items = (category.items || []).concat((existing.items || []).filter(item => {
+            const id = String(item.id || item.uid || item.title);
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        }));
+        Object.assign(existing, category, { items: existing.items });
+    }
+    return Object.assign({}, previous, latest, { categories: merged, partial: !!(previous.partial && latest.partial) });
+}
 
 function applyCatalog(catalog, groupId) {
     state.catalog = catalog || { categories: [] };
@@ -1555,6 +1614,7 @@ async function loadGroupCatalog(groupId, useCache) {
     const selectedGroup = String(groupId || '').trim();
     if (!selectedGroup) throw new Error('Selecciona un grupo de Telegram.');
     const requestId = ++groupLoadVersion;
+    if (loadGroupCatalog.refreshTimer) clearTimeout(loadGroupCatalog.refreshTimer);
     state.activeGroup = selectedGroup;
     try { localStorage.setItem(state.groupPreferenceKey, selectedGroup); } catch {}
 
@@ -1565,14 +1625,25 @@ async function loadGroupCatalog(groupId, useCache) {
         try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch {}
     }
     const refresh = async () => {
-        const catalog = await api(endpoint + '&refresh=1');
+        const catalog = await api(endpoint + '&fast=1&refresh=1&limit=500');
         if (requestId === groupLoadVersion && state.activeGroup === selectedGroup) {
-            applyCatalog(catalog, selectedGroup);
+            applyCatalog(mergeCatalogs(state.catalog, catalog), selectedGroup);
         }
+    };
+    const scheduleRefresh = () => {
+        const refreshWhenIdle = () => {
+            if (requestId !== groupLoadVersion || state.activeGroup !== selectedGroup) return;
+            if ((el.playerModal && !el.playerModal.hidden) || $('#groups-list')) {
+                loadGroupCatalog.refreshTimer = setTimeout(refreshWhenIdle, 15000);
+                return;
+            }
+            refresh().catch(e => console.warn('Catalog refresh failed:', e.message));
+        };
+        loadGroupCatalog.refreshTimer = setTimeout(refreshWhenIdle, 30000);
     };
     if (cached && cached.data && cached.ts && Date.now() - cached.ts < 30 * 60 * 1000) {
         applyCatalog(cached.data, selectedGroup);
-        refresh().catch(e => console.warn('No se pudo actualizar el catálogo del grupo:', e.message));
+        scheduleRefresh();
         return;
     }
 
@@ -1580,7 +1651,7 @@ async function loadGroupCatalog(groupId, useCache) {
     const fastCatalog = await api(endpoint + '&fast=1');
     if (requestId !== groupLoadVersion) return;
     applyCatalog(fastCatalog, selectedGroup);
-    setTimeout(() => refresh().catch(e => console.warn('No se pudo completar el catálogo del grupo:', e.message)), 200);
+    scheduleRefresh();
 }
 
 function groupPreferenceKey(me, kind) {
@@ -1639,7 +1710,20 @@ function renderGroupsPage() {
     </section>`;
     const search = $('#groups-search');
     search.oninput = () => renderGroupsList(search.value);
-    renderGroupsList('');
+    if (state.groups.length) {
+        renderGroupsList('');
+        return;
+    }
+    const list = $('#groups-list');
+    if (list) list.innerHTML = '<div class="empty-state">Buscando tus grupos de Telegram...</div>';
+    if (!groupChoicesPromise) {
+        groupChoicesPromise = api('/api/groups').then(result => {
+            setCatalogGroups(result.groups, state.account || {});
+            renderGroupsList(search.value);
+        }).catch(error => {
+            if (list) list.innerHTML = `<div class="empty-state">No se pudieron cargar los grupos.<br>${escapeHtml(error.message)}</div>`;
+        }).finally(() => { groupChoicesPromise = null; });
+    }
 }
 
 function openGroupsPage() {
@@ -1701,18 +1785,28 @@ function toggleFavoriteGroup(groupId, query) {
 
 async function boot() {
     try {
-        const info = await api('/api/app').catch(() => null);
+        const [info, me] = await Promise.all([
+            api('/api/app').catch(() => null),
+            api('/api/me').catch(() => ({ loggedIn: false }))
+        ]);
         if (info && info.appName) { if (el.brand) el.brand.innerText = info.appName.toUpperCase(); document.title = info.appName; }
 
-        const me = await api('/api/me').catch(() => ({ loggedIn: false }));
         if (!me.loggedIn) { el.loadingScreen.classList.add('hidden'); Login.open(); return; }
-        let groupList;
+        state.account = me;
+        state.groupPreferenceKey = groupPreferenceKey(me, 'selected');
+        if (el.groupsTabBtn) el.groupsTabBtn.hidden = false;
+        let selectedGroup = '';
         try {
-            groupList = await api('/api/groups');
-        } catch (e) {
-            throw new Error('No se pudieron comprobar los grupos con la etiqueta configurada: ' + e.message);
+            selectedGroup = localStorage.getItem(state.groupPreferenceKey)
+                || localStorage.getItem('tvp_selected_group')
+                || String((window.TVP_CONFIG && window.TVP_CONFIG.groupId) || '').trim();
+        } catch {
+            selectedGroup = String((window.TVP_CONFIG && window.TVP_CONFIG.groupId) || '').trim();
         }
-        const selectedGroup = setCatalogGroups(groupList.groups, me);
+        if (!selectedGroup) {
+            try { selectedGroup = setCatalogGroups((await api('/api/groups')).groups, me); }
+            catch (e) { throw new Error('No se pudieron comprobar los grupos con la etiqueta configurada: ' + e.message); }
+        }
         if (!selectedGroup) {
             el.rowsContainer.innerHTML = `<div class="empty-state">No se encontraron grupos o canales con temas que contengan la etiqueta configurada para <b>${escapeHtml(me.name || '')}</b>.</div>`;
             return;

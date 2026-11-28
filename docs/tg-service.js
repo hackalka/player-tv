@@ -21,6 +21,7 @@
             this._msgCache = new Map();
             this._refCache = new Map();
             this._chanCache = new Map();
+            this._autoTopicsCache = null;
         }
 
         async resolveGroup() {
@@ -66,11 +67,12 @@
         _cache(messages) { for (const m of messages) if (m && m.id != null) this._msgCache.set(m.id, m); }
 
         async getMessageById(id) {
-            if (this._msgCache.has(id)) return this._msgCache.get(id);
+            const key = /^\d+$/.test(String(id)) ? Number(id) : id;
+            if (this._msgCache.has(key)) return this._msgCache.get(key);
             const entity = await this.resolveGroup();
-            const res = await this.client.getMessages(entity, { ids: [Number(id)] });
+            const res = await this.client.getMessages(entity, { ids: [Number(key)] });
             const m = res && res[0];
-            if (m) this._msgCache.set(id, m);
+            if (m) this._msgCache.set(key, m);
             return m;
         }
 
@@ -151,16 +153,21 @@
         }
 
         async getAutoTopics() {
+            if (this._autoTopicsCache && Date.now() - this._autoTopicsCache.time < 5 * 60 * 1000) {
+                return this._autoTopicsCache.topics;
+            }
             const tags = this._autoTags();
             const all = await this.getForumTopics();
             const matched = all.filter(t => {
                 const low = (t.title || '').toLowerCase();
                 return tags.some(tag => low.includes(tag));
             });
-            return matched.map(t => {
+            const topics = matched.map(t => {
                 const info = this._displayInfo(t.title, tags);
                 return { id: t.id, rawTitle: t.title, name: info.name, icon: info.icon, type: info.type };
             });
+            this._autoTopicsCache = { time: Date.now(), topics };
+            return topics;
         }
 
         _displayInfo(title, tags) {
@@ -482,15 +489,21 @@
             opts = opts || {};
             const perTopic = Number(opts.limit) || this.cfg.messagesPerTopic;
             const topics = await this.getAutoTopics();
-            const categories = [];
-            for (const topic of topics) {
-                let items = [];
-                try {
-                    const msgs = await this.getTopicMessages(topic.id, perTopic);
-                    items = this._buildTopicItems(msgs, topic);
-                } catch (e) { console.warn(`Tema ${topic.name} fallo:`, e.message); }
-                categories.push({ name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items });
-            }
+            const categories = new Array(topics.length);
+            let nextTopic = 0;
+            const workers = Array.from({ length: Math.min(4, topics.length) }, async () => {
+                while (nextTopic < topics.length) {
+                    const index = nextTopic++;
+                    const topic = topics[index];
+                    let items = [];
+                    try {
+                        const msgs = await this.getTopicMessages(topic.id, perTopic);
+                        items = this._buildTopicItems(msgs, topic);
+                    } catch (e) { console.warn(`Tema ${topic.name} fallo:`, e.message); }
+                    categories[index] = { name: topic.name, icon: topic.icon, type: topic.type, id: topic.id, items };
+                }
+            });
+            await Promise.all(workers);
             const linkedVideoRefs = new Set();
             categories.forEach(category => category.items.forEach(item => {
                 (item.links || []).forEach(link => {
