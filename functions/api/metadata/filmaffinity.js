@@ -98,8 +98,8 @@ export function parseFilmAffinityReaderPage(text) {
     const synopsis = plainText((synopsisMatch && synopsisMatch[1] || '')
         .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'));
-    const imageMatch = source.match(/!\[[^\]]*\]\((https:\/\/pics\.filmaffinity\.com\/[^)\s]+)(?:\s+"[^"]*")?\)/i);
-    const image = imageMatch && imageMatch[1];
+    const imageMatch = source.match(/https:\/\/pics\.filmaffinity\.com\/[^)\s"<>]+/i);
+    const image = imageMatch && imageMatch[0];
     let poster = '';
     try {
         const imageUrl = new URL(image);
@@ -154,6 +154,15 @@ async function readWithMicrolink(targetUrl) {
     return parseMicrolinkMetadata(payload.data || {});
 }
 
+async function readWithMarkdownNew(targetUrl) {
+    const response = await fetch(`https://markdown.new/${targetUrl.href}`, {
+        headers: { Accept: 'text/markdown' }
+    });
+    if (!response.ok) throw new Error(`markdown.new HTTP ${response.status}`);
+    const text = await readResponseText(response);
+    return parseFilmAffinityReaderPage(text);
+}
+
 export async function onRequest({ request }) {
     if (request.method !== 'GET') {
         return json({ error: 'Método no permitido' }, 405, 'no-store');
@@ -182,7 +191,15 @@ export async function onRequest({ request }) {
             console.warn('[metadata] No se pudo leer Jina Reader; usando Microlink:', error.message);
         }
     } else if (response) {
-        console.warn('[metadata] Jina Reader respondió:', response.status, '; usando Microlink');
+        console.warn('[metadata] Jina Reader respondió:', response.status, '; usando lectores alternativos');
+    }
+
+    try {
+        const metadata = await readWithMarkdownNew(upstreamUrl);
+        if (metadata.description) return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
+        throw new Error('markdown.new no devolvió una sinopsis');
+    } catch (error) {
+        console.warn('[metadata] markdown.new no pudo leer FilmAffinity; usando Microlink:', error.message);
     }
 
     try {
