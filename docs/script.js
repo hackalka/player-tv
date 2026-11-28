@@ -1069,8 +1069,6 @@ const ExternalPlayers = {
                 label = `Formato ${(playable.ext || '').toUpperCase()} — reprodúcelo en la app o elige otro reproductor:`;
             } else {
                 items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
-                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado</button>`);
-                const dl = absUrl(playable.streamUrl) + (absUrl(playable.streamUrl).indexOf('?') >= 0 ? '&' : '?') + 'download=1';
                 label = `Formato ${(playable.ext || '').toUpperCase()} no compatible con el navegador. Elige cómo verlo:`;
             }
         } else if (!playable.streamUrl && playable.externalUrl) {
@@ -1105,9 +1103,8 @@ const ExternalPlayers = {
                 // "Abrir con...": selector del sistema para elegir OTRO reproductor.
                 items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="Player._openWithNative(${JSON.stringify(playable).replace(/"/g, '&quot;')}, Player.current && Player.current.parent)">📂 Abrir con...</button>`);
             } else {
-                // Navegador (sin APK nativa): intentar reproducir aquí o motor avanzado.
-                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reproducir aquí</button>`);
-                items.push(`<button class="opt-btn focusable" tabindex="0" type="button" onclick="if(window.MkvPlayer)MkvPlayer.play(${JSON.stringify(playable).replace(/"/g, '&quot;')})">⚡ Motor avanzado (convertir)</button>`);
+                // Navegador: ofrecer solo reintento en el reproductor integrado.
+                items.push(`<button class="opt-btn primary focusable" tabindex="0" type="button" onclick="Player._playHere && Player._playHere()">▶ Reintentar aquí</button>`);
             }
             // Descargar siempre disponible.
         }
@@ -1167,9 +1164,7 @@ const Player = {
         //    b) Si no, menú de reproductores externos / motor avanzado.
         if (playable.streamUrl) {
             if (this._hasNative() && this._playNative(playable, parent)) return;
-            // Mostrar primero el reproductor integrado; si el navegador rechaza
-            // el formato, _onInsideError pasa al conversor interno.
-            this._autoAdvanced = true;
+            // Probar siempre el reproductor integrado, sin conversión avanzada.
             this._playInside(playable, parent);
             return;
         }
@@ -1251,19 +1246,9 @@ const Player = {
         v.play().catch(() => {});
     },
 
-    // Forzar reproducción interna aunque el formato no esté marcado como compatible.
-    // A veces el navegador SÍ reproduce un mkv si el codec interior es H.264/AAC.
-    _forceInternal() {
-        if (!this.current || !this.current.playable) return;
-        this._playInside(this.current.playable, this.current.parent);
-    },
-
-    // Botón "▶ Reproducir aquí": intenta nativo/Artplayer y, si el formato no es
-    // compatible (error), salta AUTOMÁTICAMENTE al motor avanzado (FFmpeg.wasm)
-    // que remuxea sobre la marcha. Asi el usuario tiene UN solo botón de Play.
+    // Reintentar la fuente en el reproductor integrado.
     _playHere() {
         if (!this.current || !this.current.playable) return;
-        this._autoAdvanced = true; // si el intento nativo falla, usar motor avanzado
         this._playInside(this.current.playable, this.current.parent);
     },
 
@@ -1272,10 +1257,6 @@ const Player = {
     _onInsideError(playable, parent) {
         // Un mismo intento puede emitir varios errores; procesar solo el primero.
         this._playAttempt += 1;
-        if (this._autoAdvanced) {
-            this._autoAdvanced = false;
-            if (window.MkvPlayer) { try { window.MkvPlayer.play(playable); return; } catch (e) {} }
-        }
         // Las rutas tgstream son virtuales: las sirve el Service Worker de esta
         // pestaña y no se pueden abrir como URL externa en otra pestaña.
         if (playable && /^tgstream(?:link)?\//.test(String(playable.streamUrl || ''))) {
@@ -1406,7 +1387,6 @@ const Player = {
 
     _lastSave: 0,
     _tick() {
-        this._autoAdvanced = false; // ya reproduce bien: no saltar a avanzado
         const v = el.playerVideo, c = this.current;
         if (!c || !v.duration) return;
         const now = Date.now();
@@ -1414,7 +1394,6 @@ const Player = {
     },
     // Igual que _tick pero leyendo el tiempo desde Artplayer (cuando esta activo)
     _tickArt() {
-        this._autoAdvanced = false; // ya reproduce bien: no saltar a avanzado
         const c = this.current;
         if (!c || !window.ArtBridge || !window.ArtBridge.duration) return;
         const now = Date.now();

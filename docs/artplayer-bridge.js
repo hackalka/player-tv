@@ -7,8 +7,8 @@
  *  - Detecta tipo de stream segun la extension del URL.
  *  - Para .m3u8 usa hls.js; para resto usa <video> nativo (que ya soporta MP4,
  *    WebM y muchas veces MKV con codec H264/AAC).
- *  - Para .mkv/.avi/.flv NO se usa este puente: sigue mandando MkvPlayer con
- *    FFmpeg.wasm (mejor experiencia en navegador).
+ *  - Si el navegador no puede reproducir un formato, el error permanece en la
+ *    app y ofrece reintentar o cambiar de fuente.
  *  - Mantiene la misma API que el `<video id="player-video">` para que
  *    Player._tick(), flushProgress() y los callbacks de progreso/onended
  *    sigan funcionando sin tocar mucho codigo.
