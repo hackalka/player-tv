@@ -582,6 +582,16 @@ const Detail = {
         );
         if (!link || (item.description && item.cover) || item._metadataRequest) return;
 
+        const posterForDisplay = raw => {
+            try {
+                const poster = new URL(raw);
+                if (poster.protocol !== 'https:' || poster.hostname !== 'pics.filmaffinity.com') return '';
+                const proxy = new URL('https://images.weserv.nl/');
+                proxy.searchParams.set('url', poster.host + poster.pathname);
+                return proxy.href;
+            } catch { return ''; }
+        };
+
         const readFromBrowser = async () => {
             const target = new URL(link.url);
             if (target.protocol !== 'https:' || !/(^|\.)filmaffinity\.com$/i.test(target.hostname)
@@ -601,7 +611,7 @@ const Detail = {
                 title: titleMatch ? titleMatch[1].trim() : '',
                 description: synopsis[1].replace(/\s+/g, ' ').trim(),
                 year: ((titleMatch && titleMatch[1].match(/\b(?:19|20)\d{2}\b/)) || [])[0] || '',
-                poster: posterMatch ? posterMatch[0] : ''
+                poster: posterMatch ? posterForDisplay(posterMatch[0]) : ''
             };
         };
         const readFromServer = async () => {
@@ -617,7 +627,7 @@ const Detail = {
             return readFromServer();
         }).then(metadata => {
             if (!item.description && metadata.description) item.description = String(metadata.description);
-            if (!item.cover && metadata.poster) item.cover = String(metadata.poster);
+            if (!item.cover && metadata.poster) item.cover = posterForDisplay(metadata.poster) || String(metadata.poster);
             if (!item.backdrop && item.cover) item.backdrop = item.cover;
             if (!item.year && metadata.year) item.year = String(metadata.year);
             if (this.current === item && !el.playerModal.hidden) this._updateFilmAffinityView(item);
