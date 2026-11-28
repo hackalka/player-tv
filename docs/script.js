@@ -1166,14 +1166,10 @@ const Player = {
         //    b) Si no, menú de reproductores externos / motor avanzado.
         if (playable.streamUrl) {
             if (this._hasNative() && this._playNative(playable, parent)) return;
-            // Las rutas de Telegram son virtuales y solo funcionan dentro de
-            // esta app; en PC usamos el conversor interno si el formato lo exige.
-            if (window.MkvPlayer) {
-                this._autoAdvanced = true;
-                window.MkvPlayer.play(playable);
-                return;
-            }
-            this._showError('Este formato no se puede reproducir en el navegador ahora mismo.', playable);
+            // Mostrar primero el reproductor integrado; si el navegador rechaza
+            // el formato, _onInsideError pasa al conversor interno.
+            this._autoAdvanced = true;
+            this._playInside(playable, parent);
             return;
         }
         // 4) Enlace externo http(s): si parece vídeo directo, intentar dentro; si no, abrir externo
