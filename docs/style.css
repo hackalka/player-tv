@@ -782,9 +782,9 @@ body { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 .detail-modal { padding: 0; overflow: hidden; }
 .detail-hero {
     position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
-    align-items: flex-end; overflow: hidden; display: none;
+    align-items: flex-end; overflow: hidden; display: flex;
 }
-.detail-hero.playing { display: flex; }
+.detail-hero:not(.playing) .detail-hero-shade { display: none; }
 .detail-hero .detail-backdrop {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
 }
