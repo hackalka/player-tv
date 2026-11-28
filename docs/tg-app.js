@@ -386,22 +386,35 @@
     }
     async function swChunk(kind, a, b, group, start, length) {
         const svc = await serviceForGroup(group); if (!svc) return null;
-        const msg = await resolveMessage(svc, kind, a, b);
-        const info = svc.docInfo(msg); if (!info) return null;
         const alignedStart = Math.floor(start / ALIGN) * ALIGN;
         const skip = start - alignedStart;
         const need = skip + length;
         const limit = Math.ceil(need / ALIGN) * ALIGN;
-        const output = new Uint8Array(need); let written = 0;
-        for await (const chunk of svc.streamRange(info, alignedStart, limit)) {
-            const u = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
-            const take = Math.min(u.length, need - written);
-            output.set(u.subarray(0, take), written);
-            written += take;
-            if (written >= need) break;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const msg = attempt === 0
+                ? await resolveMessage(svc, kind, a, b)
+                : (kind === 'tgstream' || kind === 'tgthumb'
+                    ? await svc.refreshMessageById(b)
+                    : await svc.refreshMessageByRef(safeDecode(a), b));
+            const info = svc.docInfo(msg); if (!info) return null;
+            const output = new Uint8Array(need); let written = 0;
+            try {
+                for await (const chunk of svc.streamRange(info, alignedStart, limit)) {
+                    const u = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+                    const take = Math.min(u.length, need - written);
+                    output.set(u.subarray(0, take), written);
+                    written += take;
+                    if (written >= need) break;
+                }
+                if (written < need) return output.slice(skip, skip + written);
+                return output.slice(skip, skip + length);
+            } catch (error) {
+                const staleFileReference = /FILE_REFERENCE|FILEREF/i.test(String(error && (error.errorMessage || error.message) || error));
+                if (!staleFileReference || attempt > 0) throw error;
+                console.warn('[sw-bridge] referencia Telegram caducada; renovando mensaje', kind, a, b);
+            }
         }
-        if (written < need) return output.slice(skip, skip + written);
-        return output.slice(skip, skip + length);
+        return null;
     }
     async function swThumb(kind, a, b, group) {
         const svc = await serviceForGroup(group); if (!svc) return null;

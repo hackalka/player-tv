@@ -76,6 +76,12 @@
             return m;
         }
 
+        async refreshMessageById(id) {
+            const key = /^\d+$/.test(String(id)) ? Number(id) : id;
+            this._msgCache.delete(key);
+            return this.getMessageById(key);
+        }
+
         async _resolveChannel(channel) {
             if (this._chanCache.has(channel)) return this._chanCache.get(channel);
             const raw = String(channel);
@@ -95,6 +101,11 @@
             const m = res && res[0];
             if (m) this._refCache.set(key, m);
             return m;
+        }
+
+        async refreshMessageByRef(channel, msgId) {
+            this._refCache.delete(channel + ':' + msgId);
+            return this.getMessageByRef(channel, msgId);
         }
 
         async getForumTopics(options) {
