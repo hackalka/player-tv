@@ -111,6 +111,49 @@ export function parseFilmAffinityReaderPage(text) {
     return { source: 'FilmAffinity', title, description: synopsis, year, poster };
 }
 
+function parseMicrolinkMetadata(data) {
+    const pageText = String(data && (data.page || data.text) || '');
+    const bodyMatch = pageText.match(/\bSinopsis\s*:?\s*([\s\S]*?)(?:\s*\(FILMAFFINITY\)|\s+(?:Sobre las pel[ií]culas|Cr[ií]ticas|Reparto|Duraci[oó]n)\b|$)/i);
+    let description = plainText(bodyMatch && bodyMatch[1]);
+    if (!description) {
+        const summary = plainText(data && data.description);
+        const labeled = summary.match(/\bSinopsis\s*:?\s*([\s\S]*)/i);
+        description = (labeled ? labeled[1] : summary).replace(/[.…]+\s*$/, '').trim();
+    }
+
+    const candidates = [].concat(data && data.poster || [], data && data.image || [])
+        .map(value => typeof value === 'string' ? value : value && value.url)
+        .filter(Boolean);
+    let poster = '';
+    for (const candidate of candidates) {
+        try {
+            const url = new URL(candidate);
+            if (url.protocol === 'https:' && url.hostname === 'pics.filmaffinity.com') {
+                poster = url.href;
+                break;
+            }
+        } catch { }
+    }
+    const title = plainText(data && data.title);
+    const year = (title.match(/\b(?:19|20)\d{2}\b/) || [])[0] || '';
+    return { source: 'FilmAffinity', title, description, year, poster };
+}
+
+async function readWithMicrolink(targetUrl) {
+    const url = new URL('https://api.microlink.io/');
+    url.searchParams.set('url', targetUrl.href);
+    url.searchParams.set('data.page.selector', 'body');
+    url.searchParams.set('data.page.attr', 'text');
+    url.searchParams.set('data.poster.selectorAll', 'a[href*="pics.filmaffinity.com"]');
+    url.searchParams.set('data.poster.attr', 'href');
+    url.searchParams.set('data.poster.type', 'url');
+    const response = await fetch(url.href, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Microlink HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload.status !== 'success') throw new Error(payload.message || 'Microlink no pudo leer la página');
+    return parseMicrolinkMetadata(payload.data || {});
+}
+
 export async function onRequest({ request }) {
     if (request.method !== 'GET') {
         return json({ error: 'Método no permitido' }, 405, 'no-store');
@@ -127,24 +170,27 @@ export async function onRequest({ request }) {
             cf: { cacheTtl: 86400 }
         });
     } catch (error) {
-        console.warn('[metadata] Jina Reader no responde:', error.message);
-        return json({ error: 'No se pudo consultar la ficha de FilmAffinity' }, 502, 'no-store');
-    }
-    if (!response.ok) {
-        console.warn('[metadata] Jina Reader respondió:', response.status);
-        return json({ error: 'El intermediario no pudo consultar FilmAffinity', status: response.status }, 502, 'no-store');
+        console.warn('[metadata] Jina Reader no responde; usando Microlink:', error.message);
     }
 
-    let text;
-    try { text = await readResponseText(response); }
-    catch (error) {
-        console.warn('[metadata] No se pudo leer la respuesta de Jina Reader:', error.message);
-        return json({ error: 'La ficha de FilmAffinity no se pudo leer' }, 502, 'no-store');
+    if (response && response.ok) {
+        try {
+            const text = await readResponseText(response);
+            const metadata = parseFilmAffinityReaderPage(text);
+            if (metadata.description) return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
+        } catch (error) {
+            console.warn('[metadata] No se pudo leer Jina Reader; usando Microlink:', error.message);
+        }
+    } else if (response) {
+        console.warn('[metadata] Jina Reader respondió:', response.status, '; usando Microlink');
     }
-    const metadata = parseFilmAffinityReaderPage(text);
-    if (!metadata.description) {
-        console.warn('[metadata] Jina Reader no devolvió una sinopsis de FilmAffinity');
-        return json({ error: 'No se encontró la sinopsis de FilmAffinity' }, 502, 'no-store');
+
+    try {
+        const metadata = await readWithMicrolink(upstreamUrl);
+        if (!metadata.description) throw new Error('Microlink no devolvió una sinopsis');
+        return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
+    } catch (error) {
+        console.warn('[metadata] Tampoco se pudo leer FilmAffinity con Microlink:', error.message);
+        return json({ error: 'No se pudo obtener la sinopsis de FilmAffinity' }, 502, 'no-store');
     }
-    return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
 }
