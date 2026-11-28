@@ -94,7 +94,7 @@ export function parseFilmAffinityReaderPage(text) {
     const titleMatch = source.match(/^Title:\s*(.+)$/mi)
         || source.match(/^#\s+(.+)$/m);
     const title = plainText(titleMatch && titleMatch[1]);
-    const synopsisMatch = source.match(/\bSinopsis\s+([\s\S]*?)\s*\(FILMAFFINITY\)/i);
+    const synopsisMatch = source.match(/\bSinopsis\s*:?\s*([\s\S]*?)(?=\s*\(FILMAFFINITY\)|\n\s*(?:G[eÃ©]nero|Grupos|Direcci[oÃ³]n|Guion|Reparto|Duraci[oÃ³]n|Pa[iÃ­]s|Cr[eÃ©]ditos|Tr[aÃ¡]iler|Premios)\b|$)/i);
     const synopsis = plainText((synopsisMatch && synopsisMatch[1] || '')
         .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'));

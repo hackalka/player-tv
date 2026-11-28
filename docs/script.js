@@ -628,13 +628,16 @@ const Detail = {
             });
             if (!response.ok) throw new Error('Jina Reader HTTP ' + response.status);
             const text = await response.text();
-            const synopsis = text.match(/\bSinopsis\s*:?\s*([\s\S]*?)\s*\(FILMAFFINITY\)/i);
-            if (!synopsis || !synopsis[1].trim()) throw new Error('Jina Reader no devolvio una sinopsis');
+            const synopsis = text.match(/\bSinopsis\s*:?\s*([\s\S]*?)(?=\s*\(FILMAFFINITY\)|\n\s*(?:G[eÃ©]nero|Grupos|Direcci[oÃ³]n|Guion|Reparto|Duraci[oÃ³]n|Pa[iÃ­]s|Cr[eÃ©]ditos|Tr[aÃ¡]iler|Premios)\b|$)/i);
+            const description = synopsis && synopsis[1]
+                ? synopsis[1].replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim()
+                : '';
+            if (!description) throw new Error('Jina Reader no devolvio una sinopsis');
             const titleMatch = text.match(/^Title:\s*(.+)$/mi);
             const posterMatch = text.match(/https:\/\/pics\.filmaffinity\.com\/[^)\s"<>]+/i);
             return {
                 title: titleMatch ? titleMatch[1].trim() : '',
-                description: synopsis[1].replace(/\s+/g, ' ').trim(),
+                description,
                 year: ((titleMatch && titleMatch[1].match(/\b(?:19|20)\d{2}\b/)) || [])[0] || '',
                 poster: posterMatch ? posterForDisplay(posterMatch[0]) : ''
             };
