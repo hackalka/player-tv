@@ -602,10 +602,21 @@ const Detail = {
     },
 
     _loadFilmAffinityMetadata(item) {
-        const link = (item.metadataLinks || []).find(candidate =>
-            candidate.metadataSource && candidate.metadataSource.kind === 'filmaffinity'
-        );
+        const candidates = (Array.isArray(item.metadataLinks) ? item.metadataLinks : []).concat(Array.isArray(item.links) ? item.links : []);
+        if (item.externalUrl) candidates.push({ url: item.externalUrl });
+        const link = candidates.map(candidate => {
+            const url = canonicalFilmAffinityUrl(candidate.url || candidate.externalUrl);
+            return url ? { url, metadataSource: { kind: 'filmaffinity' } } : null;
+        }).find(candidate => candidate && candidate.metadataSource.kind === 'filmaffinity');
         if (!link || (item.description && item.cover) || item._metadataRequest) return;
+        if (!item.description) el.modalDescription.innerText = 'Cargando sinopsis…';
+
+        const extractSynopsis = text => {
+            const match = String(text || '').match(/\b(?:Sinopsis|Synopsis)\s*:?\s*([\s\S]*?)(?=\s*\(FILMAFFINITY\)|\n\s*(?:G[eÃ©]nero|Grupos|Direcci[oÃ³]n|Guion|Reparto|Duraci[oÃ³]n|Pa[iÃ­]s|Cr[eÃ©]ditos|Tr[aÃ¡]iler|Premios)\b|$)/i);
+            return match && match[1]
+                ? match[1].replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim()
+                : '';
+        };
 
         const posterForDisplay = raw => {
             try {
@@ -628,10 +639,7 @@ const Detail = {
             });
             if (!response.ok) throw new Error('Jina Reader HTTP ' + response.status);
             const text = await response.text();
-            const synopsis = text.match(/\bSinopsis\s*:?\s*([\s\S]*?)(?=\s*\(FILMAFFINITY\)|\n\s*(?:G[eÃ©]nero|Grupos|Direcci[oÃ³]n|Guion|Reparto|Duraci[oÃ³]n|Pa[iÃ­]s|Cr[eÃ©]ditos|Tr[aÃ¡]iler|Premios)\b|$)/i);
-            const description = synopsis && synopsis[1]
-                ? synopsis[1].replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim()
-                : '';
+            const description = extractSynopsis(text);
             if (!description) throw new Error('Jina Reader no devolvio una sinopsis');
             const titleMatch = text.match(/^Title:\s*(.+)$/mi);
             const posterMatch = text.match(/https:\/\/pics\.filmaffinity\.com\/[^)\s"<>]+/i);
@@ -640,6 +648,30 @@ const Detail = {
                 description,
                 year: ((titleMatch && titleMatch[1].match(/\b(?:19|20)\d{2}\b/)) || [])[0] || '',
                 poster: posterMatch ? posterForDisplay(posterMatch[0]) : ''
+            };
+        };
+        const readFromMicrolink = async () => {
+            const endpoint = new URL('https://api.microlink.io/');
+            endpoint.searchParams.set('url', link.url);
+            endpoint.searchParams.set('data.page.selector', 'body');
+            endpoint.searchParams.set('data.page.attr', 'text');
+            endpoint.searchParams.set('data.poster.selectorAll', 'a[href*="pics.filmaffinity.com"]');
+            endpoint.searchParams.set('data.poster.attr', 'href');
+            endpoint.searchParams.set('data.poster.type', 'url');
+            const response = await fetch(endpoint.href, { headers: { Accept: 'application/json' } });
+            if (!response.ok) throw new Error('Microlink HTTP ' + response.status);
+            const payload = await response.json();
+            if (payload.status !== 'success') throw new Error(payload.message || 'Microlink no pudo leer la ficha');
+            const data = payload.data || {};
+            const posterList = [].concat(data.poster || [], data.image || []);
+            const posterUrl = posterList.map(value => typeof value === 'string' ? value : value && value.url).find(Boolean) || '';
+            const description = extractSynopsis(data.page || data.text || '')
+                || String(data.description || '').replace(/^\s*(?:Sinopsis|Synopsis)\s*:?\s*/i, '').trim();
+            if (!description) throw new Error('Microlink no devolvio una sinopsis');
+            return {
+                title: String(data.title || ''), description,
+                year: ((String(data.title || '').match(/\b(?:19|20)\d{2}\b/)) || [])[0] || '',
+                poster: posterForDisplay(posterUrl)
             };
         };
         const readFromServer = async () => {
@@ -651,8 +683,11 @@ const Detail = {
         };
 
         const request = readFromBrowser().catch(error => {
-            console.warn('[metadata] Jina desde el navegador fallo; probando servidor:', error.message);
-            return readFromServer();
+            console.warn('[metadata] Jina Reader fallo; probando Microlink:', error.message);
+            return readFromMicrolink().catch(microlinkError => {
+                console.warn('[metadata] Microlink del navegador fallo; probando servidor:', microlinkError.message);
+                return readFromServer();
+            });
         }).then(metadata => {
             if (!item.description && metadata.description) item.description = String(metadata.description);
             if (!item.cover && metadata.poster) item.cover = posterForDisplay(metadata.poster) || String(metadata.poster);
@@ -661,6 +696,9 @@ const Detail = {
             if (this.current === item && !el.playerModal.hidden) this._updateFilmAffinityView(item);
         }).catch(error => {
             console.warn('[metadata] FilmAffinity no se pudo cargar:', error.message);
+            if (this.current === item && !el.playerModal.hidden && !item.description) {
+                el.modalDescription.innerText = 'Sin descripción disponible.';
+            }
         }).finally(() => {
             if (item._metadataRequest === request) delete item._metadataRequest;
         });
