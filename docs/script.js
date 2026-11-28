@@ -769,6 +769,8 @@ const Detail = {
     },
 
     _linkToPlayable(item, link, i) {
+        const ext = String(link.ext || item.ext || '').toLowerCase().replace(/^\./, '');
+        const browserFormats = ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov', 'quicktime'];
         return {
             id: item.id + '-l' + i,
             title: link.label,
@@ -776,8 +778,10 @@ const Detail = {
             aceUrl: link.aceUrl || '',
             tvgramUrl: link.tvgramUrl || '',
             externalUrl: link.externalUrl || '',
-            playableInBrowser: link.playableInBrowser === true,
-            ext: link.ext || '',
+            // Algunos enlaces locales pierden esta marca al normalizarse aunque
+            // el archivo sea MP4; el formato conocido debe prevalecer.
+            playableInBrowser: browserFormats.includes(ext) || link.playableInBrowser === true,
+            ext,
             thumbUrl: link.thumbUrl || item.thumbUrl
         };
     },
@@ -1194,6 +1198,7 @@ const Player = {
     _playInside(playable, parent) {
         const attempt = ++this._playAttempt;
         const isCurrentAttempt = () => this._playAttempt === attempt;
+        if (el.playerOptions) { el.playerOptions.hidden = true; el.playerOptions.innerHTML = ''; }
         el.detailHero.classList.add('playing');
         if (el.playerExit) el.playerExit.hidden = false;
         el.detailBackdrop.hidden = true;
