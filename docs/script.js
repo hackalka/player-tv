@@ -1134,6 +1134,7 @@ const ExternalPlayers = {
 /* ===== Reproductor ===== */
 const Player = {
     current: null,
+    _playAttempt: 0,
     _artListeners: [],
     _clearArtListeners() {
         if (window.ArtBridge) this._artListeners.forEach(([event, handler]) => window.ArtBridge.off(event, handler));
@@ -1191,6 +1192,8 @@ const Player = {
     },
 
     _playInside(playable, parent) {
+        const attempt = ++this._playAttempt;
+        const isCurrentAttempt = () => this._playAttempt === attempt;
         el.detailHero.classList.add('playing');
         if (el.playerExit) el.playerExit.hidden = false;
         el.detailBackdrop.hidden = true;
@@ -1204,6 +1207,19 @@ const Player = {
         if (window.ArtBridge && typeof Artplayer !== 'undefined') {
             this._clearArtListeners();
             el.playerVideo.hidden = true;
+            const listeners = [
+                ['timeupdate', () => { if (isCurrentAttempt()) this._tickArt(); }],
+                ['ended', () => {
+                    if (!isCurrentAttempt()) return;
+                    Store.clearProgress(playable.id);
+                    this.maybeNext(playable, parent);
+                }],
+                ['error', () => { if (isCurrentAttempt()) this._onInsideError(playable, parent); }],
+                ['volumechange', () => { if (isCurrentAttempt()) { try { Store.volume = window.ArtBridge.volume; } catch {} } }]
+            ];
+            // Registrar antes de load(): algunos fallos de red/formato llegan
+            // inmediatamente y, si escuchamos después, se pierden.
+            listeners.forEach(([event, handler]) => window.ArtBridge.on(event, handler));
             const ok = window.ArtBridge.load(url, {
                 title: (parent && parent.title) || playable.title || '',
                 poster: (parent && parent.poster) || playable.poster || '',
@@ -1211,31 +1227,26 @@ const Player = {
                 resume
             });
             if (ok) {
-                // Hooks: timeupdate guarda progreso, ended pasa al siguiente,
-                // error -> _onInsideError (salta a motor avanzado si procede),
-                // volumechange persiste volumen.
-                const listeners = [
-                    ['timeupdate', () => this._tickArt()],
-                    ['ended', () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); }],
-                    ['error', () => this._onInsideError(playable, parent)],
-                    ['volumechange', () => { try { Store.volume = window.ArtBridge.volume; } catch {} }]
-                ];
-                listeners.forEach(([event, handler]) => window.ArtBridge.on(event, handler));
                 this._artListeners = listeners;
                 return;
             }
+            listeners.forEach(([event, handler]) => window.ArtBridge.off(event, handler));
         }
 
         // Fallback: <video> nativo
         el.playerVideo.hidden = false;
         const v = el.playerVideo;
-        v.src = url;
         try { v.volume = Store.volume; } catch {}
-        v.onloadedmetadata = () => { if (resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
-        v.onerror = () => { this._onInsideError(playable, parent); };
-        v.ontimeupdate = () => this._tick();
+        v.onloadedmetadata = () => { if (isCurrentAttempt() && resume > 8 && resume < v.duration - 5) v.currentTime = resume; };
+        v.onerror = () => { if (isCurrentAttempt()) this._onInsideError(playable, parent); };
+        v.ontimeupdate = () => { if (isCurrentAttempt()) this._tick(); };
         v.onvolumechange = () => { Store.volume = v.volume; };
-        v.onended = () => { Store.clearProgress(playable.id); this.maybeNext(playable, parent); };
+        v.onended = () => {
+            if (!isCurrentAttempt()) return;
+            Store.clearProgress(playable.id);
+            this.maybeNext(playable, parent);
+        };
+        v.src = url;
         v.play().catch(() => {});
     },
 
@@ -1258,6 +1269,8 @@ const Player = {
     // Manejo de error al reproducir dentro: si venimos de "_playHere" saltamos al
     // motor avanzado; si no, mostramos el menú de reproductores externos.
     _onInsideError(playable, parent) {
+        // Un mismo intento puede emitir varios errores; procesar solo el primero.
+        this._playAttempt += 1;
         if (this._autoAdvanced) {
             this._autoAdvanced = false;
             if (window.MkvPlayer) { try { window.MkvPlayer.play(playable); return; } catch (e) {} }
