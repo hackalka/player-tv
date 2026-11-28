@@ -172,6 +172,7 @@ export async function onRequest({ request }) {
         return json({ error: 'Se requiere una URL válida de una ficha de FilmAffinity' }, 400, 'no-store');
     }
 
+    const failures = [];
     let response;
     try {
         response = await fetch(`https://r.jina.ai/${upstreamUrl.href}`, {
@@ -179,6 +180,7 @@ export async function onRequest({ request }) {
             cf: { cacheTtl: 86400 }
         });
     } catch (error) {
+        failures.push(`Jina: ${String(error.message || error).slice(0, 160)}`);
         console.warn('[metadata] Jina Reader no responde; usando Microlink:', error.message);
     }
 
@@ -188,9 +190,11 @@ export async function onRequest({ request }) {
             const metadata = parseFilmAffinityReaderPage(text);
             if (metadata.description) return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
         } catch (error) {
+            failures.push(`Jina: ${String(error.message || error).slice(0, 160)}`);
             console.warn('[metadata] No se pudo leer Jina Reader; usando Microlink:', error.message);
         }
     } else if (response) {
+        failures.push(`Jina HTTP ${response.status}`);
         console.warn('[metadata] Jina Reader respondió:', response.status, '; usando lectores alternativos');
     }
 
@@ -199,6 +203,7 @@ export async function onRequest({ request }) {
         if (metadata.description) return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
         throw new Error('markdown.new no devolvió una sinopsis');
     } catch (error) {
+        failures.push(`markdown.new: ${String(error.message || error).slice(0, 160)}`);
         console.warn('[metadata] markdown.new no pudo leer FilmAffinity; usando Microlink:', error.message);
     }
 
@@ -207,7 +212,8 @@ export async function onRequest({ request }) {
         if (!metadata.description) throw new Error('Microlink no devolvió una sinopsis');
         return json(metadata, 200, 'public, max-age=86400, s-maxage=86400');
     } catch (error) {
+        failures.push(`Microlink: ${String(error.message || error).slice(0, 160)}`);
         console.warn('[metadata] Tampoco se pudo leer FilmAffinity con Microlink:', error.message);
-        return json({ error: 'No se pudo obtener la sinopsis de FilmAffinity' }, 502, 'no-store');
+        return json({ error: 'No se pudo obtener la sinopsis de FilmAffinity', causes: failures }, 502, 'no-store');
     }
 }
